@@ -1,0 +1,2 @@
+Record_ID,Counter_No,Table_No,Subtotal_INR,Discount_INR,GST_5Pct_INR,Total_INR,Payment_Method,Tagged_By,Status,Timestamp
+hist-1,C23,4,340,0,17,340,UPI,app,PAID,2026-11-15T18:01:02.328Z

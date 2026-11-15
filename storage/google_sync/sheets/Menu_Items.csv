@@ -1,0 +1,8 @@
+Dish_ID,Emoji,Name_English,Name_Hindi,Name_Gujarati,Price_INR,Price_Paise,Is_Veg,Is_Jain,Available
+1,🌯,Paneer Kathi Roll,पनीर काठी रोल,પનીર કાઠી રોલ,120,12000,true,true,true
+2,🍔,Smash Chicken Burger,स्मैश चिकन बर्गर,સ્મેશ ચિકન બર્ગર,140,14000,false,false,true
+3,🍜,Schezwan Noodles,शेज़वान नूडल्स,શેઝવાન નૂડલ્સ,110,11000,true,false,true
+4,🥤,Mango Masala Cooler,मैंगो मसाला कूलर,મેંગો મસાલા કૂલર,70,7000,true,true,true
+5,🍟,Peri Peri Fries,पेरी पेरी फ्राइज़,પેરી પેરી ફ્રાઇઝ,90,9000,true,false,true
+6,🍮,Gulab Jamun Sizzler,गुलाब जामुन सिज़लर,ગુલાબ જામુન સિઝલર,80,8000,true,true,true
+7,🍲,Pasta,PAAsta,PAAASta,100,10000,true,false,true

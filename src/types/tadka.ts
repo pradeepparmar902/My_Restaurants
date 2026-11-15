@@ -1,0 +1,209 @@
+export type Language = 'en' | 'hi' | 'gu';
+export type PortalRole = 'c' | 'k' | 'w' | 'o' | 'a';
+export type StaffRoleName = 'Admin' | 'Manager' | 'Chef' | 'Waiter' | 'Reception';
+export type CustomerTab = 'menu' | 'order' | 'reward' | 'bill';
+export type WaiterTab = 'serve' | 'book';
+export type CounterMode = 'auto' | 'manual';
+export type PaymentMethod = 'UPI' | 'Card' | 'Net banking' | 'Cash at counter' | 'Cash' | 'Card machine' | 'UPI at counter';
+
+export type Permission =
+  | 'orders.kitchen'
+  | 'orders.serve'
+  | 'orders.book'
+  | 'orders.cancel'
+  | 'bills.push'
+  | 'payments.tag'
+  | 'menu.edit'
+  | 'rewards.approve'
+  | 'reports.view'
+  | 'settings.edit'
+  | 'staff.manage';
+
+export interface Dish {
+  id: number;
+  e: string;
+  p: number; // price in INR (stored in paise in DB: p * 100)
+  v: number; // 1 = veg, 0 = non-veg
+  jain?: boolean;
+  available: boolean;
+  n: {
+    en: string;
+    hi: string;
+    gu: string;
+  };
+}
+
+export interface OrderRound {
+  id: string;
+  k: number; // sequence number (Order 1, Order 2...)
+  it: Record<number, number>; // dishId -> qty
+  prices?: Record<number, number>; // snapshotted prices at order time
+  st: 1 | 2 | 3 | 4 | 5; // 1=Received, 2=Cooking, 3=Ready, 4=Delivered, 5=Cancelled
+  src: 'app' | 'waiter';
+  vip?: boolean;
+  rush?: boolean;
+  createdAt: string;
+  readyAt?: string;
+  deliveredAt?: string;
+  deliveredBy?: string;
+}
+
+export interface SessionData {
+  id: string;
+  no: string; // e.g. 'C27' or 'Pending'
+  pend?: boolean;
+  table: number;
+  mob: string;
+  waConsent?: boolean;
+  staff?: boolean; // true if created by staff
+  guestToken?: string;
+  status: 'open' | 'billed' | 'paid' | 'closed';
+  businessDate: string;
+  createdAt: string;
+}
+
+export interface StaffMember {
+  id: string;
+  n: string;
+  ph: string;
+  r: StaffRoleName;
+  mg: boolean; // Can manage access (optional for Manager)
+  extraPermissions?: Permission[];
+  on: number; // 1 = active, 0 = removed
+}
+
+export interface SampleBillRow {
+  id: string;
+  no: string;
+  t: number;
+  a: number;
+  s: string;
+  mob?: string;
+}
+
+export interface PaidBillHistoryItem {
+  id: string;
+  a: number;
+  m: string;
+  o: 'app' | 'owner';
+  counterNo?: string;
+  table?: number;
+  paidAt: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  who: string;
+  action: string;
+  what: string;
+  details: string;
+  time: string;
+}
+
+export interface DiningTable {
+  id: number;
+  label: string;
+  token: string;
+}
+
+export interface GoogleCloudStorageConfig {
+  enabled: boolean;
+  appsScriptWebAppUrl: string;
+  spreadsheetId: string;
+  driveFolderId: string;
+  lastSyncedAt?: string;
+  lastSyncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
+  lastSyncError?: string;
+}
+
+export interface DriveMediaAsset {
+  id: string;
+  name: string;
+  kind: 'reel' | 'snap' | 'dish_photo' | 'receipt_pdf';
+  mimeType: string;
+  sizeBytes: number;
+  driveFileId?: string;
+  driveViewUrl?: string;
+  caption?: string;
+  counterNo?: string;
+  uploadedBy: string;
+  createdAt: string;
+}
+
+export interface AppState {
+  // Navigation & UI
+  role: PortalRole;
+  tab: CustomerTab;
+  wtab: WaiterTab;
+  lang: Language;
+  veg: boolean;
+  jainOnly: boolean;
+  toast: string;
+
+  // Menu & Tables
+  menu: Dish[];
+  tables: DiningTable[];
+  activeTable: number;
+
+  // Cart & Ordering
+  draft: Record<number, number>;
+  cart: Record<number, number>;
+  orders: OrderRound[];
+  sess: SessionData | null;
+  status: number; // legacy overall status 0..4
+  tag: string; // 'rush' | ''
+  ctr: number; // next auto counter number (starts at 27)
+  cmode: CounterMode;
+  track: string;
+  trackRes: string;
+
+  // Waiter Booking
+  WD: Record<number, number>; // Waiter draft cart
+  M: Record<number, number>;
+
+  // Rewards, Reviews & Social
+  rating: number;
+  reel: 'wait' | 'ok' | null;
+  reelCaption: string;
+  review: boolean;
+  reviewed: boolean;
+  privateFeedback: string;
+  pts: number;
+  stars: number;
+  newStar: boolean;
+  media: 'snap' | 'reel' | null;
+  shared: boolean;
+  soc: Record<string, boolean>;
+
+  // Billing & Payments
+  billSrc: '' | 'waiter';
+  pm: PaymentMethod;
+  split: number;
+  paid: boolean;
+  cashReq: boolean;
+  wab: boolean; // Final bill on WhatsApp setting
+  waOptIn: boolean; // Customer checkbox for WhatsApp bill
+  hist: PaidBillHistoryItem[];
+  samp: SampleBillRow[];
+  spaid: number;
+
+  // Identity, Auth & Staff
+  cc: string;
+  me: {
+    mob: string;
+    name?: string;
+  };
+  lg: {
+    step: number;
+    mob: string;
+  };
+  showLogin: boolean;
+  staff: StaffMember[];
+  sf: StaffRoleName; // selected role in Give Access form
+  alr: string; // checkLogin result string
+  auditLog: AuditLogEntry[];
+
+  // Google Sheets & Google Drive Storage Integration
+  googleConfig: GoogleCloudStorageConfig;
+  driveAssets: DriveMediaAsset[];
+}

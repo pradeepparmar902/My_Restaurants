@@ -1,0 +1,5 @@
+Staff_ID,Name,Phone_E164,Role,Can_Manage_Access,Active
+st-1,Pradeep,+919800000001,Admin,true,true
+st-2,Ravi,+919800000002,Manager,false,true
+st-3,Sonal,+919800000003,Chef,false,true
+st-4,Imran,+919800000004,Waiter,false,true
