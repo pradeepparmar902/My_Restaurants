@@ -26,8 +26,8 @@ export function GoogleStorageAdminCard() {
   const {
     S,
     syncToGoogleSheets,
+    pullFromGoogleSheets,
     uploadMediaToDrive,
-    saveGoogleConfig,
     say,
   } = useTadka();
 
@@ -290,14 +290,27 @@ export function GoogleStorageAdminCard() {
               style={{ marginTop: 0, flex: 1 }}
               onClick={handleSyncNow}
             >
-              🔄 Sync All 9 Sheets Now
+              ⬆️ Push App ➔ Sheet
+            </button>
+            <button
+              className="btn alt"
+              style={{ marginTop: 0, flex: 1 }}
+              onClick={() =>
+                pullFromGoogleSheets({
+                  appsScriptWebAppUrl: webAppUrl.trim(),
+                  spreadsheetId: extractSpreadsheetIdFromUrl(sheetId),
+                  driveFolderId: extractDriveFolderIdFromUrl(folderId),
+                })
+              }
+            >
+              ⬇️ Pull Sheet ➔ App
             </button>
             <button
               className="btn ghost"
               style={{ marginTop: 0, flex: 1 }}
               onClick={() => downloadCsvClientSide(selectedTab)}
             >
-              ⬇️ Download {selectedTab}.csv
+              ⬇️ {selectedTab}.csv
             </button>
           </div>
 

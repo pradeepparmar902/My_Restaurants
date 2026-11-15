@@ -25,6 +25,11 @@ import {
   getTotal,
   normalizeMobile,
 } from '@/lib/helpers';
+import {
+  buildSheetRowsForState,
+  parseMenuFromSheetRows,
+  parseStaffFromSheetRows,
+} from '@/lib/googleSheetsShared';
 
 interface TadkaContextValue {
   S: AppState;
@@ -94,6 +99,10 @@ interface TadkaContextValue {
 
   // Google Sheets & Google Drive Storage
   syncToGoogleSheets: (overrideConfig?: Partial<AppState['googleConfig']>) => Promise<void>;
+  pullFromGoogleSheets: (
+    overrideConfig?: Partial<AppState['googleConfig']>,
+    silent?: boolean
+  ) => Promise<void>;
   uploadMediaToDrive: (payload: {
     fileName: string;
     kind: 'reel' | 'snap' | 'dish_photo' | 'receipt_pdf';
@@ -180,6 +189,22 @@ export function TadkaProvider({
           channelRef.current?.postMessage({ type: 'STATE_SYNC', payload: finalState });
           // Background auto-sync to Google Sheets & local CSV mirror
           if (finalState.googleConfig?.enabled) {
+            const webhookUrl = finalState.googleConfig.appsScriptWebAppUrl || '';
+            if (webhookUrl.startsWith('https://script.google.com/')) {
+              const sheetsPayload = buildSheetRowsForState(finalState);
+              fetch(webhookUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                  action: 'SYNC_ALL_SHEETS',
+                  spreadsheetId: finalState.googleConfig.spreadsheetId,
+                  driveFolderId: finalState.googleConfig.driveFolderId,
+                  sheets: sheetsPayload,
+                  timestamp: new Date().toISOString(),
+                }),
+              }).catch(() => {});
+            }
             fetch('/api/storage/sheets', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1117,6 +1142,87 @@ export function TadkaProvider({
     [say, updateState]
   );
 
+  const pullFromGoogleSheets = useCallback(
+    async (
+      overrideConfig?: Partial<AppState['googleConfig']>,
+      silent = false
+    ) => {
+      const mergedConfig = {
+        ...S.googleConfig,
+        ...(overrideConfig || {}),
+      };
+      const webhookUrl = (mergedConfig.appsScriptWebAppUrl || '').trim();
+      if (!webhookUrl.startsWith('https://script.google.com/')) {
+        if (!silent) {
+          say('Paste your Google Apps Script URL first to pull from Google Sheet');
+        }
+        return;
+      }
+
+      try {
+        const query = mergedConfig.spreadsheetId
+          ? `?spreadsheetId=${encodeURIComponent(mergedConfig.spreadsheetId)}`
+          : '';
+        const res = await fetch(`${webhookUrl}${query}`, {
+          method: 'GET',
+          redirect: 'follow',
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        if (data && data.ok && data.sheets) {
+          const remoteMenu = parseMenuFromSheetRows(data.sheets.Menu_Items);
+          const remoteStaff = parseStaffFromSheetRows(data.sheets.Staff_Access);
+
+          setS((prev) => {
+            const nextState: AppState = {
+              ...prev,
+              menu: remoteMenu || prev.menu,
+              staff: remoteStaff || prev.staff,
+              googleConfig: {
+                ...mergedConfig,
+                lastSyncedAt: new Date().toISOString(),
+                lastSyncStatus: 'synced',
+                lastSyncError: undefined,
+              },
+            };
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+            } catch {
+              // ignore
+            }
+            return nextState;
+          });
+
+          if (!silent) {
+            say(
+              `Pulled ${remoteMenu ? remoteMenu.length : S.menu.length} menu items & staff from Google Sheet ✅`
+            );
+          }
+        }
+      } catch {
+        if (!silent) {
+          say(
+            'Could not pull from Google Sheet — ensure your Apps Script has doGet(e) and is deployed to Anyone'
+          );
+        }
+      }
+    },
+    [S.googleConfig, S.menu.length, say]
+  );
+
+  // Auto-pull latest Menu & Staff from Google Sheet when app opens (if URL is configured)
+  useEffect(() => {
+    if (
+      isHydratedRef.current &&
+      S.googleConfig?.appsScriptWebAppUrl?.startsWith('https://script.google.com/')
+    ) {
+      pullFromGoogleSheets(undefined, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <TadkaContext.Provider
       value={{
@@ -1167,6 +1273,7 @@ export function TadkaProvider({
         setActiveTable,
         resetDemoState,
         syncToGoogleSheets,
+        pullFromGoogleSheets,
         uploadMediaToDrive,
         saveGoogleConfig,
       }}

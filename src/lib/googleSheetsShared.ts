@@ -1,4 +1,4 @@
-import { AppState } from '@/types/tadka';
+import { AppState, Dish, StaffMember, StaffRoleName } from '@/types/tadka';
 import { getSubtotal, getDiscount, getGST, getTotal } from '@/lib/helpers';
 
 export type SheetTabName =
@@ -273,8 +273,54 @@ export function extractDriveFolderIdFromUrl(raw: string): string {
   return trimmed;
 }
 
+export function parseMenuFromSheetRows(rows: unknown[][]): Dish[] | null {
+  if (!Array.isArray(rows) || rows.length <= 1) return null;
+  const dishes: Dish[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r[2]) continue;
+    const id = Number(r[0]) || i;
+    const e = String(r[1] || '🍲');
+    const en = String(r[2] || '').trim();
+    const hi = String(r[3] || en).trim();
+    const gu = String(r[4] || en).trim();
+    const p = Number(r[5]) || 100;
+    const v = String(r[7]).toLowerCase() === 'false' || r[7] === 0 ? 0 : 1;
+    const jain = String(r[8]).toLowerCase() === 'true' || r[8] === true;
+    const available = String(r[9]).toLowerCase() !== 'false';
+    dishes.push({
+      id,
+      e,
+      p,
+      v,
+      jain,
+      available,
+      n: { en, hi, gu },
+    });
+  }
+  return dishes.length > 0 ? dishes : null;
+}
+
+export function parseStaffFromSheetRows(rows: unknown[][]): StaffMember[] | null {
+  if (!Array.isArray(rows) || rows.length <= 1) return null;
+  const staff: StaffMember[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r[1] || !r[2]) continue;
+    staff.push({
+      id: String(r[0] || `st-${i}`),
+      n: String(r[1]).trim(),
+      ph: String(r[2]).trim(),
+      r: (String(r[3] || 'Waiter').trim() as StaffRoleName),
+      mg: String(r[4]).toLowerCase() === 'true' || r[4] === true,
+      on: String(r[5]).toLowerCase() === 'false' ? 0 : 1,
+    });
+  }
+  return staff.length > 0 ? staff : null;
+}
+
 export const GOOGLE_APPS_SCRIPT_TEMPLATE = `/**
- * Tadka Restaurant Growth Platform — Google Sheets & Google Drive Storage Bridge
+ * Tadka Restaurant Growth Platform — 2-Way Google Sheets & Google Drive Storage Bridge
  * 
  * Setup Instructions (2 minutes, no GCP billing required):
  * 1. Create a new Google Sheet and open Extensions -> Apps Script.
@@ -291,6 +337,32 @@ function extractId(rawOrUrl, pattern) {
   return m && m[1] ? m[1] : str;
 }
 
+// 1. PULL FROM GOOGLE SHEET -> APP (2-Way Read)
+function doGet(e) {
+  try {
+    var sheetId = e && e.parameter && e.parameter.spreadsheetId
+      ? extractId(e.parameter.spreadsheetId, /\\/spreadsheets\\/d\\/([a-zA-Z0-9-_]+)/)
+      : '';
+    var ss = sheetId
+      ? SpreadsheetApp.openById(sheetId)
+      : SpreadsheetApp.getActiveSpreadsheet();
+
+    var result = {};
+    ss.getSheets().forEach(function(sheet) {
+      result[sheet.getName()] = sheet.getDataRange().getValues();
+    });
+
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: true,
+      sheets: result
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// 2. PUSH FROM APP -> GOOGLE SHEET & DRIVE (2-Way Write)
 function doPost(e) {
   try {
     var payload = JSON.parse(e.postData.contents);
