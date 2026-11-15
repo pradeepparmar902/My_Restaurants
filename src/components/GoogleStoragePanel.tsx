@@ -42,23 +42,27 @@ export function GoogleStorageAdminCard() {
     S.googleConfig?.appsScriptWebAppUrl || ''
   );
   const [sheetId, setSheetId] = useState(
-    S.googleConfig?.spreadsheetId || ''
+    S.googleConfig?.spreadsheetId || '17E4TMRaEc_VoAE0qajaIsgPiJpuJWDGPECR-RJRwTCs'
   );
   const [folderId, setFolderId] = useState(
     S.googleConfig?.driveFolderId || ''
   );
 
   useEffect(() => {
-    if (S.googleConfig?.appsScriptWebAppUrl && !webAppUrl) {
+    if (S.googleConfig?.appsScriptWebAppUrl) {
       setWebAppUrl(S.googleConfig.appsScriptWebAppUrl);
     }
-    if (S.googleConfig?.spreadsheetId && !sheetId) {
+    if (S.googleConfig?.spreadsheetId) {
       setSheetId(S.googleConfig.spreadsheetId);
     }
-    if (S.googleConfig?.driveFolderId && !folderId) {
+    if (S.googleConfig?.driveFolderId) {
       setFolderId(S.googleConfig.driveFolderId);
     }
-  }, [S.googleConfig, webAppUrl, sheetId, folderId]);
+  }, [
+    S.googleConfig?.appsScriptWebAppUrl,
+    S.googleConfig?.spreadsheetId,
+    S.googleConfig?.driveFolderId,
+  ]);
 
   const allSheets = buildSheetRowsForState(S);
   const activeRows = allSheets[selectedTab] || [];
@@ -269,7 +273,17 @@ export function GoogleStorageAdminCard() {
             <div className="row" style={{ marginTop: '8px' }}>
               <input
                 value={webAppUrl}
-                onChange={(e) => setWebAppUrl(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setWebAppUrl(val);
+                  updateState((prev) => ({
+                    ...prev,
+                    googleConfig: {
+                      ...prev.googleConfig,
+                      appsScriptWebAppUrl: val.trim(),
+                    },
+                  }));
+                }}
                 placeholder="Paste https://script.google.com/macros/s/.../exec here"
                 className="inp"
               />
@@ -277,13 +291,33 @@ export function GoogleStorageAdminCard() {
             <div className="row" style={{ marginTop: '6px' }}>
               <input
                 value={sheetId}
-                onChange={(e) => setSheetId(e.target.value)}
-                placeholder="Spreadsheet ID from URL (optional)"
+                onChange={(e) => {
+                  const cleaned = extractSpreadsheetIdFromUrl(e.target.value);
+                  setSheetId(cleaned);
+                  updateState((prev) => ({
+                    ...prev,
+                    googleConfig: {
+                      ...prev.googleConfig,
+                      spreadsheetId: cleaned,
+                    },
+                  }));
+                }}
+                placeholder="Spreadsheet ID or URL"
                 className="inp"
               />
               <input
                 value={folderId}
-                onChange={(e) => setFolderId(e.target.value)}
+                onChange={(e) => {
+                  const cleaned = extractDriveFolderIdFromUrl(e.target.value);
+                  setFolderId(cleaned);
+                  updateState((prev) => ({
+                    ...prev,
+                    googleConfig: {
+                      ...prev.googleConfig,
+                      driveFolderId: cleaned,
+                    },
+                  }));
+                }}
                 placeholder="Drive Folder ID (optional)"
                 className="inp"
               />

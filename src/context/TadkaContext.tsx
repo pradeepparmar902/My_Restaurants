@@ -12,7 +12,7 @@ import {
   StaffRoleName,
   Dish,
 } from '@/types/tadka';
-import { INITIAL_STATE } from '@/lib/constants';
+import { INITIAL_STATE, DEFAULT_GOOGLE_SHEET_ID } from '@/lib/constants';
 import {
   cleanCounterNumber,
   filterPositiveItems,
@@ -147,6 +147,12 @@ export function TadkaProvider({
         setS((prev) => ({
           ...prev,
           ...parsed,
+          googleConfig: {
+            ...prev.googleConfig,
+            ...(parsed.googleConfig || {}),
+            spreadsheetId:
+              parsed.googleConfig?.spreadsheetId || DEFAULT_GOOGLE_SHEET_ID,
+          },
           activeTable: initialTableId || parsed.activeTable || prev.activeTable,
           toast: '',
         }));
@@ -1385,14 +1391,12 @@ export function TadkaProvider({
     [S.googleConfig, say]
   );
 
-  // Auto-pull latest Menu & Staff from Google Sheet when app opens (if URL is configured)
+  // Auto-pull latest Menu & Staff from Google Sheet when app opens
   useEffect(() => {
-    if (
-      isHydratedRef.current &&
-      S.googleConfig?.appsScriptWebAppUrl?.startsWith('https://script.google.com/')
-    ) {
-      pullFromGoogleSheets(undefined, true);
-    }
+    const timer = setTimeout(() => {
+      pullFromGoogleSheets({ spreadsheetId: DEFAULT_GOOGLE_SHEET_ID }, true);
+    }, 300);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

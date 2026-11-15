@@ -131,6 +131,8 @@ export const SOCIAL_PLATFORMS: [string, string][] = [
   ['Facebook', '📘'],
 ];
 
+export const DEFAULT_GOOGLE_SHEET_ID = '17E4TMRaEc_VoAE0qajaIsgPiJpuJWDGPECR-RJRwTCs';
+
 export const INITIAL_STATE: AppState = {
   role: 'c',
   tab: 'menu',
@@ -207,7 +209,7 @@ export const INITIAL_STATE: AppState = {
   googleConfig: {
     enabled: true,
     appsScriptWebAppUrl: process.env.NEXT_PUBLIC_GOOGLE_APPS_SCRIPT_URL || '',
-    spreadsheetId: process.env.NEXT_PUBLIC_GOOGLE_SHEET_ID || '',
+    spreadsheetId: process.env.NEXT_PUBLIC_GOOGLE_SHEET_ID || DEFAULT_GOOGLE_SHEET_ID,
     driveFolderId: process.env.NEXT_PUBLIC_GOOGLE_DRIVE_FOLDER_ID || '',
     lastSyncedAt: new Date().toISOString(),
     lastSyncStatus: 'synced',
