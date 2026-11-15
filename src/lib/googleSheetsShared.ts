@@ -389,7 +389,7 @@ function extractId(rawOrUrl, pattern) {
   return m && m[1] ? m[1] : str;
 }
 
-// 1. PULL FROM GOOGLE SHEET -> APP (2-Way Read)
+// 1. PULL FROM GOOGLE SHEET -> APP (Supports both Fetch JSON and JSONP ?callback=...)
 function doGet(e) {
   try {
     var sheetId = e && e.parameter && e.parameter.spreadsheetId
@@ -404,12 +404,25 @@ function doGet(e) {
       result[sheet.getName()] = sheet.getDataRange().getValues();
     });
 
-    return ContentService.createTextOutput(JSON.stringify({
+    var jsonStr = JSON.stringify({
       ok: true,
       sheets: result
-    })).setMimeType(ContentService.MimeType.JSON);
+    });
+
+    if (e && e.parameter && e.parameter.callback) {
+      return ContentService.createTextOutput(e.parameter.callback + '(' + jsonStr + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+
+    return ContentService.createTextOutput(jsonStr)
+      .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+    var errStr = JSON.stringify({ ok: false, error: String(err) });
+    if (e && e.parameter && e.parameter.callback) {
+      return ContentService.createTextOutput(e.parameter.callback + '(' + errStr + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(errStr)
       .setMimeType(ContentService.MimeType.JSON);
   }
 }

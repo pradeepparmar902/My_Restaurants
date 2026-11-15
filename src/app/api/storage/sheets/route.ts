@@ -32,31 +32,32 @@ export async function GET(req: NextRequest) {
     let pulledSheets: Record<string, unknown[][]> | null = null;
     let lastErr = '';
 
-    // Strategy 1: Direct Google Sheet gviz CSV fetch if spreadsheetId is provided (works without redeployment if sheet is shared)
+    // Strategy 1: Direct Google Sheet CSV export / gviz fetch if spreadsheetId is provided
     if (cleanSheetId) {
-      try {
-        const menuCsvUrl = `https://docs.google.com/spreadsheets/d/${cleanSheetId}/gviz/tq?tqx=out:csv&sheet=Menu_Items`;
-        const staffCsvUrl = `https://docs.google.com/spreadsheets/d/${cleanSheetId}/gviz/tq?tqx=out:csv&sheet=Staff_Access`;
-        const [menuRes, staffRes] = await Promise.all([
-          fetch(menuCsvUrl, { cache: 'no-store' }),
-          fetch(staffCsvUrl, { cache: 'no-store' }),
-        ]);
-        if (menuRes.ok) {
-          const menuText = await menuRes.text();
-          if (!menuText.includes('<!DOCTYPE html>') && !menuText.includes('ServiceLogin')) {
-            pulledSheets = {
-              Menu_Items: parseCsvToRows(menuText),
-            };
-            if (staffRes.ok) {
-              const staffText = await staffRes.text();
-              if (!staffText.includes('<!DOCTYPE html>')) {
-                pulledSheets.Staff_Access = parseCsvToRows(staffText);
-              }
+      const candidateUrls = [
+        `https://docs.google.com/spreadsheets/d/${cleanSheetId}/export?format=csv`,
+        `https://docs.google.com/spreadsheets/d/${cleanSheetId}/gviz/tq?tqx=out:csv&sheet=Menu_Items`,
+      ];
+      for (const url of candidateUrls) {
+        try {
+          const menuRes = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+          if (menuRes.ok) {
+            const menuText = await menuRes.text();
+            if (
+              menuText &&
+              !menuText.includes('<!DOCTYPE html>') &&
+              !menuText.includes('ServiceLogin') &&
+              menuText.includes('Dish_ID')
+            ) {
+              pulledSheets = {
+                Menu_Items: parseCsvToRows(menuText),
+              };
+              break;
             }
           }
+        } catch (e) {
+          lastErr = (e as Error).message;
         }
-      } catch (e) {
-        lastErr = (e as Error).message;
       }
     }
 

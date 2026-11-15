@@ -1195,23 +1195,109 @@ export function TadkaProvider({
         // Ignore if running on static GitHub Pages without /api
       }
 
-      // 2. Fallback: Direct Google Sheet gviz CSV fetch from browser (works on GitHub Pages if sheet is shared "Anyone with link")
-      if (!pulledMenu && cleanSheetId) {
-        try {
-          const menuCsvUrl = `https://docs.google.com/spreadsheets/d/${cleanSheetId}/gviz/tq?tqx=out:csv&sheet=Menu_Items`;
-          const csvRes = await fetch(menuCsvUrl, { cache: 'no-store' });
-          if (csvRes.ok) {
-            const csvText = await csvRes.text();
-            if (!csvText.includes('<!DOCTYPE html>') && !csvText.includes('ServiceLogin')) {
-              pulledMenu = parseMenuFromSheetRows(parseCsvToRows(csvText));
-            }
+      // 2. Fallback: Browser JSONP <script> injection to Google Sheet gviz API (works on GitHub Pages & localhost with zero CORS restriction!)
+      if (!pulledMenu && cleanSheetId && typeof window !== 'undefined') {
+        pulledMenu = await new Promise<Dish[] | null>((resolve) => {
+          const cbName = `__tadkaGvizCb_${Date.now()}`;
+          const script = document.createElement('script');
+          const timer = setTimeout(() => {
+            cleanup();
+            resolve(null);
+          }, 5000);
+
+          function cleanup() {
+            clearTimeout(timer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            delete (window as any)[cbName];
+            script.remove();
           }
-        } catch {
-          // Ignore CORS error if sheet is private
-        }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any)[cbName] = (resp: any) => {
+            cleanup();
+            try {
+              if (resp && resp.table && Array.isArray(resp.table.rows)) {
+                const header = (resp.table.cols || []).map(
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (c: any, idx: number) => c.label || `Col${idx}`
+                );
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const dataRows = resp.table.rows.map((r: any) =>
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (r.c || []).map((cell: any) => (cell ? cell.v ?? '' : ''))
+                );
+                const combined = [header, ...dataRows];
+                const parsed = parseMenuFromSheetRows(combined);
+                resolve(parsed);
+                return;
+              }
+            } catch {
+              // ignore
+            }
+            resolve(null);
+          };
+
+          script.src = `https://docs.google.com/spreadsheets/d/${cleanSheetId}/gviz/tq?sheet=Menu_Items&tqx=responseHandler:${cbName}`;
+          script.onerror = () => {
+            cleanup();
+            resolve(null);
+          };
+          document.body.appendChild(script);
+        });
       }
 
-      // 3. Fallback: Direct Apps Script GET / POST from browser (works on GitHub Pages when updated Code.gs is deployed as New Version)
+      // 3. Fallback: Browser JSONP <script> injection to Apps Script Web App URL (bypasses CORS on GitHub Pages!)
+      if (
+        !pulledMenu &&
+        webhookUrl.startsWith('https://script.google.com/') &&
+        typeof window !== 'undefined'
+      ) {
+        const jsonpResult = await new Promise<{
+          menu: Dish[] | null;
+          staff: AppState['staff'] | null;
+        }>((resolve) => {
+          const cbName = `__tadkaScriptCb_${Date.now()}`;
+          const script = document.createElement('script');
+          const timer = setTimeout(() => {
+            cleanup();
+            resolve({ menu: null, staff: null });
+          }, 6000);
+
+          function cleanup() {
+            clearTimeout(timer);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            delete (window as any)[cbName];
+            script.remove();
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any)[cbName] = (data: any) => {
+            cleanup();
+            if (data && data.ok && data.sheets) {
+              resolve({
+                menu: parseMenuFromSheetRows(data.sheets.Menu_Items || []),
+                staff: parseStaffFromSheetRows(data.sheets.Staff_Access || []),
+              });
+            } else {
+              resolve({ menu: null, staff: null });
+            }
+          };
+
+          const sep = webhookUrl.includes('?') ? '&' : '?';
+          script.src = `${webhookUrl}${sep}callback=${cbName}&spreadsheetId=${encodeURIComponent(
+            cleanSheetId
+          )}&t=${Date.now()}`;
+          script.onerror = () => {
+            cleanup();
+            resolve({ menu: null, staff: null });
+          };
+          document.body.appendChild(script);
+        });
+        if (jsonpResult.menu) pulledMenu = jsonpResult.menu;
+        if (jsonpResult.staff) pulledStaff = jsonpResult.staff;
+      }
+
+      // 4. Fallback: Direct Apps Script GET / POST from browser
       if (!pulledMenu && webhookUrl.startsWith('https://script.google.com/')) {
         try {
           const query = cleanSheetId
