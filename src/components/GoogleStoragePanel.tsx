@@ -7,6 +7,8 @@ import {
   extractDriveFolderIdFromUrl,
   extractSpreadsheetIdFromUrl,
   GOOGLE_APPS_SCRIPT_TEMPLATE,
+  parseCsvToRows,
+  parseMenuFromSheetRows,
   SheetTabName,
 } from '@/lib/googleSheetsShared';
 
@@ -25,6 +27,7 @@ const SHEET_TABS: SheetTabName[] = [
 export function GoogleStorageAdminCard() {
   const {
     S,
+    updateState,
     syncToGoogleSheets,
     pullFromGoogleSheets,
     uploadMediaToDrive,
@@ -135,6 +138,24 @@ export function GoogleStorageAdminCard() {
       });
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleImportCsvFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === 'string' ? reader.result : '';
+      const rows = parseCsvToRows(text);
+      const parsedMenu = parseMenuFromSheetRows(rows);
+      if (parsedMenu && parsedMenu.length > 0) {
+        updateState((prev) => ({ ...prev, menu: parsedMenu }));
+        say(`Imported ${parsedMenu.length} dishes from CSV into App ✅`);
+      } else {
+        say('Could not parse Menu_Items from that CSV file');
+      }
+    };
+    reader.readAsText(file);
   };
 
   const isCloudConnected = Boolean(
@@ -312,6 +333,23 @@ export function GoogleStorageAdminCard() {
             >
               ⬇️ {selectedTab}.csv
             </button>
+            <label
+              className="btn ghost"
+              style={{
+                marginTop: 0,
+                flex: 1,
+                textAlign: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              📂 Import Menu CSV
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleImportCsvFile}
+                style={{ display: 'none' }}
+              />
+            </label>
           </div>
 
           {/* Live Google Sheet Tabs Explorer */}

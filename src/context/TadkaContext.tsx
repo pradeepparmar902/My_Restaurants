@@ -27,6 +27,8 @@ import {
 } from '@/lib/helpers';
 import {
   buildSheetRowsForState,
+  extractSpreadsheetIdFromUrl,
+  parseCsvToRows,
   parseMenuFromSheetRows,
   parseStaffFromSheetRows,
 } from '@/lib/googleSheetsShared';
@@ -1152,64 +1154,149 @@ export function TadkaProvider({
         ...(overrideConfig || {}),
       };
       const webhookUrl = (mergedConfig.appsScriptWebAppUrl || '').trim();
-      if (!webhookUrl.startsWith('https://script.google.com/')) {
+      const cleanSheetId = extractSpreadsheetIdFromUrl(
+        mergedConfig.spreadsheetId || ''
+      );
+
+      if (!webhookUrl.startsWith('https://script.google.com/') && !cleanSheetId) {
         if (!silent) {
-          say('Paste your Google Apps Script URL first to pull from Google Sheet');
+          say('Paste your Google Apps Script URL or Spreadsheet link first');
         }
         return;
       }
 
+      if (!silent) {
+        say('⏳ Pulling latest Menu & Staff from Google Sheet…');
+      }
+
+      let pulledMenu: Dish[] | null = null;
+      let pulledStaff: AppState['staff'] | null = null;
+
+      // 1. Try Server Proxy (/api/storage/sheets?pull=1) — avoids all browser CORS redirect issues on localhost
       try {
-        const query = mergedConfig.spreadsheetId
-          ? `?spreadsheetId=${encodeURIComponent(mergedConfig.spreadsheetId)}`
-          : '';
-        const res = await fetch(`${webhookUrl}${query}`, {
-          method: 'GET',
-          redirect: 'follow',
+        const params = new URLSearchParams({
+          pull: '1',
+          appsScriptUrl: webhookUrl,
+          spreadsheetId: cleanSheetId,
         });
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        const data = await res.json();
-        if (data && data.ok && data.sheets) {
-          const remoteMenu = parseMenuFromSheetRows(data.sheets.Menu_Items);
-          const remoteStaff = parseStaffFromSheetRows(data.sheets.Staff_Access);
-
-          setS((prev) => {
-            const nextState: AppState = {
-              ...prev,
-              menu: remoteMenu || prev.menu,
-              staff: remoteStaff || prev.staff,
-              googleConfig: {
-                ...mergedConfig,
-                lastSyncedAt: new Date().toISOString(),
-                lastSyncStatus: 'synced',
-                lastSyncError: undefined,
-              },
-            };
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
-            } catch {
-              // ignore
-            }
-            return nextState;
-          });
-
-          if (!silent) {
-            say(
-              `Pulled ${remoteMenu ? remoteMenu.length : S.menu.length} menu items & staff from Google Sheet ✅`
+        const apiRes = await fetch(`/api/storage/sheets?${params.toString()}`, {
+          cache: 'no-store',
+        });
+        if (apiRes.ok) {
+          const apiData = await apiRes.json();
+          if (apiData.ok && apiData.sheets) {
+            pulledMenu = parseMenuFromSheetRows(apiData.sheets.Menu_Items || []);
+            pulledStaff = parseStaffFromSheetRows(
+              apiData.sheets.Staff_Access || []
             );
           }
         }
       } catch {
-        if (!silent) {
-          say(
-            'Could not pull from Google Sheet — ensure your Apps Script has doGet(e) and is deployed to Anyone'
-          );
+        // Ignore if running on static GitHub Pages without /api
+      }
+
+      // 2. Fallback: Direct Google Sheet gviz CSV fetch from browser (works on GitHub Pages if sheet is shared "Anyone with link")
+      if (!pulledMenu && cleanSheetId) {
+        try {
+          const menuCsvUrl = `https://docs.google.com/spreadsheets/d/${cleanSheetId}/gviz/tq?tqx=out:csv&sheet=Menu_Items`;
+          const csvRes = await fetch(menuCsvUrl, { cache: 'no-store' });
+          if (csvRes.ok) {
+            const csvText = await csvRes.text();
+            if (!csvText.includes('<!DOCTYPE html>') && !csvText.includes('ServiceLogin')) {
+              pulledMenu = parseMenuFromSheetRows(parseCsvToRows(csvText));
+            }
+          }
+        } catch {
+          // Ignore CORS error if sheet is private
         }
       }
+
+      // 3. Fallback: Direct Apps Script GET / POST from browser (works on GitHub Pages when updated Code.gs is deployed as New Version)
+      if (!pulledMenu && webhookUrl.startsWith('https://script.google.com/')) {
+        try {
+          const query = cleanSheetId
+            ? `?spreadsheetId=${encodeURIComponent(cleanSheetId)}&t=${Date.now()}`
+            : `?t=${Date.now()}`;
+          const res = await fetch(`${webhookUrl}${query}`, {
+            method: 'GET',
+            redirect: 'follow',
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.ok && data.sheets) {
+              pulledMenu = parseMenuFromSheetRows(data.sheets.Menu_Items || []);
+              pulledStaff = parseStaffFromSheetRows(
+                data.sheets.Staff_Access || []
+              );
+            }
+          }
+        } catch {
+          // Try POST PULL_ALL_SHEETS
+          try {
+            const postRes = await fetch(webhookUrl, {
+              method: 'POST',
+              redirect: 'follow',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({
+                action: 'PULL_ALL_SHEETS',
+                spreadsheetId: cleanSheetId,
+              }),
+            });
+            if (postRes.ok) {
+              const data = await postRes.json();
+              if (data && data.ok && data.sheets) {
+                pulledMenu = parseMenuFromSheetRows(
+                  data.sheets.Menu_Items || []
+                );
+                pulledStaff = parseStaffFromSheetRows(
+                  data.sheets.Staff_Access || []
+                );
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      if (pulledMenu && pulledMenu.length > 0) {
+        setS((prev) => {
+          const nextState: AppState = {
+            ...prev,
+            menu: pulledMenu!,
+            staff: pulledStaff || prev.staff,
+            googleConfig: {
+              ...mergedConfig,
+              spreadsheetId: cleanSheetId,
+              lastSyncedAt: new Date().toISOString(),
+              lastSyncStatus: 'synced',
+              lastSyncError: undefined,
+            },
+          };
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+            channelRef.current?.postMessage({
+              type: 'STATE_SYNC',
+              payload: nextState,
+            });
+          } catch {
+            // ignore
+          }
+          return nextState;
+        });
+
+        if (!silent) {
+          say(
+            `Pulled ${pulledMenu.length} menu items from Google Sheet ✅`
+          );
+        }
+      } else if (!silent) {
+        say(
+          'To pull from Sheet: either paste your Google Sheet link/ID & set Share -> "Anyone with link", OR redeploy Apps Script as a New Version'
+        );
+      }
     },
-    [S.googleConfig, S.menu.length, say]
+    [S.googleConfig, say]
   );
 
   // Auto-pull latest Menu & Staff from Google Sheet when app opens (if URL is configured)

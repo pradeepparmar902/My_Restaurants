@@ -273,6 +273,54 @@ export function extractDriveFolderIdFromUrl(raw: string): string {
   return trimmed;
 }
 
+export function parseCsvToRows(csvText: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < csvText.length; i++) {
+    const ch = csvText[i];
+    const next = csvText[i + 1];
+
+    if (inQuotes) {
+      if (ch === '"' && next === '"') {
+        current += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        row.push(current);
+        current = '';
+      } else if (ch === '\r' && next === '\n') {
+        row.push(current);
+        rows.push(row);
+        row = [];
+        current = '';
+        i++;
+      } else if (ch === '\n' || ch === '\r') {
+        row.push(current);
+        rows.push(row);
+        row = [];
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+  }
+  if (current.length > 0 || row.length > 0) {
+    row.push(current);
+    rows.push(row);
+  }
+  return rows;
+}
+
 export function parseMenuFromSheetRows(rows: unknown[][]): Dish[] | null {
   if (!Array.isArray(rows) || rows.length <= 1) return null;
   const dishes: Dish[] = [];
@@ -280,14 +328,18 @@ export function parseMenuFromSheetRows(rows: unknown[][]): Dish[] | null {
     const r = rows[i];
     if (!r || !r[2]) continue;
     const id = Number(r[0]) || i;
-    const e = String(r[1] || '🍲');
+    const e = String(r[1] || '🍲').trim();
     const en = String(r[2] || '').trim();
+    if (!en) continue;
     const hi = String(r[3] || en).trim();
     const gu = String(r[4] || en).trim();
-    const p = Number(r[5]) || 100;
-    const v = String(r[7]).toLowerCase() === 'false' || r[7] === 0 ? 0 : 1;
-    const jain = String(r[8]).toLowerCase() === 'true' || r[8] === true;
-    const available = String(r[9]).toLowerCase() !== 'false';
+    const p = Number(String(r[5] || '100').replace(/[^0-9.]/g, '')) || 100;
+    const vRaw = String(r[7] ?? 'true').trim().toLowerCase();
+    const v = vRaw === 'false' || vRaw === '0' || vRaw === 'no' ? 0 : 1;
+    const jainRaw = String(r[8] ?? 'false').trim().toLowerCase();
+    const jain = jainRaw === 'true' || jainRaw === '1' || jainRaw === 'yes';
+    const availRaw = String(r[9] ?? 'true').trim().toLowerCase();
+    const available = availRaw !== 'false' && availRaw !== '0' && availRaw !== 'no';
     dishes.push({
       id,
       e,
@@ -367,6 +419,21 @@ function doPost(e) {
   try {
     var payload = JSON.parse(e.postData.contents);
     var action = payload.action;
+
+    if (action === 'PULL_ALL_SHEETS') {
+      var pullSheetId = extractId(payload.spreadsheetId, /\\/spreadsheets\\/d\\/([a-zA-Z0-9-_]+)/);
+      var pullSs = pullSheetId
+        ? SpreadsheetApp.openById(pullSheetId)
+        : SpreadsheetApp.getActiveSpreadsheet();
+      var pullResult = {};
+      pullSs.getSheets().forEach(function(sheet) {
+        pullResult[sheet.getName()] = sheet.getDataRange().getValues();
+      });
+      return ContentService.createTextOutput(JSON.stringify({
+        ok: true,
+        sheets: pullResult
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
 
     if (action === 'SYNC_ALL_SHEETS') {
       var sheetId = extractId(payload.spreadsheetId, /\\/spreadsheets\\/d\\/([a-zA-Z0-9-_]+)/);
