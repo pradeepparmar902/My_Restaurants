@@ -3,6 +3,13 @@ import { TadkaProvider } from '@/context/TadkaContext';
 import { TadkaShell } from '@/components/TadkaShell';
 import { INITIAL_TABLES } from '@/lib/constants';
 
+export function generateStaticParams() {
+  return INITIAL_TABLES.map((t) => ({
+    restaurant: 'tadka-truck',
+    tableToken: t.token,
+  }));
+}
+
 export default async function TableQrLandingPage({
   params,
 }: {

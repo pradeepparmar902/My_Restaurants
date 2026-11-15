@@ -60,6 +60,29 @@ export function GoogleStorageAdminCard() {
   const allSheets = buildSheetRowsForState(S);
   const activeRows = allSheets[selectedTab] || [];
 
+  const downloadCsvClientSide = (tabName: SheetTabName) => {
+    const rows = allSheets[tabName] || [];
+    const csv = rows
+      .map((r) =>
+        r
+          .map((c) => {
+            const s = String(c ?? '');
+            return s.includes(',') || s.includes('"') || s.includes('\n')
+              ? `"${s.replace(/"/g, '""')}"`
+              : s;
+          })
+          .join(',')
+      )
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Tadka_${tabName}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleSyncNow = async () => {
     const cleanedSheetId = extractSpreadsheetIdFromUrl(sheetId);
     const cleanedFolderId = extractDriveFolderIdFromUrl(folderId);
@@ -269,20 +292,13 @@ export function GoogleStorageAdminCard() {
             >
               🔄 Sync All 9 Sheets Now
             </button>
-            <a
-              href={`/api/storage/sheets?format=csv&tab=${selectedTab}`}
-              download={`Tadka_${selectedTab}.csv`}
+            <button
               className="btn ghost"
-              style={{
-                marginTop: 0,
-                flex: 1,
-                textAlign: 'center',
-                textDecoration: 'none',
-                display: 'inline-block',
-              }}
+              style={{ marginTop: 0, flex: 1 }}
+              onClick={() => downloadCsvClientSide(selectedTab)}
             >
               ⬇️ Download {selectedTab}.csv
-            </a>
+            </button>
           </div>
 
           {/* Live Google Sheet Tabs Explorer */}
