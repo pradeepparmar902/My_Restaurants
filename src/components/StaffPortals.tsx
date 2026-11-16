@@ -4,7 +4,13 @@ import React, { useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import { StaffRoleName } from '@/types/tadka';
 import { ROLE_DESCRIPTIONS } from '@/lib/constants';
-import { getCurrentBusinessDate, getSessionRowStatus } from '@/lib/helpers';
+import {
+  getCurrentBusinessDate,
+  getDiscount,
+  getSessionRowStatus,
+  getSubtotal,
+  getTotal,
+} from '@/lib/helpers';
 import {
   CountryCodeMobileInput,
   TagOfflinePaidWidget,
@@ -362,15 +368,41 @@ export function LiveAndPendingBillsCard() {
             t: S.activeTable,
             a: total(),
             s: getSessionRowStatus(S),
-            mob: S.sess.mob,
+            mob: S.sess.mob || S.me.mob,
             me: true,
             i: -1,
           },
         ]
       : [];
 
+  // Also include open sessions from other logged-in customer accounts stored in sessionsByUser
+  const otherUserOpenRows = Object.entries(S.sessionsByUser || {})
+    .filter(
+      ([mobKey, snap]) =>
+        snap.sess &&
+        !snap.paid &&
+        snap.sess.id !== S.sess?.id &&
+        mobKey !== '__guest__'
+    )
+    .map(([mobKey, snap], idx) => {
+      const subVal = getSubtotal(S.menu, snap.cart);
+      const discVal = getDiscount(subVal, snap.reel, snap.review);
+      const totVal = getTotal(subVal, discVal);
+      return {
+        id: snap.sess!.id,
+        no: snap.sess!.pend ? 'Pending' : snap.sess!.no,
+        t: snap.sess!.table || S.activeTable,
+        a: totVal,
+        s: snap.billSrc === 'waiter' ? 'Bill pushed' : 'In kitchen',
+        mob: snap.sess!.mob || mobKey,
+        me: false,
+        i: -100 - idx,
+      };
+    });
+
   const rows = [
     ...live,
+    ...otherUserOpenRows,
     ...S.samp.map((x, i) => ({ ...x, me: false, i })),
   ];
 

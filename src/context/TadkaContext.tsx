@@ -15,6 +15,7 @@ import {
 import { INITIAL_STATE, ORDER_STATUS_LABELS } from '@/lib/constants';
 import {
   cleanCounterNumber,
+  extractUserSessionSnapshot,
   filterPositiveItems,
   formatIndianDateTime,
   formatItemsSummary,
@@ -27,6 +28,7 @@ import {
   getSubtotal,
   getTotal,
   normalizeMobile,
+  switchUserSessionInState,
 } from '@/lib/helpers';
 import {
   buildSheetRowsForState,
@@ -187,7 +189,18 @@ export function TadkaProvider({
       const staffMember = getActiveStaffMember(next.staff, next.me.mob);
       const allowed = getAllowedPortals(staffMember);
       const validatedRole = allowed.includes(next.role) ? next.role : 'c';
-      const finalState = validatedRole === next.role ? next : { ...next, role: validatedRole };
+      const activeUserKey = next.me.mob || next.sess?.mob || '__guest__';
+      const syncedSessionsByUser = {
+        ...(next.sessionsByUser || {}),
+        ...(next.sess || next.orders.length > 0
+          ? { [activeUserKey]: extractUserSessionSnapshot(next) }
+          : {}),
+      };
+      const finalState = {
+        ...next,
+        role: validatedRole,
+        sessionsByUser: syncedSessionsByUser,
+      };
 
       if (isHydratedRef.current && typeof window !== 'undefined') {
         try {
@@ -357,6 +370,16 @@ export function TadkaProvider({
           : [...(prev.usedCountersToday || [])];
 
         let nextSess = prev.sess;
+        // If an existing session on this browser belonged to a DIFFERENT mobile number, do NOT reuse it — open a brand-new counter number!
+        const activeUserMob = normalizedOptionalMob || prev.me.mob;
+        if (
+          nextSess &&
+          ((nextSess.mob && activeUserMob && nextSess.mob !== activeUserMob) ||
+            (nextSess.mob && !activeUserMob))
+        ) {
+          nextSess = null;
+        }
+        const isStartingNewSess = !nextSess;
         if (!nextSess) {
           const isAuto = prev.cmode === 'auto';
           let assignedNo = 'Pending';
@@ -372,7 +395,7 @@ export function TadkaProvider({
             no: assignedNo,
             pend: !isAuto,
             table: prev.activeTable,
-            mob: normalizedOptionalMob || prev.me.mob,
+            mob: activeUserMob,
             waConsent: waConsent ?? prev.waOptIn,
             status: 'open',
             businessDate: todayBizDate,
@@ -382,7 +405,8 @@ export function TadkaProvider({
           nextSess = { ...nextSess, mob: normalizedOptionalMob };
         }
 
-        const nextCart = { ...prev.cart };
+        const baseOrders = isStartingNewSess ? [] : prev.orders;
+        const nextCart = isStartingNewSess ? {} : { ...prev.cart };
         const pricesSnapshot: Record<number, number> = {};
         for (const idStr of Object.keys(it)) {
           const id = Number(idStr);
@@ -392,7 +416,7 @@ export function TadkaProvider({
         }
 
         const nowIso = new Date().toISOString();
-        const orderSeq = prev.orders.length + 1;
+        const orderSeq = baseOrders.length + 1;
         const orderId = `ord-${Date.now()}-${orderSeq}`;
 
         const newOrder = {
@@ -451,9 +475,11 @@ export function TadkaProvider({
           dailyOrderHistory: nextHistory,
           sess: nextSess,
           cart: nextCart,
-          orders: [...prev.orders, newOrder],
+          orders: [...baseOrders, newOrder],
           draft: {},
           status: 1,
+          paid: false,
+          billSrc: isStartingNewSess ? '' : prev.billSrc,
           tab: 'order',
         };
       });
@@ -967,29 +993,35 @@ export function TadkaProvider({
   );
 
   const startNewOrder = useCallback(() => {
-    updateState((prev) => ({
-      ...prev,
-      paid: false,
-      status: 0,
-      cart: {},
-      reel: null,
-      reelCaption: '',
-      review: false,
-      rating: 0,
-      newStar: false,
-      media: null,
-      shared: false,
-      billSrc: '',
-      M: {},
-      cashReq: false,
-      reviewed: false,
-      sess: null,
-      orders: [],
-      draft: {},
-      track: '',
-      trackRes: '',
-      tab: 'menu',
-    }));
+    updateState((prev) => {
+      const userKey = prev.me.mob || '__guest__';
+      const nextSessionsByUser = { ...(prev.sessionsByUser || {}) };
+      delete nextSessionsByUser[userKey];
+      return {
+        ...prev,
+        paid: false,
+        status: 0,
+        cart: {},
+        reel: null,
+        reelCaption: '',
+        review: false,
+        rating: 0,
+        newStar: false,
+        media: null,
+        shared: false,
+        billSrc: '',
+        M: {},
+        cashReq: false,
+        reviewed: false,
+        sess: null,
+        orders: [],
+        draft: {},
+        track: '',
+        trackRes: '',
+        sessionsByUser: nextSessionsByUser,
+        tab: 'menu',
+      };
+    });
   }, [updateState]);
 
   const sendOtp = useCallback(
@@ -1018,38 +1050,28 @@ export function TadkaProvider({
       const staffMember = getActiveStaffMember(S.staff, mob);
       const allowed = getAllowedPortals(staffMember);
       const landingRole = allowed[1] || 'c';
-      const hasMatchingOrder = S.sess && S.sess.mob === mob;
+      const hasExistingOrder = Boolean(
+        S.sessionsByUser?.[mob]?.sess || (S.sess && S.sess.mob === mob)
+      );
 
-      updateState((prev) => ({
-        ...prev,
-        me: { mob },
-        role: landingRole,
-        lg: { step: 0, mob: '' },
-        showLogin: false,
-      }));
+      updateState((prev) => switchUserSessionInState(prev, mob, landingRole));
 
       if (staffMember) {
         say(`Logged in as ${staffMember.r} ✅`);
-      } else if (hasMatchingOrder) {
+      } else if (hasExistingOrder) {
         say('Welcome back. Your order is here ✅');
-      } else if (S.sess && S.sess.mob) {
-        say('No open order for this number');
       } else {
-        say('Logged in ✅');
+        say('Logged in ✅ Place a new order to get your counter number');
       }
     },
-    [S.lg.mob, S.staff, S.sess, say, updateState]
+    [S.lg.mob, S.staff, S.sessionsByUser, S.sess, say, updateState]
   );
 
   const logoutOrOpenLogin = useCallback(() => {
     updateState((prev) => {
       if (prev.me.mob) {
-        return {
-          ...prev,
-          me: { mob: '' },
-          role: 'c',
-          showLogin: false,
-        };
+        // Logging out: save current user's session under their mobile and switch to a clean Guest view
+        return switchUserSessionInState(prev, '', 'c');
       }
       return {
         ...prev,

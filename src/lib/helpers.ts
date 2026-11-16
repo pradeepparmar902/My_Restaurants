@@ -1,4 +1,11 @@
-import { AppState, Dish, StaffMember, PortalRole, Permission } from '@/types/tadka';
+import {
+  AppState,
+  Dish,
+  StaffMember,
+  PortalRole,
+  Permission,
+  UserSessionSnapshot,
+} from '@/types/tadka';
 import { ROLE_DEFAULT_PERMISSIONS } from '@/lib/constants';
 
 export function normalizeMobile(rawInput: string, countryCode: string): string | null {
@@ -172,5 +179,136 @@ export function formatItemsSummary(
     summary: parts.join(', '),
     totalQty,
     subtotal,
+  };
+}
+
+export function extractUserSessionSnapshot(state: AppState): UserSessionSnapshot {
+  return {
+    sess: state.sess,
+    orders: state.orders,
+    cart: state.cart,
+    status: state.status,
+    billSrc: state.billSrc,
+    paid: state.paid,
+    cashReq: state.cashReq,
+    reel: state.reel,
+    reelCaption: state.reelCaption,
+    review: state.review,
+    reviewed: state.reviewed,
+    rating: state.rating,
+    media: state.media,
+    shared: state.shared,
+    split: state.split,
+    pm: state.pm,
+    pts: state.pts,
+    stars: state.stars,
+  };
+}
+
+export function getEmptyUserSessionSnapshot(): UserSessionSnapshot {
+  return {
+    sess: null,
+    orders: [],
+    cart: {},
+    status: 0,
+    billSrc: '',
+    paid: false,
+    cashReq: false,
+    reel: null,
+    reelCaption: '',
+    review: false,
+    reviewed: false,
+    rating: 0,
+    media: null,
+    shared: false,
+    split: 1,
+    pm: 'UPI',
+    pts: 0,
+    stars: 0,
+  };
+}
+
+/**
+ * Switches the active session context from the current user to `nextMob` (or '' for Guest),
+ * strictly isolating orders, counter numbers, bills, and loyalty stars per user login.
+ */
+export function switchUserSessionInState(
+  prev: AppState,
+  nextMob: string,
+  nextRole: PortalRole
+): AppState {
+  const currentKey = prev.me.mob || prev.sess?.mob || '__guest__';
+  const updatedMap: Record<string, UserSessionSnapshot> = {
+    ...(prev.sessionsByUser || {}),
+  };
+
+  // Save current user's session under their mobile key (or guest key)
+  if (prev.sess || prev.orders.length > 0 || prev.pts > 0 || prev.stars > 0) {
+    updatedMap[currentKey] = extractUserSessionSnapshot(prev);
+    if (prev.sess?.mob) {
+      updatedMap[prev.sess.mob] = extractUserSessionSnapshot(prev);
+    }
+  }
+
+  const targetKey = nextMob || '__guest__';
+  const restored = updatedMap[targetKey];
+
+  // If Guest is logging in and there was an unlinked guest session, claim it only if target has no session yet
+  if (
+    !restored &&
+    nextMob &&
+    !prev.me.mob &&
+    prev.sess &&
+    (!prev.sess.mob || prev.sess.mob === nextMob) &&
+    !prev.sess.staff
+  ) {
+    const claimedSess = { ...prev.sess, mob: nextMob };
+    const claimedSnap = {
+      ...extractUserSessionSnapshot(prev),
+      sess: claimedSess,
+    };
+    updatedMap[nextMob] = claimedSnap;
+    delete updatedMap['__guest__'];
+    return {
+      ...prev,
+      me: { mob: nextMob },
+      role: nextRole,
+      sess: claimedSess,
+      sessionsByUser: updatedMap,
+      lg: { step: 0, mob: '' },
+      showLogin: false,
+    };
+  }
+
+  const snap = restored || getEmptyUserSessionSnapshot();
+
+  return {
+    ...prev,
+    me: { mob: nextMob },
+    role: nextRole,
+    sess: snap.sess,
+    orders: snap.orders,
+    cart: snap.cart,
+    status: snap.status,
+    billSrc: snap.billSrc,
+    paid: snap.paid,
+    cashReq: snap.cashReq,
+    reel: snap.reel,
+    reelCaption: snap.reelCaption,
+    review: snap.review,
+    reviewed: snap.reviewed,
+    rating: snap.rating,
+    media: snap.media,
+    shared: snap.shared,
+    split: snap.split,
+    pm: snap.pm,
+    pts: snap.pts,
+    stars: snap.stars,
+    draft: {},
+    track: '',
+    trackRes: '',
+    sessionsByUser: updatedMap,
+    lg: { step: 0, mob: '' },
+    showLogin: false,
   };
 }

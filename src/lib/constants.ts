@@ -154,6 +154,7 @@ export const INITIAL_STATE: AppState = {
   counterBusinessDate: new Date().toISOString().slice(0, 10),
   usedCountersToday: [],
   dailyOrderHistory: [],
+  sessionsByUser: {},
   cmode: 'auto',
   track: '',
   trackRes: '',

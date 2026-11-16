@@ -200,6 +200,40 @@ export function buildSheetRowsForState(
     ...historicalOrderRows,
   ];
 
+  // Also include open sessions from other users stored in sessionsByUser
+  const otherUserCounterRows: (string | number | boolean)[][] = Object.entries(
+    state.sessionsByUser || {}
+  )
+    .filter(
+      ([mobKey, snap]) =>
+        snap.sess &&
+        !snap.paid &&
+        snap.sess.id !== state.sess?.id &&
+        mobKey !== '__guest__'
+    )
+    .map(([mobKey, snap]) => {
+      const { dateFormatted, timeFormatted } = formatIndianDateTime(
+        snap.sess!.createdAt
+      );
+      const { summary } = formatItemsSummary(state.menu, snap.cart);
+      const subVal = getSubtotal(state.menu, snap.cart);
+      const discVal = getDiscount(subVal, snap.reel, snap.review);
+      const totVal = getTotal(subVal, discVal);
+      return [
+        snap.sess!.businessDate || businessDateToday,
+        dateFormatted,
+        timeFormatted,
+        snap.sess!.no,
+        state.cmode.toUpperCase(),
+        snap.sess!.table || state.activeTable,
+        snap.sess!.mob || mobKey,
+        summary || 'In progress',
+        totVal,
+        'OPEN / UNPAID',
+        snap.pm || 'UPI',
+      ];
+    });
+
   // Daily_Counters: Day-wise counter number tracker (C1, C2, C3... per Business Date with Date, Time, Menu, Amount, Status)
   const Daily_Counters: (string | number | boolean)[][] = [
     [
@@ -238,6 +272,7 @@ export function buildSheetRowsForState(
           ];
         })()
       : []),
+    ...otherUserCounterRows,
     ...state.hist.map((h) => {
       const { dateFormatted, timeFormatted } = formatIndianDateTime(h.paidAt);
       return [

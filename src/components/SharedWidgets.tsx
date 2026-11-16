@@ -3,7 +3,10 @@
 import React, { useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import { COUNTRY_CODES, SOCIAL_PLATFORMS } from '@/lib/constants';
-import { isSessionGated } from '@/lib/helpers';
+import {
+  isSessionGated,
+  switchUserSessionInState,
+} from '@/lib/helpers';
 
 export function CountryCodeMobileInput({
   id,
@@ -59,12 +62,9 @@ export function LoginBar() {
             className="chip"
             title="Quick Demo Staff Switcher"
             onClick={() =>
-              updateState((p) => ({
-                ...p,
-                me: { mob: '+919800000001' },
-                role: 'a',
-                showLogin: false,
-              }))
+              updateState((p) =>
+                switchUserSessionInState(p, '+919800000001', 'a')
+              )
             }
           >
             ⚡ Demo Staff
@@ -109,10 +109,24 @@ export function RoleBar() {
 }
 
 export function StarsStrip() {
-  const { S, total } = useTadka();
+  const { S, total, staffOf } = useTadka();
   const t = total();
+  const isStaff = Boolean(staffOf());
+  const currentMob = S.me.mob;
+
+  // Customers only see their own paid bill history; Staff with designated access can see all or their own
+  const visibleHist = isStaff
+    ? S.hist.slice(0, 3)
+    : S.hist
+        .filter((x) =>
+          currentMob
+            ? x.customerMob === currentMob
+            : !x.customerMob || x.customerMob === 'Guest'
+        )
+        .slice(0, 3);
+
   const cur =
-    S.status && !S.paid ? (
+    S.status && !S.paid && S.sess ? (
       <div className="line">
         <span>
           Table {S.activeTable} · ₹{t}
@@ -160,10 +174,15 @@ export function StarsStrip() {
         )}
         <div className="mu">Your bills</div>
         {cur}
-        {S.hist.slice(0, 3).map((x, idx) => (
+        {visibleHist.length === 0 && !cur && (
+          <p className="mu" style={{ fontSize: '12px', marginTop: '4px' }}>
+            No bills for {currentMob || 'Guest'} yet.
+          </p>
+        )}
+        {visibleHist.map((x, idx) => (
           <div key={x.id || idx} className="line">
             <span>
-              ₹{x.a} · {x.m}
+              {x.counterNo ? `${x.counterNo} · ` : ''}₹{x.a} · {x.m}
               {x.o === 'owner' ? ' · tagged by restaurant' : ''}
             </span>
             <span className="tag ok">✅ Paid</span>

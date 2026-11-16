@@ -155,6 +155,27 @@ export interface DriveMediaAsset {
   createdAt: string;
 }
 
+export interface UserSessionSnapshot {
+  sess: SessionData | null;
+  orders: OrderRound[];
+  cart: Record<number, number>;
+  status: number;
+  billSrc: '' | 'waiter';
+  paid: boolean;
+  cashReq: boolean;
+  reel: 'wait' | 'ok' | null;
+  reelCaption: string;
+  review: boolean;
+  reviewed: boolean;
+  rating: number;
+  media: 'snap' | 'reel' | null;
+  shared: boolean;
+  split: number;
+  pm: PaymentMethod;
+  pts: number;
+  stars: number;
+}
+
 export interface AppState {
   // Navigation & UI
   role: PortalRole;
@@ -181,6 +202,7 @@ export interface AppState {
   counterBusinessDate: string; // YYYY-MM-DD business date for day-wise counter reset
   usedCountersToday: string[]; // All counter numbers used on counterBusinessDate
   dailyOrderHistory: DailyCounterOrderLogEntry[]; // Persistent day-wise log of all counter orders
+  sessionsByUser: Record<string, UserSessionSnapshot>; // Per-mobile isolated session map
   cmode: CounterMode;
   track: string;
   trackRes: string;

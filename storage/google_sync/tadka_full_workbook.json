@@ -1,46 +1,89 @@
 {
-  "updatedAt": "2026-11-16T02:47:43.018Z",
+  "updatedAt": "2026-11-16T16:39:42.336Z",
   "sheets": {
-    "Restaurant_Config": [
+    "Daily_Counters": [
       [
-        "Config_Key",
-        "Config_Value",
-        "Updated_At"
+        "Business_Date",
+        "Date",
+        "Time",
+        "Counter_No",
+        "Counter_Mode",
+        "Table_No",
+        "Customer_Mobile",
+        "Menu_Items_Ordered",
+        "Total_Bill_INR",
+        "Payment_Status",
+        "Payment_Method"
       ],
       [
-        "restaurant_slug",
-        "tadka-truck",
-        "2026-11-16T02:47:43.008Z"
+        "2026-11-16",
+        "15 Nov 2026",
+        "11:31:02 pm",
+        "C23",
+        "AUTO",
+        4,
+        "Guest",
+        "Paid Visit Items",
+        340,
+        "PAID",
+        "UPI"
+      ]
+    ],
+    "Orders": [
+      [
+        "Business_Date",
+        "Date",
+        "Time",
+        "Counter_No",
+        "Table_No",
+        "Order_Round",
+        "Order_Source",
+        "Customer_Mobile",
+        "Menu_Items_Ordered",
+        "Total_Qty",
+        "Order_Amount_INR",
+        "Kitchen_Status",
+        "Bill_Status",
+        "Payment_Method",
+        "VIP",
+        "Rush",
+        "Order_ID"
+      ]
+    ],
+    "Bills_Payments": [
+      [
+        "Business_Date",
+        "Date",
+        "Time",
+        "Counter_No",
+        "Table_No",
+        "Customer_Mobile",
+        "Menu_Items_Ordered",
+        "Subtotal_INR",
+        "Discount_INR",
+        "GST_5Pct_INR",
+        "Total_INR",
+        "Payment_Method",
+        "Tagged_By",
+        "Status",
+        "Record_ID"
       ],
       [
-        "restaurant_name",
-        "Tadka Truck",
-        "2026-11-16T02:47:43.008Z"
-      ],
-      [
-        "appsScriptWebAppUrl",
-        "https://script.google.com/macros/s/AKfycbyQkzH6LMy16fOcvQLdSsKNsbKmJRx3fC37d7DUTxbCKkB1nPp1ESHH0EcVS5dI6Zym/exec",
-        "2026-11-16T02:47:43.008Z"
-      ],
-      [
-        "spreadsheetId",
-        "17E4TMRaEc_VoAE0qajaIsgPiJpuJWDGPECR-RJRwTCs",
-        "2026-11-16T02:47:43.008Z"
-      ],
-      [
-        "driveFolderId",
-        "1MRw5ircB_XUf8jSv5vPBDTM08pwhzAMX",
-        "2026-11-16T02:47:43.008Z"
-      ],
-      [
-        "counter_mode",
-        "auto",
-        "2026-11-16T02:47:43.008Z"
-      ],
-      [
-        "whatsapp_final_bill",
-        true,
-        "2026-11-16T02:47:43.008Z"
+        "2026-11-16",
+        "15 Nov 2026",
+        "11:31:02 pm",
+        "C23",
+        4,
+        "Guest",
+        "Paid Visit",
+        340,
+        0,
+        17,
+        340,
+        "UPI",
+        "app",
+        "PAID",
+        "hist-1"
       ]
     ],
     "Menu_Items": [
@@ -131,14 +174,42 @@
       [
         7,
         "🍲",
-        "Pasta",
-        "Paasta",
-        "Pasta",
-        100,
-        10000,
+        "abcd",
+        "acd",
+        "acd",
+        80,
+        8000,
         true,
         true,
         true
+      ],
+      [
+        8,
+        "🍲",
+        "pasta",
+        "pasta",
+        "pasta",
+        80,
+        8000,
+        true,
+        true,
+        true
+      ]
+    ],
+    "Sessions": [
+      [
+        "Business_Date",
+        "Date",
+        "Time",
+        "Counter_No",
+        "Table_No",
+        "Customer_Mobile",
+        "Items_Ordered_Menu",
+        "Session_Subtotal_INR",
+        "Status",
+        "Created_By_Staff",
+        "WhatsApp_Consent",
+        "Session_ID"
       ]
     ],
     "Staff_Access": [
@@ -183,61 +254,6 @@
         true
       ]
     ],
-    "Sessions": [
-      [
-        "Session_ID",
-        "Counter_No",
-        "Table_No",
-        "Customer_Mobile",
-        "Status",
-        "Created_By_Staff",
-        "WhatsApp_Consent",
-        "Business_Date",
-        "Created_At"
-      ]
-    ],
-    "Orders": [
-      [
-        "Order_ID",
-        "Order_Seq",
-        "Counter_No",
-        "Table_No",
-        "Source",
-        "Status",
-        "Items_Summary",
-        "VIP",
-        "Rush",
-        "Created_At"
-      ]
-    ],
-    "Bills_Payments": [
-      [
-        "Record_ID",
-        "Counter_No",
-        "Table_No",
-        "Subtotal_INR",
-        "Discount_INR",
-        "GST_5Pct_INR",
-        "Total_INR",
-        "Payment_Method",
-        "Tagged_By",
-        "Status",
-        "Timestamp"
-      ],
-      [
-        "hist-1",
-        "C23",
-        4,
-        340,
-        0,
-        17,
-        340,
-        "UPI",
-        "app",
-        "PAID",
-        "2026-11-15T20:04:58.665Z"
-      ]
-    ],
     "Loyalty_Ledger": [
       [
         "Customer_Mobile",
@@ -253,7 +269,7 @@
         120,
         "Silver",
         false,
-        "2026-11-16T02:47:43.008Z"
+        "2026-11-16T16:39:42.315Z"
       ]
     ],
     "Social_Reels_Reviews": [
@@ -282,6 +298,22 @@
         "Target",
         "Details",
         "Timestamp"
+      ],
+      [
+        "aud-1794797264987-a1pb",
+        "System",
+        "storage.sheets_sync",
+        "Google Sheets Workbook",
+        "Synced 10 tabs (google_cloud_webhook)",
+        "2026-11-16T02:47:44.987Z"
+      ],
+      [
+        "aud-1794797264845-soyl",
+        "System",
+        "storage.sheets_sync",
+        "Google Sheets Workbook",
+        "Synced 10 tabs (google_cloud_webhook)",
+        "2026-11-16T02:47:44.845Z"
       ],
       [
         "aud-1794797235040-5ksv",
@@ -501,7 +533,49 @@
         "Paneer Kathi Roll at @tadkatruck",
         "C23",
         "+919820112233",
-        "2026-11-15T20:04:58.666Z"
+        "2026-11-15T18:23:46.783Z"
+      ]
+    ],
+    "Restaurant_Config": [
+      [
+        "Config_Key",
+        "Config_Value",
+        "Updated_At"
+      ],
+      [
+        "restaurant_slug",
+        "tadka-truck",
+        "2026-11-16T16:39:42.310Z"
+      ],
+      [
+        "restaurant_name",
+        "Tadka Truck",
+        "2026-11-16T16:39:42.310Z"
+      ],
+      [
+        "appsScriptWebAppUrl",
+        "https://script.google.com/macros/s/AKfycbyQkzH6LMy16fOcvQLdSsKNsbKmJRx3fC37d7DUTxbCKkB1nPp1ESHH0EcVS5dI6Zym/exec",
+        "2026-11-16T16:39:42.310Z"
+      ],
+      [
+        "spreadsheetId",
+        "17E4TMRaEc_VoAE0qajaIsgPiJpuJWDGPECR-RJRwTCs",
+        "2026-11-16T16:39:42.310Z"
+      ],
+      [
+        "driveFolderId",
+        "1MRw5ircB_XUf8jSv5vPBDTM08pwhzAMX",
+        "2026-11-16T16:39:42.310Z"
+      ],
+      [
+        "counter_mode",
+        "auto",
+        "2026-11-16T16:39:42.310Z"
+      ],
+      [
+        "whatsapp_final_bill",
+        true,
+        "2026-11-16T16:39:42.310Z"
       ]
     ]
   }

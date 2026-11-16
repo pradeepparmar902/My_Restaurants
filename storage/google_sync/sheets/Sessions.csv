@@ -1,1 +1,1 @@
-Session_ID,Counter_No,Table_No,Customer_Mobile,Status,Created_By_Staff,WhatsApp_Consent,Business_Date,Created_At
+Business_Date,Date,Time,Counter_No,Table_No,Customer_Mobile,Items_Ordered_Menu,Session_Subtotal_INR,Status,Created_By_Staff,WhatsApp_Consent,Session_ID

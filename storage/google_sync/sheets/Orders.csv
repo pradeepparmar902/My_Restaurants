@@ -1,1 +1,1 @@
-Order_ID,Order_Seq,Counter_No,Table_No,Source,Status,Items_Summary,VIP,Rush,Created_At
+Business_Date,Date,Time,Counter_No,Table_No,Order_Round,Order_Source,Customer_Mobile,Menu_Items_Ordered,Total_Qty,Order_Amount_INR,Kitchen_Status,Bill_Status,Payment_Method,VIP,Rush,Order_ID

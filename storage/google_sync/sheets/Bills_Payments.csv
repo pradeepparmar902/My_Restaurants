@@ -1,2 +1,2 @@
-Record_ID,Counter_No,Table_No,Subtotal_INR,Discount_INR,GST_5Pct_INR,Total_INR,Payment_Method,Tagged_By,Status,Timestamp
-hist-1,C23,4,340,0,17,340,UPI,app,PAID,2026-11-15T20:04:58.665Z
+Business_Date,Date,Time,Counter_No,Table_No,Customer_Mobile,Menu_Items_Ordered,Subtotal_INR,Discount_INR,GST_5Pct_INR,Total_INR,Payment_Method,Tagged_By,Status,Record_ID
+2026-11-16,15 Nov 2026,11:31:02 pm,C23,4,Guest,Paid Visit,340,0,17,340,UPI,app,PAID,hist-1
