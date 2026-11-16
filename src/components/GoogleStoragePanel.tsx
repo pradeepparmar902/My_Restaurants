@@ -467,6 +467,8 @@ export function GoogleStorageAdminCard() {
               style={{
                 marginTop: '10px',
                 overflowX: 'auto',
+                maxHeight: '340px',
+                overflowY: 'auto',
                 background: 'var(--bg)',
                 borderRadius: '12px',
                 padding: '8px',
@@ -510,7 +512,7 @@ export function GoogleStorageAdminCard() {
                       </td>
                     </tr>
                   ) : (
-                    activeRows.slice(1, 8).map((row, rIdx) => (
+                    activeRows.slice(1).map((row, rIdx) => (
                       <tr key={rIdx}>
                         {row.map((cell, cIdx) => (
                           <td
