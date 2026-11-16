@@ -2,6 +2,7 @@ import { AppState, Dish, StaffMember, StaffRoleName } from '@/types/tadka';
 import { getSubtotal, getDiscount, getGST, getTotal } from '@/lib/helpers';
 
 export type SheetTabName =
+  | 'Restaurant_Config'
   | 'Menu_Items'
   | 'Staff_Access'
   | 'Sessions'
@@ -19,6 +20,17 @@ export function buildSheetRowsForState(
   const discount = getDiscount(subtotal, state.reel, state.review);
   const gst = getGST(subtotal, discount);
   const total = getTotal(subtotal, discount);
+
+  const Restaurant_Config: (string | number | boolean)[][] = [
+    ['Config_Key', 'Config_Value', 'Updated_At'],
+    ['restaurant_slug', 'tadka-truck', new Date().toISOString()],
+    ['restaurant_name', 'Tadka Truck', new Date().toISOString()],
+    ['appsScriptWebAppUrl', state.googleConfig?.appsScriptWebAppUrl || '', new Date().toISOString()],
+    ['spreadsheetId', state.googleConfig?.spreadsheetId || '', new Date().toISOString()],
+    ['driveFolderId', state.googleConfig?.driveFolderId || '', new Date().toISOString()],
+    ['counter_mode', state.cmode, new Date().toISOString()],
+    ['whatsapp_final_bill', state.wab, new Date().toISOString()],
+  ];
 
   const Menu_Items: (string | number | boolean)[][] = [
     [
@@ -229,6 +241,7 @@ export function buildSheetRowsForState(
   ];
 
   return {
+    Restaurant_Config,
     Menu_Items,
     Staff_Access,
     Sessions,
@@ -371,6 +384,23 @@ export function parseStaffFromSheetRows(rows: unknown[][]): StaffMember[] | null
   return staff.length > 0 ? staff : null;
 }
 
+export function parseConfigFromSheetRows(
+  rows: unknown[][]
+): Partial<AppState['googleConfig']> | null {
+  if (!Array.isArray(rows) || rows.length <= 1) return null;
+  const cfg: Partial<AppState['googleConfig']> = {};
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r[0]) continue;
+    const key = String(r[0]).trim();
+    const val = String(r[1] ?? '').trim();
+    if (key === 'appsScriptWebAppUrl' && val) cfg.appsScriptWebAppUrl = val;
+    if (key === 'spreadsheetId' && val) cfg.spreadsheetId = val;
+    if (key === 'driveFolderId' && val) cfg.driveFolderId = val;
+  }
+  return Object.keys(cfg).length > 0 ? cfg : null;
+}
+
 export const GOOGLE_APPS_SCRIPT_TEMPLATE = `/**
  * Tadka Restaurant Growth Platform — 2-Way Google Sheets & Google Drive Storage Bridge
  * 
@@ -462,6 +492,21 @@ function doPost(e) {
         sheet.clearContents();
         sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
       });
+
+      // Also save or update tadka-config.json inside the restaurant's Google Drive folder
+      if (payload.configJson) {
+        try {
+          var cfgFolderId = extractId(payload.driveFolderId, /\\/folders\\/([a-zA-Z0-9-_]+)/);
+          var cfgFolder = cfgFolderId ? DriveApp.getFolderById(cfgFolderId) : DriveApp.getRootFolder();
+          var existing = cfgFolder.getFilesByName('tadka-config.json');
+          var cfgContent = JSON.stringify(payload.configJson, null, 2);
+          if (existing.hasNext()) {
+            existing.next().setContent(cfgContent);
+          } else {
+            cfgFolder.createFile('tadka-config.json', cfgContent, MimeType.PLAIN_TEXT);
+          }
+        } catch (cfgErr) {}
+      }
 
       return ContentService.createTextOutput(JSON.stringify({
         ok: true,

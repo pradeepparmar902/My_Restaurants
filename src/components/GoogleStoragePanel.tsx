@@ -13,6 +13,7 @@ import {
 } from '@/lib/googleSheetsShared';
 
 const SHEET_TABS: SheetTabName[] = [
+  'Restaurant_Config',
   'Menu_Items',
   'Staff_Access',
   'Sessions',
@@ -42,7 +43,7 @@ export function GoogleStorageAdminCard() {
     S.googleConfig?.appsScriptWebAppUrl || ''
   );
   const [sheetId, setSheetId] = useState(
-    S.googleConfig?.spreadsheetId || '17E4TMRaEc_VoAE0qajaIsgPiJpuJWDGPECR-RJRwTCs'
+    S.googleConfig?.spreadsheetId || ''
   );
   const [folderId, setFolderId] = useState(
     S.googleConfig?.driveFolderId || ''
@@ -66,6 +67,33 @@ export function GoogleStorageAdminCard() {
 
   const allSheets = buildSheetRowsForState(S);
   const activeRows = allSheets[selectedTab] || [];
+
+  const downloadTenantConfigJson = () => {
+    const cleanedSheetId = extractSpreadsheetIdFromUrl(sheetId);
+    const cleanedFolderId = extractDriveFolderIdFromUrl(folderId);
+    const configPayload = {
+      defaultRestaurant: 'tadka-truck',
+      restaurants: {
+        'tadka-truck': {
+          name: 'Tadka Truck',
+          slug: 'tadka-truck',
+          appsScriptWebAppUrl: webAppUrl.trim(),
+          spreadsheetId: cleanedSheetId,
+          driveFolderId: cleanedFolderId,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    };
+    const blob = new Blob([JSON.stringify(configPayload, null, 2)], {
+      type: 'application/json;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'restaurants.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const downloadCsvClientSide = (tabName: SheetTabName) => {
     const rows = allSheets[tabName] || [];
@@ -115,6 +143,19 @@ export function GoogleStorageAdminCard() {
             spreadsheetId: cfg.spreadsheetId,
             driveFolderId: cfg.driveFolderId,
             sheets: allSheets,
+            configJson: {
+              defaultRestaurant: 'tadka-truck',
+              restaurants: {
+                'tadka-truck': {
+                  name: 'Tadka Truck',
+                  slug: 'tadka-truck',
+                  appsScriptWebAppUrl: cfg.appsScriptWebAppUrl,
+                  spreadsheetId: cfg.spreadsheetId,
+                  driveFolderId: cfg.driveFolderId,
+                  updatedAt: new Date().toISOString(),
+                },
+              },
+            },
             timestamp: new Date().toISOString(),
           }),
         });
@@ -327,13 +368,20 @@ export function GoogleStorageAdminCard() {
                 ⚠️ Last error: {S.googleConfig.lastSyncError}
               </p>
             )}
-            <div className="row" style={{ marginTop: '8px', gap: '8px' }}>
+            <div className="row" style={{ marginTop: '8px', gap: '8px', flexWrap: 'wrap' }}>
               <button
                 className="btn alt"
-                style={{ marginTop: 0, flex: 1 }}
+                style={{ marginTop: 0, flex: 2 }}
                 onClick={handleSyncNow}
               >
-                ⚡ Save & Sync All 9 Tabs to Google Sheet
+                ⚡ Save Config & Sync All 10 Tabs
+              </button>
+              <button
+                className="btn ghost"
+                style={{ marginTop: 0, flex: 1 }}
+                onClick={downloadTenantConfigJson}
+              >
+                ⚙️ Export restaurants.json
               </button>
             </div>
           </div>

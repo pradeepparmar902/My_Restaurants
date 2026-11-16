@@ -12,7 +12,7 @@ import {
   StaffRoleName,
   Dish,
 } from '@/types/tadka';
-import { INITIAL_STATE, DEFAULT_GOOGLE_SHEET_ID } from '@/lib/constants';
+import { INITIAL_STATE } from '@/lib/constants';
 import {
   cleanCounterNumber,
   filterPositiveItems,
@@ -28,6 +28,7 @@ import {
 import {
   buildSheetRowsForState,
   extractSpreadsheetIdFromUrl,
+  parseConfigFromSheetRows,
   parseCsvToRows,
   parseMenuFromSheetRows,
   parseStaffFromSheetRows,
@@ -147,12 +148,6 @@ export function TadkaProvider({
         setS((prev) => ({
           ...prev,
           ...parsed,
-          googleConfig: {
-            ...prev.googleConfig,
-            ...(parsed.googleConfig || {}),
-            spreadsheetId:
-              parsed.googleConfig?.spreadsheetId || DEFAULT_GOOGLE_SHEET_ID,
-          },
           activeTable: initialTableId || parsed.activeTable || prev.activeTable,
           toast: '',
         }));
@@ -1177,6 +1172,7 @@ export function TadkaProvider({
 
       let pulledMenu: Dish[] | null = null;
       let pulledStaff: AppState['staff'] | null = null;
+      let pulledConfig: Partial<AppState['googleConfig']> | null = null;
 
       // 1. Try Server Proxy (/api/storage/sheets?pull=1) — avoids all browser CORS redirect issues on localhost
       try {
@@ -1195,6 +1191,9 @@ export function TadkaProvider({
             pulledStaff = parseStaffFromSheetRows(
               apiData.sheets.Staff_Access || []
             );
+            pulledConfig = parseConfigFromSheetRows(
+              apiData.sheets.Restaurant_Config || []
+            );
           }
         }
       } catch {
@@ -1203,53 +1202,62 @@ export function TadkaProvider({
 
       // 2. Fallback: Browser JSONP <script> injection to Google Sheet gviz API (works on GitHub Pages & localhost with zero CORS restriction!)
       if (!pulledMenu && cleanSheetId && typeof window !== 'undefined') {
-        pulledMenu = await new Promise<Dish[] | null>((resolve) => {
-          const cbName = `__tadkaGvizCb_${Date.now()}`;
-          const script = document.createElement('script');
-          const timer = setTimeout(() => {
-            cleanup();
-            resolve(null);
-          }, 5000);
-
-          function cleanup() {
-            clearTimeout(timer);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            delete (window as any)[cbName];
-            script.remove();
-          }
-
+        const gvizFetchTab = (tabName: string) =>
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (window as any)[cbName] = (resp: any) => {
-            cleanup();
-            try {
-              if (resp && resp.table && Array.isArray(resp.table.rows)) {
-                const header = (resp.table.cols || []).map(
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (c: any, idx: number) => c.label || `Col${idx}`
-                );
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const dataRows = resp.table.rows.map((r: any) =>
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (r.c || []).map((cell: any) => (cell ? cell.v ?? '' : ''))
-                );
-                const combined = [header, ...dataRows];
-                const parsed = parseMenuFromSheetRows(combined);
-                resolve(parsed);
-                return;
-              }
-            } catch {
-              // ignore
-            }
-            resolve(null);
-          };
+          new Promise<any[][] | null>((resolve) => {
+            const cbName = `__tadkaGviz_${tabName}_${Date.now()}`;
+            const script = document.createElement('script');
+            const timer = setTimeout(() => {
+              cleanup();
+              resolve(null);
+            }, 5000);
 
-          script.src = `https://docs.google.com/spreadsheets/d/${cleanSheetId}/gviz/tq?sheet=Menu_Items&tqx=responseHandler:${cbName}`;
-          script.onerror = () => {
-            cleanup();
-            resolve(null);
-          };
-          document.body.appendChild(script);
-        });
+            function cleanup() {
+              clearTimeout(timer);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              delete (window as any)[cbName];
+              script.remove();
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any)[cbName] = (resp: any) => {
+              cleanup();
+              try {
+                if (resp && resp.table && Array.isArray(resp.table.rows)) {
+                  const header = (resp.table.cols || []).map(
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (c: any, idx: number) => c.label || `Col${idx}`
+                  );
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const dataRows = resp.table.rows.map((r: any) =>
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (r.c || []).map((cell: any) => (cell ? cell.v ?? '' : ''))
+                  );
+                  resolve([header, ...dataRows]);
+                  return;
+                }
+              } catch {
+                // ignore
+              }
+              resolve(null);
+            };
+
+            script.src = `https://docs.google.com/spreadsheets/d/${cleanSheetId}/gviz/tq?sheet=${encodeURIComponent(
+              tabName
+            )}&tqx=responseHandler:${cbName}`;
+            script.onerror = () => {
+              cleanup();
+              resolve(null);
+            };
+            document.body.appendChild(script);
+          });
+
+        const [menuRows, cfgRows] = await Promise.all([
+          gvizFetchTab('Menu_Items'),
+          gvizFetchTab('Restaurant_Config'),
+        ]);
+        if (menuRows) pulledMenu = parseMenuFromSheetRows(menuRows);
+        if (cfgRows) pulledConfig = parseConfigFromSheetRows(cfgRows);
       }
 
       // 3. Fallback: Browser JSONP <script> injection to Apps Script Web App URL (bypasses CORS on GitHub Pages!)
@@ -1261,12 +1269,13 @@ export function TadkaProvider({
         const jsonpResult = await new Promise<{
           menu: Dish[] | null;
           staff: AppState['staff'] | null;
+          config: Partial<AppState['googleConfig']> | null;
         }>((resolve) => {
           const cbName = `__tadkaScriptCb_${Date.now()}`;
           const script = document.createElement('script');
           const timer = setTimeout(() => {
             cleanup();
-            resolve({ menu: null, staff: null });
+            resolve({ menu: null, staff: null, config: null });
           }, 6000);
 
           function cleanup() {
@@ -1283,9 +1292,12 @@ export function TadkaProvider({
               resolve({
                 menu: parseMenuFromSheetRows(data.sheets.Menu_Items || []),
                 staff: parseStaffFromSheetRows(data.sheets.Staff_Access || []),
+                config: parseConfigFromSheetRows(
+                  data.sheets.Restaurant_Config || []
+                ),
               });
             } else {
-              resolve({ menu: null, staff: null });
+              resolve({ menu: null, staff: null, config: null });
             }
           };
 
@@ -1295,12 +1307,13 @@ export function TadkaProvider({
           )}&t=${Date.now()}`;
           script.onerror = () => {
             cleanup();
-            resolve({ menu: null, staff: null });
+            resolve({ menu: null, staff: null, config: null });
           };
           document.body.appendChild(script);
         });
         if (jsonpResult.menu) pulledMenu = jsonpResult.menu;
         if (jsonpResult.staff) pulledStaff = jsonpResult.staff;
+        if (jsonpResult.config) pulledConfig = jsonpResult.config;
       }
 
       // 4. Fallback: Direct Apps Script GET / POST from browser
@@ -1351,15 +1364,20 @@ export function TadkaProvider({
         }
       }
 
-      if (pulledMenu && pulledMenu.length > 0) {
+      if ((pulledMenu && pulledMenu.length > 0) || pulledConfig) {
         setS((prev) => {
           const nextState: AppState = {
             ...prev,
-            menu: pulledMenu!,
+            menu: pulledMenu && pulledMenu.length > 0 ? pulledMenu : prev.menu,
             staff: pulledStaff || prev.staff,
             googleConfig: {
+              ...prev.googleConfig,
               ...mergedConfig,
-              spreadsheetId: cleanSheetId,
+              ...(pulledConfig || {}),
+              spreadsheetId:
+                pulledConfig?.spreadsheetId ||
+                cleanSheetId ||
+                prev.googleConfig.spreadsheetId,
               lastSyncedAt: new Date().toISOString(),
               lastSyncStatus: 'synced',
               lastSyncError: undefined,
@@ -1379,7 +1397,9 @@ export function TadkaProvider({
 
         if (!silent) {
           say(
-            `Pulled ${pulledMenu.length} menu items from Google Sheet ✅`
+            `Pulled ${
+              pulledMenu ? pulledMenu.length : S.menu.length
+            } menu items & config from Google Sheet ✅`
           );
         }
       } else if (!silent) {
@@ -1388,15 +1408,95 @@ export function TadkaProvider({
         );
       }
     },
-    [S.googleConfig, say]
+    [S.googleConfig, S.menu.length, say]
   );
 
-  // Auto-pull latest Menu & Staff from Google Sheet when app opens
+  // Commercial Multi-Tenant Startup Loader:
+  // On any new browser/device, load config from /config/restaurants.json (or NEXT_PUBLIC_REMOTE_CONFIG_JSON_URL),
+  // then auto-pull Menu, Staff & Restaurant_Config from that restaurant's Google Sheet!
   useEffect(() => {
-    const timer = setTimeout(() => {
-      pullFromGoogleSheets({ spreadsheetId: DEFAULT_GOOGLE_SHEET_ID }, true);
-    }, 300);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+    async function bootstrapTenantConfig() {
+      let tenantCfg: Partial<AppState['googleConfig']> = {};
+      const slug =
+        process.env.NEXT_PUBLIC_DEFAULT_RESTAURANT_SLUG || 'tadka-truck';
+
+      // Check both root path and GitHub Pages basePath
+      const candidateUrls = [
+        process.env.NEXT_PUBLIC_REMOTE_CONFIG_JSON_URL || '',
+        '/config/restaurants.json',
+        '/My_Restaurants/config/restaurants.json',
+      ].filter(Boolean);
+
+      for (const url of candidateUrls) {
+        try {
+          const res = await fetch(`${url}?t=${Date.now()}`, {
+            cache: 'no-store',
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const entry =
+              data?.restaurants?.[slug] ||
+              data?.restaurants?.[data?.defaultRestaurant] ||
+              data;
+            if (entry) {
+              tenantCfg = {
+                appsScriptWebAppUrl: entry.appsScriptWebAppUrl || '',
+                spreadsheetId: entry.spreadsheetId || '',
+                driveFolderId: entry.driveFolderId || '',
+              };
+              break;
+            }
+          }
+        } catch {
+          // try next candidate
+        }
+      }
+
+      if (cancelled) return;
+
+      // Merge non-empty config fields from restaurants.json if current browser has blank fields
+      setS((prev) => {
+        const mergedCfg = {
+          ...prev.googleConfig,
+          appsScriptWebAppUrl:
+            prev.googleConfig.appsScriptWebAppUrl ||
+            tenantCfg.appsScriptWebAppUrl ||
+            '',
+          spreadsheetId:
+            prev.googleConfig.spreadsheetId || tenantCfg.spreadsheetId || '',
+          driveFolderId:
+            prev.googleConfig.driveFolderId || tenantCfg.driveFolderId || '',
+        };
+        const next = { ...prev, googleConfig: mergedCfg };
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+
+      // Now auto-pull live Menu, Staff, and Restaurant_Config from the Google Sheet
+      await pullFromGoogleSheets(
+        {
+          appsScriptWebAppUrl:
+            S.googleConfig.appsScriptWebAppUrl ||
+            tenantCfg.appsScriptWebAppUrl ||
+            '',
+          spreadsheetId:
+            S.googleConfig.spreadsheetId || tenantCfg.spreadsheetId || '',
+          driveFolderId:
+            S.googleConfig.driveFolderId || tenantCfg.driveFolderId || '',
+        },
+        true
+      );
+    }
+
+    bootstrapTenantConfig();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

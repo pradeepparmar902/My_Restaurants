@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 import { getStore, logAudit } from '@/lib/serverStore';
 import {
@@ -8,6 +10,7 @@ import {
   normalizeAppsScriptUrl,
 } from '@/lib/googleStorage';
 import {
+  parseConfigFromSheetRows,
   parseCsvToRows,
   parseMenuFromSheetRows,
   parseStaffFromSheetRows,
@@ -40,7 +43,13 @@ export async function GET(req: NextRequest) {
       ];
       for (const url of candidateUrls) {
         try {
-          const menuRes = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+          const [menuRes, cfgRes] = await Promise.all([
+            fetch(url, { cache: 'no-store', redirect: 'follow' }),
+            fetch(
+              `https://docs.google.com/spreadsheets/d/${cleanSheetId}/gviz/tq?tqx=out:csv&sheet=Restaurant_Config`,
+              { cache: 'no-store', redirect: 'follow' }
+            ),
+          ]);
           if (menuRes.ok) {
             const menuText = await menuRes.text();
             if (
@@ -52,6 +61,12 @@ export async function GET(req: NextRequest) {
               pulledSheets = {
                 Menu_Items: parseCsvToRows(menuText),
               };
+              if (cfgRes.ok) {
+                const cfgText = await cfgRes.text();
+                if (cfgText && cfgText.includes('Config_Key')) {
+                  pulledSheets.Restaurant_Config = parseCsvToRows(cfgText);
+                }
+              }
               break;
             }
           }
@@ -109,13 +124,18 @@ export async function GET(req: NextRequest) {
     if (pulledSheets) {
       const remoteMenu = parseMenuFromSheetRows(pulledSheets.Menu_Items || []);
       const remoteStaff = parseStaffFromSheetRows(pulledSheets.Staff_Access || []);
+      const remoteConfig = parseConfigFromSheetRows(pulledSheets.Restaurant_Config || []);
       if (remoteMenu) store.menu = remoteMenu;
       if (remoteStaff) store.staff = remoteStaff;
+      if (remoteConfig) {
+        store.googleConfig = { ...store.googleConfig, ...remoteConfig };
+      }
       return NextResponse.json({
         ok: true,
         sheets: pulledSheets,
         menu: store.menu,
         staff: store.staff,
+        googleConfig: store.googleConfig,
       });
     }
 
@@ -172,6 +192,33 @@ export async function POST(req: NextRequest) {
         ...store.googleConfig,
         ...body.googleConfig,
       };
+      // Persist updated tenant credentials to public/config/restaurants.json so any new browser loads them automatically
+      try {
+        const configPath = path.join(process.cwd(), 'public', 'config', 'restaurants.json');
+        const slug = body.restaurantSlug || 'tadka-truck';
+        let existingRegistry: {
+          defaultRestaurant: string;
+          restaurants: Record<string, unknown>;
+        } = {
+          defaultRestaurant: slug,
+          restaurants: {},
+        };
+        if (fs.existsSync(configPath)) {
+          existingRegistry = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        }
+        existingRegistry.restaurants[slug] = {
+          name: 'Tadka Truck',
+          slug,
+          appsScriptWebAppUrl: store.googleConfig.appsScriptWebAppUrl || '',
+          spreadsheetId: store.googleConfig.spreadsheetId || '',
+          driveFolderId: store.googleConfig.driveFolderId || '',
+          updatedAt: new Date().toISOString(),
+        };
+        fs.mkdirSync(path.dirname(configPath), { recursive: true });
+        fs.writeFileSync(configPath, JSON.stringify(existingRegistry, null, 2), 'utf-8');
+      } catch {
+        // Ignore fs write error on read-only serverless environments
+      }
     }
 
     // If client passed its latest state snapshot, merge key collections so server mirror stays up to date

@@ -1,0 +1,12 @@
+{
+  "defaultRestaurant": "tadka-truck",
+  "restaurants": {
+    "tadka-truck": {
+      "name": "Tadka Truck",
+      "slug": "tadka-truck",
+      "appsScriptWebAppUrl": "",
+      "spreadsheetId": "17E4TMRaEc_VoAE0qajaIsgPiJpuJWDGPECR-RJRwTCs",
+      "driveFolderId": ""
+    }
+  }
+}
