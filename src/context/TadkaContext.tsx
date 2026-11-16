@@ -152,9 +152,49 @@ export function TadkaProvider({
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<AppState>;
+        const todayBizDate = getCurrentBusinessDate();
+
+        // Sanitize legacy C27/C28/C29 prototype demo counter state if no real Daily_Counters exist for >= 27
+        const hasLegacyCtr =
+          typeof parsed.ctr === 'number' &&
+          parsed.ctr >= 27 &&
+          (parsed.dailyOrderHistory || []).length < 10;
+        const cleanCtr =
+          parsed.counterBusinessDate !== todayBizDate || hasLegacyCtr
+            ? 1
+            : parsed.ctr || 1;
+        const cleanUsed = (
+          parsed.counterBusinessDate === todayBizDate
+            ? parsed.usedCountersToday || []
+            : []
+        ).filter((c) => !hasLegacyCtr || !/^C2[4-9]$/i.test(c));
+
+        // Also clean any legacy C27/C28/C29 in sessionsByUser if migrating from prototype
+        const cleanedSessionsByUser = { ...(parsed.sessionsByUser || {}) };
+        if (hasLegacyCtr) {
+          for (const k of Object.keys(cleanedSessionsByUser)) {
+            const snap = cleanedSessionsByUser[k];
+            if (snap?.sess?.no && /^C2[4-9]$/i.test(snap.sess.no)) {
+              delete cleanedSessionsByUser[k];
+            }
+          }
+        }
+        const cleanedActiveSess =
+          hasLegacyCtr && parsed.sess?.no && /^C2[4-9]$/i.test(parsed.sess.no)
+            ? null
+            : parsed.sess ?? null;
+
         setS((prev) => ({
           ...prev,
           ...parsed,
+          ctr: cleanCtr,
+          counterBusinessDate: todayBizDate,
+          usedCountersToday: cleanUsed,
+          sessionsByUser: cleanedSessionsByUser,
+          sess: cleanedActiveSess,
+          orders: cleanedActiveSess ? parsed.orders || [] : [],
+          cart: cleanedActiveSess ? parsed.cart || {} : {},
+          status: cleanedActiveSess ? parsed.status || 0 : 0,
           activeTable: initialTableId || parsed.activeTable || prev.activeTable,
           toast: '',
         }));

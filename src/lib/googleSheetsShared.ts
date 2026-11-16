@@ -634,12 +634,15 @@ export function parseDailyCountersAndStateFromSheets(
       if (k === 'next_counter_number') cfgNextCtr = Number(v) || 0;
       if (k === 'used_counters_today') cfgUsed = v;
     }
-    if (cfgDate === todayBizDate) {
-      if (cfgNextCtr > maxNumberSeen + 1) {
+      if (cfgDate === todayBizDate) {
+      if (cfgNextCtr > maxNumberSeen + 1 && cfgNextCtr < 24) {
         maxNumberSeen = cfgNextCtr - 1;
       }
       if (cfgUsed) {
-        cfgUsed.split(',').forEach((c) => recordCounter(c));
+        cfgUsed
+          .split(',')
+          .filter((c) => !/^C2[4-9]$/i.test(c.trim()))
+          .forEach((c) => recordCounter(c));
       }
     }
   }

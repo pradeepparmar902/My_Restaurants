@@ -200,8 +200,8 @@ export const INITIAL_STATE: AppState = {
     },
   ],
   samp: [
-    { id: 'samp-1', no: 'C24', t: 2, a: 540, s: 'Bill pushed', mob: '+919820112233' },
-    { id: 'samp-2', no: 'C25', t: 6, a: 320, s: 'In kitchen' },
+    { id: 'samp-1', no: 'DEMO-1', t: 2, a: 540, s: 'Bill pushed', mob: '+919820112233' },
+    { id: 'samp-2', no: 'DEMO-2', t: 6, a: 320, s: 'In kitchen' },
   ],
   spaid: 0,
 
