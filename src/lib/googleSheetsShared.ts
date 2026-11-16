@@ -1,17 +1,27 @@
 import { AppState, Dish, StaffMember, StaffRoleName } from '@/types/tadka';
-import { getSubtotal, getDiscount, getGST, getTotal } from '@/lib/helpers';
+import {
+  getSubtotal,
+  getDiscount,
+  getGST,
+  getTotal,
+  formatIndianDateTime,
+  formatItemsSummary,
+  getCurrentBusinessDate,
+} from '@/lib/helpers';
+import { ORDER_STATUS_LABELS } from '@/lib/constants';
 
 export type SheetTabName =
-  | 'Restaurant_Config'
-  | 'Menu_Items'
-  | 'Staff_Access'
-  | 'Sessions'
+  | 'Daily_Counters'
   | 'Orders'
   | 'Bills_Payments'
+  | 'Menu_Items'
+  | 'Sessions'
+  | 'Staff_Access'
   | 'Loyalty_Ledger'
   | 'Social_Reels_Reviews'
   | 'Audit_Log'
-  | 'Drive_Assets';
+  | 'Drive_Assets'
+  | 'Restaurant_Config';
 
 export function buildSheetRowsForState(
   state: AppState
@@ -64,73 +74,197 @@ export function buildSheetRowsForState(
     ...state.staff.map((s) => [s.id, s.n, s.ph, s.r, s.mg, s.on === 1]),
   ];
 
+  const businessDateToday =
+    state.counterBusinessDate || getCurrentBusinessDate();
+
   const Sessions: (string | number | boolean)[][] = [
     [
-      'Session_ID',
+      'Business_Date',
+      'Date',
+      'Time',
       'Counter_No',
       'Table_No',
       'Customer_Mobile',
+      'Items_Ordered_Menu',
+      'Session_Subtotal_INR',
       'Status',
       'Created_By_Staff',
       'WhatsApp_Consent',
-      'Business_Date',
-      'Created_At',
+      'Session_ID',
     ],
     ...(state.sess
-      ? [
-          [
-            state.sess.id,
-            state.sess.no,
-            state.sess.table,
-            state.sess.mob || 'Guest',
-            state.sess.status,
-            !!state.sess.staff,
-            !!state.sess.waConsent,
-            state.sess.businessDate,
-            state.sess.createdAt,
-          ],
-        ]
+      ? (() => {
+          const { dateFormatted, timeFormatted } = formatIndianDateTime(
+            state.sess.createdAt
+          );
+          const { summary, subtotal: sessSub } = formatItemsSummary(
+            state.menu,
+            state.cart
+          );
+          return [
+            [
+              state.sess.businessDate || businessDateToday,
+              dateFormatted,
+              timeFormatted,
+              state.sess.no,
+              state.sess.table,
+              state.sess.mob || 'Guest',
+              summary || 'No items yet',
+              sessSub,
+              state.sess.status.toUpperCase(),
+              !!state.sess.staff,
+              !!state.sess.waConsent,
+              state.sess.id,
+            ],
+          ];
+        })()
       : []),
   ];
 
-  const Orders: (string | number | boolean)[][] = [
-    [
-      'Order_ID',
-      'Order_Seq',
-      'Counter_No',
-      'Table_No',
-      'Source',
-      'Status',
-      'Items_Summary',
-      'VIP',
-      'Rush',
-      'Created_At',
-    ],
-    ...state.orders.map((o) => {
-      const summary = state.menu
-        .filter((m) => o.it[m.id])
-        .map((m) => `${o.it[m.id]}x ${m.n.en}`)
-        .join(', ');
+  // Combine active session orders + persistent dailyOrderHistory so completed visits stay in the Orders sheet
+  const activeOrderRows: (string | number | boolean)[][] = state.orders.map(
+    (o) => {
+      const { dateFormatted, timeFormatted } = formatIndianDateTime(o.createdAt);
+      const { summary, totalQty, subtotal: ordSub } = formatItemsSummary(
+        state.menu,
+        o.it,
+        o.prices
+      );
       return [
-        o.id,
-        o.k,
+        state.sess?.businessDate || businessDateToday,
+        dateFormatted,
+        timeFormatted,
         state.sess?.no || 'Pending',
         state.activeTable,
-        o.src,
-        o.st,
+        o.k,
+        o.src === 'waiter' ? 'Waiter' : 'Customer App',
+        state.sess?.mob || state.me.mob || 'Guest',
         summary,
+        totalQty,
+        ordSub,
+        ORDER_STATUS_LABELS[o.st] || String(o.st),
+        state.paid ? 'PAID' : 'UNPAID',
+        state.paid ? state.pm : 'Pending',
         !!o.vip,
         !!o.rush,
-        o.createdAt,
+        o.id,
+      ];
+    }
+  );
+
+  const historicalOrderRows: (string | number | boolean)[][] = (
+    state.dailyOrderHistory || []
+  )
+    .filter((h) => !state.orders.some((o) => o.id === h.id))
+    .map((h) => [
+      h.businessDate,
+      h.dateFormatted,
+      h.timeFormatted,
+      h.counterNo,
+      h.tableNo,
+      h.orderSeq,
+      h.source === 'waiter' ? 'Waiter' : 'Customer App',
+      h.customerMob || 'Guest',
+      h.itemsDetailed,
+      h.totalItemsQty,
+      h.orderSubtotal,
+      h.orderStatus,
+      h.billStatus,
+      h.paymentMethod,
+      false,
+      false,
+      h.id,
+    ]);
+
+  const Orders: (string | number | boolean)[][] = [
+    [
+      'Business_Date',
+      'Date',
+      'Time',
+      'Counter_No',
+      'Table_No',
+      'Order_Round',
+      'Order_Source',
+      'Customer_Mobile',
+      'Menu_Items_Ordered',
+      'Total_Qty',
+      'Order_Amount_INR',
+      'Kitchen_Status',
+      'Bill_Status',
+      'Payment_Method',
+      'VIP',
+      'Rush',
+      'Order_ID',
+    ],
+    ...activeOrderRows,
+    ...historicalOrderRows,
+  ];
+
+  // Daily_Counters: Day-wise counter number tracker (C1, C2, C3... per Business Date with Date, Time, Menu, Amount, Status)
+  const Daily_Counters: (string | number | boolean)[][] = [
+    [
+      'Business_Date',
+      'Date',
+      'Time',
+      'Counter_No',
+      'Counter_Mode',
+      'Table_No',
+      'Customer_Mobile',
+      'Menu_Items_Ordered',
+      'Total_Bill_INR',
+      'Payment_Status',
+      'Payment_Method',
+    ],
+    ...(state.sess && !state.paid
+      ? (() => {
+          const { dateFormatted, timeFormatted } = formatIndianDateTime(
+            state.sess.createdAt
+          );
+          const { summary } = formatItemsSummary(state.menu, state.cart);
+          return [
+            [
+              state.sess.businessDate || businessDateToday,
+              dateFormatted,
+              timeFormatted,
+              state.sess.no,
+              state.cmode.toUpperCase(),
+              state.activeTable,
+              state.sess.mob || state.me.mob || 'Guest',
+              summary || 'In progress',
+              total,
+              'OPEN / UNPAID',
+              state.pm,
+            ],
+          ];
+        })()
+      : []),
+    ...state.hist.map((h) => {
+      const { dateFormatted, timeFormatted } = formatIndianDateTime(h.paidAt);
+      return [
+        h.businessDate || businessDateToday,
+        dateFormatted,
+        timeFormatted,
+        h.counterNo || 'C1',
+        state.cmode.toUpperCase(),
+        h.table || state.activeTable,
+        h.customerMob || 'Guest',
+        h.itemsSummary || 'Paid Visit Items',
+        h.a,
+        'PAID',
+        h.m,
       ];
     }),
   ];
 
   const Bills_Payments: (string | number | boolean)[][] = [
     [
-      'Record_ID',
+      'Business_Date',
+      'Date',
+      'Time',
       'Counter_No',
       'Table_No',
+      'Customer_Mobile',
+      'Menu_Items_Ordered',
       'Subtotal_INR',
       'Discount_INR',
       'GST_5Pct_INR',
@@ -138,38 +272,53 @@ export function buildSheetRowsForState(
       'Payment_Method',
       'Tagged_By',
       'Status',
-      'Timestamp',
+      'Record_ID',
     ],
     ...(state.sess && !state.paid
-      ? [
-          [
-            `live-${state.sess.id}`,
-            state.sess.no,
-            state.activeTable,
-            subtotal,
-            discount,
-            gst,
-            total,
-            state.pm,
-            state.billSrc || 'draft',
-            'UNPAID',
-            new Date().toISOString(),
-          ],
-        ]
+      ? (() => {
+          const { dateFormatted, timeFormatted } = formatIndianDateTime();
+          const { summary } = formatItemsSummary(state.menu, state.cart);
+          return [
+            [
+              state.sess.businessDate || businessDateToday,
+              dateFormatted,
+              timeFormatted,
+              state.sess.no,
+              state.activeTable,
+              state.sess.mob || state.me.mob || 'Guest',
+              summary,
+              subtotal,
+              discount,
+              gst,
+              total,
+              state.pm,
+              state.billSrc || 'draft',
+              'UNPAID',
+              `live-${state.sess.id}`,
+            ],
+          ];
+        })()
       : []),
-    ...state.hist.map((h) => [
-      h.id,
-      h.counterNo || 'C27',
-      h.table || state.activeTable,
-      h.a,
-      0,
-      Math.round(h.a * 0.05),
-      h.a,
-      h.m,
-      h.o,
-      'PAID',
-      h.paidAt,
-    ]),
+    ...state.hist.map((h) => {
+      const { dateFormatted, timeFormatted } = formatIndianDateTime(h.paidAt);
+      return [
+        h.businessDate || businessDateToday,
+        dateFormatted,
+        timeFormatted,
+        h.counterNo || 'C1',
+        h.table || state.activeTable,
+        h.customerMob || 'Guest',
+        h.itemsSummary || 'Paid Visit',
+        h.subtotal ?? h.a,
+        h.discount ?? 0,
+        h.gst ?? Math.round(h.a * 0.05),
+        h.a,
+        h.m,
+        h.o,
+        'PAID',
+        h.id,
+      ];
+    }),
   ];
 
   const Loyalty_Ledger: (string | number | boolean)[][] = [
@@ -241,16 +390,17 @@ export function buildSheetRowsForState(
   ];
 
   return {
-    Restaurant_Config,
-    Menu_Items,
-    Staff_Access,
-    Sessions,
+    Daily_Counters,
     Orders,
     Bills_Payments,
+    Menu_Items,
+    Sessions,
+    Staff_Access,
     Loyalty_Ledger,
     Social_Reels_Reviews,
     Audit_Log,
     Drive_Assets,
+    Restaurant_Config,
   };
 }
 

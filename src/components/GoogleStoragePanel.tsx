@@ -13,16 +13,17 @@ import {
 } from '@/lib/googleSheetsShared';
 
 const SHEET_TABS: SheetTabName[] = [
-  'Restaurant_Config',
-  'Menu_Items',
-  'Staff_Access',
-  'Sessions',
+  'Daily_Counters',
   'Orders',
   'Bills_Payments',
+  'Menu_Items',
+  'Sessions',
+  'Staff_Access',
   'Loyalty_Ledger',
   'Social_Reels_Reviews',
   'Audit_Log',
   'Drive_Assets',
+  'Restaurant_Config',
 ];
 
 export function GoogleStorageAdminCard() {
@@ -36,7 +37,7 @@ export function GoogleStorageAdminCard() {
   } = useTadka();
 
   const [expanded, setExpanded] = useState(true);
-  const [selectedTab, setSelectedTab] = useState<SheetTabName>('Menu_Items');
+  const [selectedTab, setSelectedTab] = useState<SheetTabName>('Daily_Counters');
   const [showScriptModal, setShowScriptModal] = useState(false);
 
   const [webAppUrl, setWebAppUrl] = useState(

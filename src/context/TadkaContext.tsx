@@ -12,12 +12,15 @@ import {
   StaffRoleName,
   Dish,
 } from '@/types/tadka';
-import { INITIAL_STATE } from '@/lib/constants';
+import { INITIAL_STATE, ORDER_STATUS_LABELS } from '@/lib/constants';
 import {
   cleanCounterNumber,
   filterPositiveItems,
+  formatIndianDateTime,
+  formatItemsSummary,
   getActiveStaffMember,
   getAllowedPortals,
+  getCurrentBusinessDate,
   getDiscount,
   getDraftCount,
   getGST,
@@ -346,19 +349,33 @@ export function TadkaProvider({
       }
 
       updateState((prev) => {
-        let nextCtr = prev.ctr;
+        const todayBizDate = getCurrentBusinessDate();
+        const isNewBusinessDay = prev.counterBusinessDate !== todayBizDate;
+        let nextCtr = isNewBusinessDay ? 1 : prev.ctr;
+        const usedToday = isNewBusinessDay
+          ? []
+          : [...(prev.usedCountersToday || [])];
+
         let nextSess = prev.sess;
         if (!nextSess) {
           const isAuto = prev.cmode === 'auto';
+          let assignedNo = 'Pending';
+          if (isAuto) {
+            while (usedToday.includes(`C${nextCtr}`)) {
+              nextCtr++;
+            }
+            assignedNo = `C${nextCtr++}`;
+            usedToday.push(assignedNo);
+          }
           nextSess = {
             id: `sess-${Date.now()}`,
-            no: isAuto ? `C${nextCtr++}` : 'Pending',
+            no: assignedNo,
             pend: !isAuto,
             table: prev.activeTable,
             mob: normalizedOptionalMob || prev.me.mob,
             waConsent: waConsent ?? prev.waOptIn,
             status: 'open',
-            businessDate: new Date().toISOString().slice(0, 10),
+            businessDate: todayBizDate,
             createdAt: new Date().toISOString(),
           };
         } else if (normalizedOptionalMob && !nextSess.mob) {
@@ -366,21 +383,58 @@ export function TadkaProvider({
         }
 
         const nextCart = { ...prev.cart };
+        const pricesSnapshot: Record<number, number> = {};
         for (const idStr of Object.keys(it)) {
           const id = Number(idStr);
           nextCart[id] = (nextCart[id] || 0) + it[id];
+          const dish = prev.menu.find((m) => m.id === id);
+          if (dish) pricesSnapshot[id] = dish.p;
         }
 
+        const nowIso = new Date().toISOString();
+        const orderSeq = prev.orders.length + 1;
+        const orderId = `ord-${Date.now()}-${orderSeq}`;
+
         const newOrder = {
-          id: `ord-${Date.now()}-${prev.orders.length + 1}`,
-          k: prev.orders.length + 1,
+          id: orderId,
+          k: orderSeq,
           it,
+          prices: pricesSnapshot,
           st: 1 as const,
           src: 'app' as const,
           vip: prev.pts >= 100,
           rush: false,
-          createdAt: new Date().toISOString(),
+          createdAt: nowIso,
         };
+
+        const { dateFormatted, timeFormatted } = formatIndianDateTime(nowIso);
+        const { summary, totalQty, subtotal: ordSub } = formatItemsSummary(
+          prev.menu,
+          it,
+          pricesSnapshot
+        );
+
+        const nextHistory = [
+          {
+            id: orderId,
+            businessDate: nextSess.businessDate || todayBizDate,
+            dateFormatted,
+            timeFormatted,
+            counterNo: nextSess.no,
+            tableNo: prev.activeTable,
+            orderSeq,
+            source: 'app' as const,
+            customerMob: nextSess.mob || prev.me.mob || 'Guest',
+            itemsDetailed: summary,
+            totalItemsQty: totalQty,
+            orderSubtotal: ordSub,
+            orderStatus: 'Received',
+            billStatus: 'UNPAID' as const,
+            paymentMethod: 'Pending',
+            createdAt: nowIso,
+          },
+          ...(prev.dailyOrderHistory || []),
+        ];
 
         // Fire-and-forget server sync
         fetch('/api/orders', {
@@ -392,6 +446,9 @@ export function TadkaProvider({
         return {
           ...prev,
           ctr: nextCtr,
+          counterBusinessDate: todayBizDate,
+          usedCountersToday: usedToday,
+          dailyOrderHistory: nextHistory,
           sess: nextSess,
           cart: nextCart,
           orders: [...prev.orders, newOrder],
@@ -441,8 +498,19 @@ export function TadkaProvider({
   const assignNo = useCallback(() => {
     let assigned = '';
     updateState((prev) => {
-      let nextCtr = prev.ctr;
+      const todayBizDate = getCurrentBusinessDate();
+      const isNewBusinessDay = prev.counterBusinessDate !== todayBizDate;
+      let nextCtr = isNewBusinessDay ? 1 : prev.ctr;
+      const usedToday = isNewBusinessDay
+        ? []
+        : [...(prev.usedCountersToday || [])];
+
+      while (usedToday.includes(`C${nextCtr}`)) {
+        nextCtr++;
+      }
       assigned = `C${nextCtr++}`;
+      usedToday.push(assigned);
+
       const nextSess = prev.sess
         ? { ...prev.sess, no: assigned, pend: false }
         : {
@@ -452,10 +520,22 @@ export function TadkaProvider({
             table: prev.activeTable,
             mob: '',
             status: 'open' as const,
-            businessDate: new Date().toISOString().slice(0, 10),
+            businessDate: todayBizDate,
             createdAt: new Date().toISOString(),
           };
-      return { ...prev, ctr: nextCtr, sess: nextSess };
+
+      const nextHistory = (prev.dailyOrderHistory || []).map((h) =>
+        h.counterNo === 'Pending' ? { ...h, counterNo: assigned } : h
+      );
+
+      return {
+        ...prev,
+        ctr: nextCtr,
+        counterBusinessDate: todayBizDate,
+        usedCountersToday: usedToday,
+        dailyOrderHistory: nextHistory,
+        sess: nextSess,
+      };
     });
     if (assigned) say(`Assigned ${assigned} ✅`);
   }, [say, updateState]);
@@ -467,30 +547,61 @@ export function TadkaProvider({
         say('Enter the number you were given');
         return;
       }
-      if (S.samp.some((x) => x.no.toUpperCase() === v)) {
+      const todayBizDate = getCurrentBusinessDate();
+      const usedToday =
+        S.counterBusinessDate === todayBizDate
+          ? S.usedCountersToday || []
+          : [];
+      if (
+        S.samp.some((x) => x.no.toUpperCase() === v) ||
+        (usedToday.includes(v) && S.sess?.no !== v)
+      ) {
         say('That counter number is already in use today');
         return;
       }
-      updateState((prev) => ({
-        ...prev,
-        sess: prev.sess ? { ...prev.sess, no: v, pend: false } : prev.sess,
-      }));
+      updateState((prev) => {
+        const nextUsed = usedToday.includes(v) ? usedToday : [...usedToday, v];
+        const nextHistory = (prev.dailyOrderHistory || []).map((h) =>
+          h.counterNo === 'Pending' ? { ...h, counterNo: v } : h
+        );
+        return {
+          ...prev,
+          counterBusinessDate: todayBizDate,
+          usedCountersToday: nextUsed,
+          dailyOrderHistory: nextHistory,
+          sess: prev.sess ? { ...prev.sess, no: v, pend: false } : prev.sess,
+        };
+      });
       say(`Counter ${v} saved ✅`);
     },
-    [S.samp, say, updateState]
+    [S.samp, S.counterBusinessDate, S.usedCountersToday, S.sess?.no, say, updateState]
   );
 
   const reissueNumber = useCallback(() => {
     updateState((prev) => {
       if (!prev.sess) return prev;
-      let nextCtr = prev.ctr;
-      const reissued =
-        prev.cmode === 'auto'
-          ? { no: `C${nextCtr++}`, pend: false }
-          : { no: 'Pending', pend: true };
+      const todayBizDate = getCurrentBusinessDate();
+      const isNewBusinessDay = prev.counterBusinessDate !== todayBizDate;
+      let nextCtr = isNewBusinessDay ? 1 : prev.ctr;
+      const usedToday = isNewBusinessDay
+        ? []
+        : [...(prev.usedCountersToday || [])];
+
+      let reissued = { no: 'Pending', pend: true };
+      if (prev.cmode === 'auto') {
+        while (usedToday.includes(`C${nextCtr}`)) {
+          nextCtr++;
+        }
+        const newNo = `C${nextCtr++}`;
+        usedToday.push(newNo);
+        reissued = { no: newNo, pend: false };
+      }
+
       return {
         ...prev,
         ctr: nextCtr,
+        counterBusinessDate: todayBizDate,
+        usedCountersToday: usedToday,
         sess: { ...prev.sess, ...reissued },
       };
     });
@@ -499,10 +610,24 @@ export function TadkaProvider({
   const advanceOrderStatus = useCallback(
     (orderIndex: number, nextStatus: 1 | 2 | 3 | 4 | 5) => {
       updateState((prev) => {
+        const targetOrder = prev.orders[orderIndex];
         const nextOrders = prev.orders.map((o, idx) =>
           idx === orderIndex ? { ...o, st: nextStatus } : o
         );
-        return { ...prev, orders: nextOrders, status: nextStatus };
+        const nextHistory = (prev.dailyOrderHistory || []).map((h) =>
+          targetOrder && h.id === targetOrder.id
+            ? {
+                ...h,
+                orderStatus: ORDER_STATUS_LABELS[nextStatus] || String(nextStatus),
+              }
+            : h
+        );
+        return {
+          ...prev,
+          orders: nextOrders,
+          dailyOrderHistory: nextHistory,
+          status: nextStatus,
+        };
       });
     },
     [updateState]
@@ -565,23 +690,37 @@ export function TadkaProvider({
 
       let targetLabel = `Table ${S.activeTable}`;
       updateState((prev) => {
-        let nextCtr = prev.ctr;
+        const todayBizDate = getCurrentBusinessDate();
+        const isNewBusinessDay = prev.counterBusinessDate !== todayBizDate;
+        let nextCtr = isNewBusinessDay ? 1 : prev.ctr;
+        const usedToday = isNewBusinessDay
+          ? []
+          : [...(prev.usedCountersToday || [])];
+
         let nextSess = prev.sess;
         if (!nextSess) {
           if (prev.cmode === 'auto') {
+            while (usedToday.includes(`C${nextCtr}`)) {
+              nextCtr++;
+            }
+            const assignedNo = `C${nextCtr++}`;
+            usedToday.push(assignedNo);
             nextSess = {
               id: `sess-${Date.now()}`,
-              no: `C${nextCtr++}`,
+              no: assignedNo,
               pend: false,
               table: prev.activeTable,
               mob: mv || '',
               staff: true,
               status: 'open',
-              businessDate: new Date().toISOString().slice(0, 10),
+              businessDate: todayBizDate,
               createdAt: new Date().toISOString(),
             };
           } else {
             const v = cleanCounterNumber(rawCounterNo);
+            if (v && !usedToday.includes(v)) {
+              usedToday.push(v);
+            }
             nextSess = {
               id: `sess-${Date.now()}`,
               no: v || 'Pending',
@@ -590,7 +729,7 @@ export function TadkaProvider({
               mob: mv || '',
               staff: true,
               status: 'open',
-              businessDate: new Date().toISOString().slice(0, 10),
+              businessDate: todayBizDate,
               createdAt: new Date().toISOString(),
             };
           }
@@ -601,21 +740,58 @@ export function TadkaProvider({
         targetLabel = nextSess.pend ? `Table ${prev.activeTable}` : nextSess.no;
 
         const nextCart = { ...prev.cart };
+        const pricesSnapshot: Record<number, number> = {};
         for (const idStr of Object.keys(it)) {
           const id = Number(idStr);
           nextCart[id] = (nextCart[id] || 0) + it[id];
+          const dish = prev.menu.find((m) => m.id === id);
+          if (dish) pricesSnapshot[id] = dish.p;
         }
 
+        const nowIso = new Date().toISOString();
+        const orderSeq = prev.orders.length + 1;
+        const orderId = `ord-${Date.now()}-${orderSeq}`;
+
         const newOrder = {
-          id: `ord-${Date.now()}-${prev.orders.length + 1}`,
-          k: prev.orders.length + 1,
+          id: orderId,
+          k: orderSeq,
           it,
+          prices: pricesSnapshot,
           st: 1 as const,
           src: 'waiter' as const,
           vip: prev.pts >= 100,
           rush: false,
-          createdAt: new Date().toISOString(),
+          createdAt: nowIso,
         };
+
+        const { dateFormatted, timeFormatted } = formatIndianDateTime(nowIso);
+        const { summary, totalQty, subtotal: ordSub } = formatItemsSummary(
+          prev.menu,
+          it,
+          pricesSnapshot
+        );
+
+        const nextHistory = [
+          {
+            id: orderId,
+            businessDate: nextSess.businessDate || todayBizDate,
+            dateFormatted,
+            timeFormatted,
+            counterNo: nextSess.no,
+            tableNo: prev.activeTable,
+            orderSeq,
+            source: 'waiter' as const,
+            customerMob: nextSess.mob || prev.me.mob || 'Guest',
+            itemsDetailed: summary,
+            totalItemsQty: totalQty,
+            orderSubtotal: ordSub,
+            orderStatus: 'Received',
+            billStatus: 'UNPAID' as const,
+            paymentMethod: 'Pending',
+            createdAt: nowIso,
+          },
+          ...(prev.dailyOrderHistory || []),
+        ];
 
         fetch('/api/waiter/orders', {
           method: 'POST',
@@ -626,6 +802,9 @@ export function TadkaProvider({
         return {
           ...prev,
           ctr: nextCtr,
+          counterBusinessDate: todayBizDate,
+          usedCountersToday: usedToday,
+          dailyOrderHistory: nextHistory,
           sess: nextSess,
           cart: nextCart,
           orders: [...prev.orders, newOrder],
@@ -695,19 +874,45 @@ export function TadkaProvider({
       updateState((prev) => {
         const s = getSubtotal(prev.menu, prev.cart);
         const d = getDiscount(s, prev.reel, prev.review);
+        const g = getGST(s, d);
         const t = getTotal(s, d);
+        const { summary } = formatItemsSummary(prev.menu, prev.cart);
+        const todayBizDate =
+          prev.sess?.businessDate ||
+          prev.counterBusinessDate ||
+          getCurrentBusinessDate();
+
         const nextHist = [
           {
             id: `hist-${Date.now()}`,
             a: t,
+            subtotal: s,
+            discount: d,
+            gst: g,
             m: method,
             o: by,
-            counterNo: prev.sess?.no,
+            counterNo: prev.sess?.no || 'C1',
             table: prev.activeTable,
+            customerMob: prev.sess?.mob || prev.me.mob || 'Guest',
+            itemsSummary: summary,
+            businessDate: todayBizDate,
             paidAt: new Date().toISOString(),
           },
           ...prev.hist,
         ];
+
+        const activeOrderIds = new Set(prev.orders.map((o) => o.id));
+        const nextDailyHistory = (prev.dailyOrderHistory || []).map((h) =>
+          activeOrderIds.has(h.id) ||
+          (prev.sess?.no && h.counterNo === prev.sess.no && h.billStatus === 'UNPAID')
+            ? {
+                ...h,
+                billStatus: 'PAID' as const,
+                paymentMethod: `${method} (${by === 'owner' ? 'Staff Tagged' : 'Online'})`,
+              }
+            : h
+        );
+
         fetch(by === 'owner' ? '/api/payments/tag-offline' : '/api/payments/webhook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -721,6 +926,7 @@ export function TadkaProvider({
           stars: Math.min(5, prev.stars + 1),
           newStar: true,
           hist: nextHist,
+          dailyOrderHistory: nextDailyHistory,
           sess: prev.sess ? { ...prev.sess, status: 'paid' } : null,
         };
       });

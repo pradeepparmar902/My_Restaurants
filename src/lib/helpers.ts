@@ -97,3 +97,80 @@ export function getSessionRowStatus(state: AppState): string {
 export function filterPositiveItems(items: Record<number, number>): Record<number, number> {
   return Object.fromEntries(Object.entries(items).filter(([, v]) => v > 0));
 }
+
+/**
+ * Computes the restaurant's current Business Date (YYYY-MM-DD) in IST (Asia/Kolkata)
+ * with a 4:00 AM cutoff (so late-night orders before 4 AM belong to the previous business day, per PRD Section 7).
+ */
+export function getCurrentBusinessDate(now = new Date()): string {
+  // Shift back by 4 hours so 00:00-03:59 belongs to previous day
+  const shifted = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(shifted);
+    const y = parts.find((p) => p.type === 'year')?.value;
+    const m = parts.find((p) => p.type === 'month')?.value;
+    const d = parts.find((p) => p.type === 'day')?.value;
+    if (y && m && d) return `${y}-${m}-${d}`;
+  } catch {
+    // Fallback
+  }
+  return shifted.toISOString().slice(0, 10);
+}
+
+export function formatIndianDateTime(isoString?: string): {
+  dateFormatted: string;
+  timeFormatted: string;
+} {
+  const dt = isoString ? new Date(isoString) : new Date();
+  try {
+    const dateFormatted = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(dt);
+    const timeFormatted = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    }).format(dt);
+    return { dateFormatted, timeFormatted };
+  } catch {
+    return {
+      dateFormatted: dt.toISOString().slice(0, 10),
+      timeFormatted: dt.toISOString().slice(11, 19),
+    };
+  }
+}
+
+export function formatItemsSummary(
+  menu: Dish[],
+  items: Record<number, number>,
+  pricesSnapshot?: Record<number, number>
+): { summary: string; totalQty: number; subtotal: number } {
+  const parts: string[] = [];
+  let totalQty = 0;
+  let subtotal = 0;
+  for (const [idStr, qty] of Object.entries(items)) {
+    if (!qty || qty <= 0) continue;
+    const id = Number(idStr);
+    const dish = menu.find((m) => m.id === id);
+    const price = pricesSnapshot?.[id] ?? dish?.p ?? 0;
+    const lineTotal = price * qty;
+    totalQty += qty;
+    subtotal += lineTotal;
+    parts.push(`${qty}× ${dish ? dish.n.en : `Dish #${id}`} (₹${lineTotal})`);
+  }
+  return {
+    summary: parts.join(', '),
+    totalQty,
+    subtotal,
+  };
+}

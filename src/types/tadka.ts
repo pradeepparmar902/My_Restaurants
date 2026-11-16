@@ -84,11 +84,36 @@ export interface SampleBillRow {
 export interface PaidBillHistoryItem {
   id: string;
   a: number;
+  subtotal?: number;
+  discount?: number;
+  gst?: number;
   m: string;
   o: 'app' | 'owner';
   counterNo?: string;
   table?: number;
+  customerMob?: string;
+  itemsSummary?: string;
+  businessDate?: string;
   paidAt: string;
+}
+
+export interface DailyCounterOrderLogEntry {
+  id: string;
+  businessDate: string; // YYYY-MM-DD (4 AM cut-off)
+  dateFormatted: string; // e.g. 16 Nov 2026
+  timeFormatted: string; // e.g. 09:15:30 AM
+  counterNo: string; // e.g. C27
+  tableNo: number;
+  orderSeq: number;
+  source: 'app' | 'waiter';
+  customerMob: string;
+  itemsDetailed: string; // e.g. 2x Paneer Kathi Roll (₹240), 1x Pasta (₹100)
+  totalItemsQty: number;
+  orderSubtotal: number;
+  orderStatus: string;
+  billStatus: 'UNPAID' | 'PAID';
+  paymentMethod: string;
+  createdAt: string;
 }
 
 export interface AuditLogEntry {
@@ -152,7 +177,10 @@ export interface AppState {
   sess: SessionData | null;
   status: number; // legacy overall status 0..4
   tag: string; // 'rush' | ''
-  ctr: number; // next auto counter number (starts at 27)
+  ctr: number; // next auto counter number for current businessDate
+  counterBusinessDate: string; // YYYY-MM-DD business date for day-wise counter reset
+  usedCountersToday: string[]; // All counter numbers used on counterBusinessDate
+  dailyOrderHistory: DailyCounterOrderLogEntry[]; // Persistent day-wise log of all counter orders
   cmode: CounterMode;
   track: string;
   trackRes: string;

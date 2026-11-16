@@ -4,9 +4,10 @@
     "tadka-truck": {
       "name": "Tadka Truck",
       "slug": "tadka-truck",
-      "appsScriptWebAppUrl": "",
+      "appsScriptWebAppUrl": "https://script.google.com/macros/s/AKfycbyQkzH6LMy16fOcvQLdSsKNsbKmJRx3fC37d7DUTxbCKkB1nPp1ESHH0EcVS5dI6Zym/exec",
       "spreadsheetId": "17E4TMRaEc_VoAE0qajaIsgPiJpuJWDGPECR-RJRwTCs",
-      "driveFolderId": ""
+      "driveFolderId": "1MRw5ircB_XUf8jSv5vPBDTM08pwhzAMX",
+      "updatedAt": "2026-11-16T02:47:43.006Z"
     }
   }
 }

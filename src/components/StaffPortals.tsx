@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import { StaffRoleName } from '@/types/tadka';
 import { ROLE_DESCRIPTIONS } from '@/lib/constants';
-import { getSessionRowStatus } from '@/lib/helpers';
+import { getCurrentBusinessDate, getSessionRowStatus } from '@/lib/helpers';
 import {
   CountryCodeMobileInput,
   TagOfflinePaidWidget,
@@ -446,16 +446,43 @@ export function LiveAndPendingBillsCard() {
 }
 
 export function CounterNumbersModeCard() {
-  const { S, setMode, reissueNumber, assignNo } = useTadka();
+  const { S, setMode, reissueNumber, assignNo, updateState, say } = useTadka();
+  const bizDate = S.counterBusinessDate || getCurrentBusinessDate();
+
   return (
     <div className="card">
-      <h3>🎟️ Counter numbers</h3>
+      <div className="row sp">
+        <h3>🎟️ Day-wise Counter Numbers</h3>
+        <span className="tag ok">📅 {bizDate}</span>
+      </div>
+      <div className="row sp" style={{ marginTop: '6px' }}>
+        <span className="mu">
+          Next Auto Counter: <b>C{S.ctr}</b> · Issued today:{' '}
+          <b>{S.usedCountersToday?.length || 0}</b>
+        </span>
+        <button
+          className="chip"
+          style={{ fontSize: '12px', padding: '4px 10px' }}
+          onClick={() => {
+            const today = getCurrentBusinessDate();
+            updateState((p) => ({
+              ...p,
+              ctr: 1,
+              counterBusinessDate: today,
+              usedCountersToday: [],
+            }));
+            say(`Reset counter sequence to C1 for ${today} ✅`);
+          }}
+        >
+          🔄 Reset Day to C1
+        </button>
+      </div>
       <div className="row" style={{ marginTop: '8px' }}>
         <button
           className={`chip ${S.cmode === 'auto' ? 'on' : ''}`}
           onClick={() => setMode('auto')}
         >
-          Auto
+          Auto (C1, C2…)
         </button>
         <button
           className={`chip ${S.cmode === 'manual' ? 'on' : ''}`}
@@ -466,7 +493,7 @@ export function CounterNumbersModeCard() {
       </div>
       <p className="mu" style={{ marginTop: '8px' }}>
         {S.cmode === 'auto'
-          ? 'The app gives every new session the next number (C27, C28…).'
+          ? `Automatically assigns C1, C2, C3… per business day (${bizDate}, resets at 4 AM). Next up: C${S.ctr}.`
           : 'Staff give each customer a number (waiter, owner or reception). The customer enters it in the app, or staff assign it here.'}
       </p>
       {S.sess && !S.sess.pend && (
