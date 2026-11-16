@@ -31,6 +31,9 @@ export function buildSheetRowsForState(
   const gst = getGST(subtotal, discount);
   const total = getTotal(subtotal, discount);
 
+  const businessDateToday =
+    state.counterBusinessDate || getCurrentBusinessDate();
+
   const Restaurant_Config: (string | number | boolean)[][] = [
     ['Config_Key', 'Config_Value', 'Updated_At'],
     ['restaurant_slug', 'tadka-truck', new Date().toISOString()],
@@ -40,6 +43,9 @@ export function buildSheetRowsForState(
     ['driveFolderId', state.googleConfig?.driveFolderId || '', new Date().toISOString()],
     ['counter_mode', state.cmode, new Date().toISOString()],
     ['whatsapp_final_bill', state.wab, new Date().toISOString()],
+    ['counter_business_date', businessDateToday, new Date().toISOString()],
+    ['next_counter_number', state.ctr, new Date().toISOString()],
+    ['used_counters_today', (state.usedCountersToday || []).join(','), new Date().toISOString()],
   ];
 
   const Menu_Items: (string | number | boolean)[][] = [
@@ -73,9 +79,6 @@ export function buildSheetRowsForState(
     ['Staff_ID', 'Name', 'Phone_E164', 'Role', 'Can_Manage_Access', 'Active'],
     ...state.staff.map((s) => [s.id, s.n, s.ph, s.r, s.mg, s.on === 1]),
   ];
-
-  const businessDateToday =
-    state.counterBusinessDate || getCurrentBusinessDate();
 
   const Sessions: (string | number | boolean)[][] = [
     [
@@ -569,6 +572,13 @@ export function parseStaffFromSheetRows(rows: unknown[][]): StaffMember[] | null
   return staff.length > 0 ? staff : null;
 }
 
+export interface ParsedSheetCounterState {
+  counterBusinessDate?: string;
+  nextCtr?: number;
+  usedCountersToday?: string[];
+  counterByMob: Record<string, string>;
+}
+
 export function parseConfigFromSheetRows(
   rows: unknown[][]
 ): Partial<AppState['googleConfig']> | null {
@@ -584,6 +594,76 @@ export function parseConfigFromSheetRows(
     if (key === 'driveFolderId' && val) cfg.driveFolderId = val;
   }
   return Object.keys(cfg).length > 0 ? cfg : null;
+}
+
+export function parseDailyCountersAndStateFromSheets(
+  configRows?: unknown[][],
+  dailyCountersRows?: unknown[][]
+): ParsedSheetCounterState {
+  const todayBizDate = getCurrentBusinessDate();
+  const usedSet = new Set<string>();
+  const counterByMob: Record<string, string> = {};
+  let maxNumberSeen = 0;
+
+  const recordCounter = (cnoRaw: string, mobRaw?: string, statusRaw?: string) => {
+    const cno = (cnoRaw || '').trim().toUpperCase();
+    if (!cno || cno === 'PENDING' || cno === 'COUNTER_NO') return;
+    usedSet.add(cno);
+    const numMatch = cno.match(/^C(\d+)$/i);
+    if (numMatch && numMatch[1]) {
+      const n = Number(numMatch[1]);
+      if (n > maxNumberSeen) maxNumberSeen = n;
+    }
+    const mob = (mobRaw || '').trim();
+    const st = (statusRaw || '').toUpperCase();
+    if (mob && mob !== 'Guest' && !st.includes('PAID')) {
+      counterByMob[mob] = cno;
+    }
+  };
+
+  if (Array.isArray(configRows) && configRows.length > 1) {
+    let cfgDate = '';
+    let cfgNextCtr = 0;
+    let cfgUsed = '';
+    for (let i = 1; i < configRows.length; i++) {
+      const r = configRows[i];
+      if (!r || !r[0]) continue;
+      const k = String(r[0]).trim();
+      const v = String(r[1] ?? '').trim();
+      if (k === 'counter_business_date') cfgDate = v;
+      if (k === 'next_counter_number') cfgNextCtr = Number(v) || 0;
+      if (k === 'used_counters_today') cfgUsed = v;
+    }
+    if (cfgDate === todayBizDate) {
+      if (cfgNextCtr > maxNumberSeen + 1) {
+        maxNumberSeen = cfgNextCtr - 1;
+      }
+      if (cfgUsed) {
+        cfgUsed.split(',').forEach((c) => recordCounter(c));
+      }
+    }
+  }
+
+  if (Array.isArray(dailyCountersRows) && dailyCountersRows.length > 1) {
+    for (let i = 1; i < dailyCountersRows.length; i++) {
+      const r = dailyCountersRows[i];
+      if (!r || !r[0]) continue;
+      const rowBizDate = String(r[0] || '').trim();
+      const rowCounterNo = String(r[3] || '').trim();
+      const rowMob = String(r[6] || '').trim();
+      const rowPayStatus = String(r[9] || '').trim();
+      if (!rowBizDate || rowBizDate === todayBizDate) {
+        recordCounter(rowCounterNo, rowMob, rowPayStatus);
+      }
+    }
+  }
+
+  return {
+    counterBusinessDate: todayBizDate,
+    nextCtr: maxNumberSeen > 0 ? maxNumberSeen + 1 : undefined,
+    usedCountersToday: Array.from(usedSet),
+    counterByMob,
+  };
 }
 
 export const GOOGLE_APPS_SCRIPT_TEMPLATE = `/**

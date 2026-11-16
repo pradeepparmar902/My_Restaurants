@@ -35,6 +35,8 @@ import {
   extractSpreadsheetIdFromUrl,
   parseConfigFromSheetRows,
   parseCsvToRows,
+  parseDailyCountersAndStateFromSheets,
+  ParsedSheetCounterState,
   parseMenuFromSheetRows,
   parseStaffFromSheetRows,
 } from '@/lib/googleSheetsShared';
@@ -368,6 +370,22 @@ export function TadkaProvider({
         const usedToday = isNewBusinessDay
           ? []
           : [...(prev.usedCountersToday || [])];
+
+        // Also scan all known open sessions & today's history so no counter number can EVER collide
+        Object.values(prev.sessionsByUser || {}).forEach((snap) => {
+          if (snap.sess?.no && snap.sess.no !== 'Pending') {
+            if (!usedToday.includes(snap.sess.no)) usedToday.push(snap.sess.no);
+            const m = snap.sess.no.match(/^C(\d+)$/i);
+            if (m && Number(m[1]) >= nextCtr) nextCtr = Number(m[1]) + 1;
+          }
+        });
+        (prev.dailyOrderHistory || []).forEach((h) => {
+          if (h.businessDate === todayBizDate && h.counterNo && h.counterNo !== 'Pending') {
+            if (!usedToday.includes(h.counterNo)) usedToday.push(h.counterNo);
+            const m = h.counterNo.match(/^C(\d+)$/i);
+            if (m && Number(m[1]) >= nextCtr) nextCtr = Number(m[1]) + 1;
+          }
+        });
 
         let nextSess = prev.sess;
         // If an existing session on this browser belonged to a DIFFERENT mobile number, do NOT reuse it — open a brand-new counter number!
@@ -723,6 +741,22 @@ export function TadkaProvider({
           ? []
           : [...(prev.usedCountersToday || [])];
 
+        // Also scan all known open sessions & today's history so no counter number can EVER collide
+        Object.values(prev.sessionsByUser || {}).forEach((snap) => {
+          if (snap.sess?.no && snap.sess.no !== 'Pending') {
+            if (!usedToday.includes(snap.sess.no)) usedToday.push(snap.sess.no);
+            const m = snap.sess.no.match(/^C(\d+)$/i);
+            if (m && Number(m[1]) >= nextCtr) nextCtr = Number(m[1]) + 1;
+          }
+        });
+        (prev.dailyOrderHistory || []).forEach((h) => {
+          if (h.businessDate === todayBizDate && h.counterNo && h.counterNo !== 'Pending') {
+            if (!usedToday.includes(h.counterNo)) usedToday.push(h.counterNo);
+            const m = h.counterNo.match(/^C(\d+)$/i);
+            if (m && Number(m[1]) >= nextCtr) nextCtr = Number(m[1]) + 1;
+          }
+        });
+
         let nextSess = prev.sess;
         if (!nextSess) {
           if (prev.cmode === 'auto') {
@@ -1055,6 +1089,8 @@ export function TadkaProvider({
       );
 
       updateState((prev) => switchUserSessionInState(prev, mob, landingRole));
+      // Also pull latest counter sequence from Google Sheet so a second browser/incognito tab never reuses a counter number
+      pullFromGoogleSheets(undefined, true);
 
       if (staffMember) {
         say(`Logged in as ${staffMember.r} ✅`);
@@ -1064,7 +1100,7 @@ export function TadkaProvider({
         say('Logged in ✅ Place a new order to get your counter number');
       }
     },
-    [S.lg.mob, S.staff, S.sessionsByUser, S.sess, say, updateState]
+    [S.lg.mob, S.staff, S.sessionsByUser, S.sess, say, updateState, pullFromGoogleSheets]
   );
 
   const logoutOrOpenLogin = useCallback(() => {
@@ -1401,6 +1437,7 @@ export function TadkaProvider({
       let pulledMenu: Dish[] | null = null;
       let pulledStaff: AppState['staff'] | null = null;
       let pulledConfig: Partial<AppState['googleConfig']> | null = null;
+      let pulledCounters: ParsedSheetCounterState | null = null;
 
       // 1. Try Server Proxy (/api/storage/sheets?pull=1) — avoids all browser CORS redirect issues on localhost
       try {
@@ -1421,6 +1458,10 @@ export function TadkaProvider({
             );
             pulledConfig = parseConfigFromSheetRows(
               apiData.sheets.Restaurant_Config || []
+            );
+            pulledCounters = parseDailyCountersAndStateFromSheets(
+              apiData.sheets.Restaurant_Config,
+              apiData.sheets.Daily_Counters
             );
           }
         }
@@ -1480,12 +1521,19 @@ export function TadkaProvider({
             document.body.appendChild(script);
           });
 
-        const [menuRows, cfgRows] = await Promise.all([
+        const [menuRows, cfgRows, dailyCounterRows] = await Promise.all([
           gvizFetchTab('Menu_Items'),
           gvizFetchTab('Restaurant_Config'),
+          gvizFetchTab('Daily_Counters'),
         ]);
         if (menuRows) pulledMenu = parseMenuFromSheetRows(menuRows);
         if (cfgRows) pulledConfig = parseConfigFromSheetRows(cfgRows);
+        if (cfgRows || dailyCounterRows) {
+          pulledCounters = parseDailyCountersAndStateFromSheets(
+            cfgRows || undefined,
+            dailyCounterRows || undefined
+          );
+        }
       }
 
       // 3. Fallback: Browser JSONP <script> injection to Apps Script Web App URL (bypasses CORS on GitHub Pages!)
@@ -1498,12 +1546,13 @@ export function TadkaProvider({
           menu: Dish[] | null;
           staff: AppState['staff'] | null;
           config: Partial<AppState['googleConfig']> | null;
+          counters: ParsedSheetCounterState | null;
         }>((resolve) => {
           const cbName = `__tadkaScriptCb_${Date.now()}`;
           const script = document.createElement('script');
           const timer = setTimeout(() => {
             cleanup();
-            resolve({ menu: null, staff: null, config: null });
+            resolve({ menu: null, staff: null, config: null, counters: null });
           }, 6000);
 
           function cleanup() {
@@ -1523,9 +1572,13 @@ export function TadkaProvider({
                 config: parseConfigFromSheetRows(
                   data.sheets.Restaurant_Config || []
                 ),
+                counters: parseDailyCountersAndStateFromSheets(
+                  data.sheets.Restaurant_Config,
+                  data.sheets.Daily_Counters
+                ),
               });
             } else {
-              resolve({ menu: null, staff: null, config: null });
+              resolve({ menu: null, staff: null, config: null, counters: null });
             }
           };
 
@@ -1535,13 +1588,14 @@ export function TadkaProvider({
           )}&t=${Date.now()}`;
           script.onerror = () => {
             cleanup();
-            resolve({ menu: null, staff: null, config: null });
+            resolve({ menu: null, staff: null, config: null, counters: null });
           };
           document.body.appendChild(script);
         });
         if (jsonpResult.menu) pulledMenu = jsonpResult.menu;
         if (jsonpResult.staff) pulledStaff = jsonpResult.staff;
         if (jsonpResult.config) pulledConfig = jsonpResult.config;
+        if (jsonpResult.counters) pulledCounters = jsonpResult.counters;
       }
 
       // 4. Fallback: Direct Apps Script GET / POST from browser
@@ -1592,12 +1646,29 @@ export function TadkaProvider({
         }
       }
 
-      if ((pulledMenu && pulledMenu.length > 0) || pulledConfig) {
+      if ((pulledMenu && pulledMenu.length > 0) || pulledConfig || pulledCounters) {
         setS((prev) => {
+          const todayBizDate = getCurrentBusinessDate();
+          const mergedUsed = Array.from(
+            new Set([
+              ...(prev.counterBusinessDate === todayBizDate
+                ? prev.usedCountersToday || []
+                : []),
+              ...(pulledCounters?.usedCountersToday || []),
+            ])
+          );
+          const highestCtr = Math.max(
+            prev.counterBusinessDate === todayBizDate ? prev.ctr : 1,
+            pulledCounters?.nextCtr || 1
+          );
+
           const nextState: AppState = {
             ...prev,
             menu: pulledMenu && pulledMenu.length > 0 ? pulledMenu : prev.menu,
             staff: pulledStaff || prev.staff,
+            counterBusinessDate: todayBizDate,
+            ctr: highestCtr,
+            usedCountersToday: mergedUsed,
             googleConfig: {
               ...prev.googleConfig,
               ...mergedConfig,
@@ -1627,7 +1698,7 @@ export function TadkaProvider({
           say(
             `Pulled ${
               pulledMenu ? pulledMenu.length : S.menu.length
-            } menu items & config from Google Sheet ✅`
+            } menu items & counter sequence from Google Sheet ✅`
           );
         }
       } else if (!silent) {
