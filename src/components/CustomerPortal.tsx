@@ -22,9 +22,11 @@ export function MenuTabView() {
     cnt,
     dsub,
     updateState,
+    staffOf,
   } = useTadka();
   const [optMob, setOptMob] = useState('');
   const [showOptMob, setShowOptMob] = useState(false);
+  const currentStaff = staffOf();
 
   const L: Record<Language, string> = {
     en: 'Menu',
@@ -163,10 +165,44 @@ export function MenuTabView() {
         </div>
       )}
 
+      {currentStaff && cnt() > 0 && (
+        <div className="card">
+          <div className="row sp">
+            <b>👤 Ordering on behalf of Customer ({currentStaff.r})</b>
+          </div>
+          <p className="mu" style={{ margin: '4px 0 8px', fontSize: '12px' }}>
+            Enter the customer&apos;s mobile number to place this order under
+            their name &amp; counter (leave blank to use {S.me.mob}).
+          </p>
+          <CountryCodeMobileInput
+            id="staff-cust-mob"
+            value={optMob}
+            onChange={setOptMob}
+            placeholder="Customer mobile number"
+          />
+          <label
+            className="row mu"
+            style={{ marginTop: '8px', cursor: 'pointer' }}
+          >
+            <input
+              type="checkbox"
+              checked={S.waOptIn}
+              onChange={(e) =>
+                updateState((p) => ({ ...p, waOptIn: e.target.checked }))
+              }
+            />
+            <span>Send customer&apos;s final bill on WhatsApp</span>
+          </label>
+        </div>
+      )}
+
       <button
         className="btn"
         disabled={cnt() === 0}
-        onClick={() => placeOrder(optMob, S.waOptIn)}
+        onClick={() => {
+          placeOrder(optMob, S.waOptIn);
+          if (currentStaff) setOptMob('');
+        }}
       >
         {!S.me.mob
           ? 'Login & Place order'
