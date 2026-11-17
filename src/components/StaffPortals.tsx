@@ -482,6 +482,177 @@ export function WaiterPortalView() {
               null
             : null;
 
+          const renderWsBox = (ws: WorkspaceBox) => {
+            const isSelected = selectedWs?.counterNo === ws.counterNo;
+            return (
+              <button
+                key={ws.counterNo}
+                type="button"
+                onClick={() => {
+                  if (isSelected) {
+                    setSelectedWorkspaceCounter(null);
+                  } else {
+                    setSelectedWorkspaceCounter(ws.counterNo);
+                    setActiveTable(ws.table);
+                  }
+                }}
+                style={{
+                  textAlign: 'left',
+                  padding: '10px',
+                  borderRadius: '12px',
+                  border: isSelected
+                    ? '2px solid #5cf2c0'
+                    : '1px solid #5a4690',
+                  background: isSelected
+                    ? 'rgba(92,242,192,0.14)'
+                    : 'var(--bg)',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                <div className="row sp">
+                  <b style={{ fontSize: '14px' }}>{ws.counterNo}</b>
+                  <span className="tag" style={{ fontSize: '10px' }}>
+                    T{ws.table}
+                  </span>
+                </div>
+                <div
+                  className="mu"
+                  style={{
+                    fontSize: '11px',
+                    marginTop: '3px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  📱 {ws.mob}
+                </div>
+                <div style={{ fontSize: '12px', marginTop: '3px' }}>
+                  {ws.orders.length} order{ws.orders.length === 1 ? '' : 's'} ·{' '}
+                  <b>₹{ws.totalAmt}</b>
+                </div>
+              </button>
+            );
+          };
+
+          const renderBookingForm = () => (
+            <div>
+              <h3 style={{ marginTop: selectedWs ? '10px' : 0 }}>
+                {selectedWs
+                  ? `➕ Add Another Order to ${selectedWs.counterNo} (Table ${selectedWs.table})`
+                  : `📝 Book New Order (Table ${S.activeTable})`}
+              </h3>
+
+              {!selectedWs && (
+                <div
+                  className="row"
+                  style={{ flexWrap: 'wrap', gap: '6px', margin: '8px 0 10px' }}
+                >
+                  {S.tables.map((t) => (
+                    <button
+                      key={t.id}
+                      className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
+                      style={{ fontSize: '12px' }}
+                      onClick={() => setActiveTable(t.id)}
+                    >
+                      🪑 {t.label || `Table ${t.id}`}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {S.menu
+                .filter((m) => m.available)
+                .map((m) => (
+                  <div key={m.id} className="row sp" style={{ marginTop: '8px' }}>
+                    <span>
+                      {m.e} {m.n.en} <span className="mu">₹{m.p}</span>
+                    </span>
+                    <span className="row">
+                      <button
+                        className="chip"
+                        aria-label="Remove"
+                        onClick={() => changeWaiterDraftQty(m.id, -1)}
+                      >
+                        −
+                      </button>
+                      <b>{S.WD[m.id] || 0}</b>
+                      <button
+                        className="chip"
+                        aria-label="Add"
+                        onClick={() => changeWaiterDraftQty(m.id, 1)}
+                      >
+                        +
+                      </button>
+                    </span>
+                  </div>
+                ))}
+
+              <div className="line tot">
+                <span>{waiterItemCount} items</span>
+                <span>₹{waiterDraftTotal}</span>
+              </div>
+
+              {!selectedWs && S.cmode !== 'auto' && (
+                <>
+                  <p className="mu" style={{ margin: '8px 0' }}>
+                    Manual mode: enter the counter number you gave the customer,
+                    or leave blank to set it later.
+                  </p>
+                  <input
+                    id="wno"
+                    value={wnoInput}
+                    onChange={(e) => setWnoInput(e.target.value)}
+                    placeholder="e.g. C27"
+                    className="inp"
+                    style={{ width: '100%' }}
+                  />
+                </>
+              )}
+
+              {!selectedWs && (
+                <>
+                  <p className="mu" style={{ margin: '8px 0 6px' }}>
+                    Customer WhatsApp / Mobile number (optional — for order
+                    tracking &amp; final bill):
+                  </p>
+                  <CountryCodeMobileInput
+                    id="wmob"
+                    value={wmobInput}
+                    onChange={setWmobInput}
+                  />
+                </>
+              )}
+
+              <button
+                className="btn"
+                disabled={waiterItemCount === 0}
+                onClick={() => {
+                  bookWaiter(
+                    selectedWs
+                      ? selectedWs.mob === 'Guest'
+                        ? ''
+                        : selectedWs.mob
+                      : wmobInput,
+                    wnoInput,
+                    selectedWs ? selectedWs.counterNo : null
+                  );
+                  setWmobInput('');
+                  setWnoInput('');
+                }}
+              >
+                {selectedWs
+                  ? `➕ Add to ${selectedWs.counterNo} · ₹${waiterDraftTotal}`
+                  : `🆕 Book New Order · ₹${waiterDraftTotal}`}
+              </button>
+            </div>
+          );
+
+          const otherWorkspaces = selectedWs
+            ? workspaces.filter((w) => w.counterNo !== selectedWs.counterNo)
+            : workspaces;
+
           return (
             <>
               <div className="card">
@@ -492,8 +663,8 @@ export function WaiterPortalView() {
                   </span>
                 </div>
                 <p className="mu" style={{ margin: '4px 0 10px', fontSize: '12px' }}>
-                  Tap any counter box to view placed orders &amp; add another
-                  round, or tap &ldquo;+ New Order&rdquo; for a new customer.
+                  Tap any counter box to view its orders &amp; add another round
+                  right there, or tap &ldquo;+ New Order&rdquo;.
                 </p>
                 <div
                   style={{
@@ -529,212 +700,81 @@ export function WaiterPortalView() {
                     </div>
                   </button>
 
-                  {workspaces.map((ws) => {
-                    const isSelected = selectedWs?.counterNo === ws.counterNo;
-                    return (
-                      <button
-                        key={ws.counterNo}
-                        type="button"
-                        onClick={() => {
-                          setSelectedWorkspaceCounter(ws.counterNo);
-                          setActiveTable(ws.table);
-                        }}
-                        style={{
-                          textAlign: 'left',
-                          padding: '10px',
-                          borderRadius: '12px',
-                          border: isSelected
-                            ? '2px solid #5cf2c0'
-                            : '1px solid #5a4690',
-                          background: isSelected
-                            ? 'rgba(92,242,192,0.14)'
-                            : 'var(--bg)',
-                          color: 'inherit',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <div className="row sp">
-                          <b style={{ fontSize: '14px' }}>{ws.counterNo}</b>
-                          <span className="tag" style={{ fontSize: '10px' }}>
-                            T{ws.table}
-                          </span>
-                        </div>
-                        <div
-                          className="mu"
-                          style={{
-                            fontSize: '11px',
-                            marginTop: '3px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          📱 {ws.mob}
-                        </div>
-                        <div style={{ fontSize: '12px', marginTop: '3px' }}>
-                          {ws.orders.length} order{ws.orders.length === 1 ? '' : 's'}{' '}
-                          · <b>₹{ws.totalAmt}</b>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                  {selectedWs && renderWsBox(selectedWs)}
 
-              {selectedWs && (
-                <div className="card">
-                  <div className="row sp">
-                    <h3 style={{ margin: 0 }}>
-                      📋 {selectedWs.counterNo} · Table {selectedWs.table}
-                    </h3>
-                    <button
-                      className="chip"
-                      style={{ fontSize: '11px' }}
-                      onClick={() => setSelectedWorkspaceCounter(null)}
-                    >
-                      + New Order
-                    </button>
-                  </div>
-                  <p className="mu" style={{ margin: '4px 0 8px', fontSize: '12px' }}>
-                    Customer: <b>📱 {selectedWs.mob}</b> · Total:{' '}
-                    <b>₹{selectedWs.totalAmt}</b>
-                  </p>
-                  {selectedWs.orders.map((ord) => (
+                  {selectedWs && (
                     <div
-                      key={ord.id}
                       style={{
-                        padding: '8px',
-                        borderRadius: '10px',
-                        background: 'var(--bg)',
-                        border: '1px solid #382562',
-                        marginBottom: '6px',
+                        gridColumn: '1 / -1',
+                        padding: '12px',
+                        borderRadius: '12px',
+                        background: 'rgba(92,242,192,0.06)',
+                        border: '1px solid #5cf2c0',
                       }}
                     >
                       <div className="row sp">
-                        <b>Order {ord.round}</b>
-                        <span className="tag" style={{ fontSize: '11px' }}>
-                          {ord.status}
-                        </span>
+                        <h3 style={{ margin: 0 }}>
+                          📋 {selectedWs.counterNo} · Table {selectedWs.table}
+                        </h3>
+                        <button
+                          className="chip"
+                          style={{ fontSize: '11px' }}
+                          onClick={() => setSelectedWorkspaceCounter(null)}
+                        >
+                          ✕ Close
+                        </button>
                       </div>
-                      <div className="line" style={{ marginTop: '4px', fontSize: '13px' }}>
-                        <span>{ord.itemsText}</span>
-                        <span>₹{ord.amt}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="card">
-                <h3>
-                  {selectedWs
-                    ? `➕ Add Another Order to ${selectedWs.counterNo} (Table ${selectedWs.table})`
-                    : `📝 Book New Order (Table ${S.activeTable})`}
-                </h3>
-
-                {!selectedWs && (
-                  <div
-                    className="row"
-                    style={{ flexWrap: 'wrap', gap: '6px', margin: '8px 0 10px' }}
-                  >
-                    {S.tables.map((t) => (
-                      <button
-                        key={t.id}
-                        className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
-                        style={{ fontSize: '12px' }}
-                        onClick={() => setActiveTable(t.id)}
+                      <p
+                        className="mu"
+                        style={{ margin: '4px 0 8px', fontSize: '12px' }}
                       >
-                        🪑 {t.label || `Table ${t.id}`}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                        Customer: <b>📱 {selectedWs.mob}</b> · Total:{' '}
+                        <b>₹{selectedWs.totalAmt}</b>
+                      </p>
+                      {selectedWs.orders.map((ord) => (
+                        <div
+                          key={ord.id}
+                          style={{
+                            padding: '8px',
+                            borderRadius: '10px',
+                            background: 'var(--bg)',
+                            border: '1px solid #382562',
+                            marginBottom: '6px',
+                          }}
+                        >
+                          <div className="row sp">
+                            <b>Order {ord.round}</b>
+                            <span className="tag" style={{ fontSize: '11px' }}>
+                              {ord.status}
+                            </span>
+                          </div>
+                          <div
+                            className="line"
+                            style={{ marginTop: '4px', fontSize: '13px' }}
+                          >
+                            <span>{ord.itemsText}</span>
+                            <span>₹{ord.amt}</span>
+                          </div>
+                        </div>
+                      ))}
 
-                {S.menu
-                  .filter((m) => m.available)
-                  .map((m) => (
-                    <div key={m.id} className="row sp" style={{ marginTop: '8px' }}>
-                      <span>
-                        {m.e} {m.n.en} <span className="mu">₹{m.p}</span>
-                      </span>
-                      <span className="row">
-                        <button
-                          className="chip"
-                          aria-label="Remove"
-                          onClick={() => changeWaiterDraftQty(m.id, -1)}
-                        >
-                          −
-                        </button>
-                        <b>{S.WD[m.id] || 0}</b>
-                        <button
-                          className="chip"
-                          aria-label="Add"
-                          onClick={() => changeWaiterDraftQty(m.id, 1)}
-                        >
-                          +
-                        </button>
-                      </span>
+                      <div
+                        style={{
+                          marginTop: '10px',
+                          paddingTop: '10px',
+                          borderTop: '1px dashed #5a4690',
+                        }}
+                      >
+                        {renderBookingForm()}
+                      </div>
                     </div>
-                  ))}
+                  )}
 
-                <div className="line tot">
-                  <span>{waiterItemCount} items</span>
-                  <span>₹{waiterDraftTotal}</span>
+                  {otherWorkspaces.map((ws) => renderWsBox(ws))}
                 </div>
-
-                {!selectedWs && S.cmode !== 'auto' && (
-                  <>
-                    <p className="mu" style={{ margin: '8px 0' }}>
-                      Manual mode: enter the counter number you gave the customer,
-                      or leave blank to set it later.
-                    </p>
-                    <input
-                      id="wno"
-                      value={wnoInput}
-                      onChange={(e) => setWnoInput(e.target.value)}
-                      placeholder="e.g. C27"
-                      className="inp"
-                      style={{ width: '100%' }}
-                    />
-                  </>
-                )}
-
-                {!selectedWs && (
-                  <>
-                    <p className="mu" style={{ margin: '8px 0 6px' }}>
-                      Customer WhatsApp / Mobile number (optional — for order
-                      tracking &amp; final bill):
-                    </p>
-                    <CountryCodeMobileInput
-                      id="wmob"
-                      value={wmobInput}
-                      onChange={setWmobInput}
-                    />
-                  </>
-                )}
-
-                <button
-                  className="btn"
-                  disabled={waiterItemCount === 0}
-                  onClick={() => {
-                    bookWaiter(
-                      selectedWs
-                        ? selectedWs.mob === 'Guest'
-                          ? ''
-                          : selectedWs.mob
-                        : wmobInput,
-                      wnoInput,
-                      selectedWs ? selectedWs.counterNo : null
-                    );
-                    setWmobInput('');
-                    setWnoInput('');
-                  }}
-                >
-                  {selectedWs
-                    ? `➕ Add to ${selectedWs.counterNo} · ₹${waiterDraftTotal}`
-                    : `🆕 Book New Order · ₹${waiterDraftTotal}`}
-                </button>
               </div>
+
+              {!selectedWs && <div className="card">{renderBookingForm()}</div>}
             </>
           );
         })()
