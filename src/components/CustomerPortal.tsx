@@ -245,7 +245,9 @@ export function EnterCounterNumberCard() {
 }
 
 export function OrderTabView() {
-  const { S, setTab, say } = useTadka();
+  const { S, setTab, say, inviteMemberToSession, removeInvitedMember } =
+    useTadka();
+  const [inviteMob, setInviteMob] = useState('');
   const stepIcons = ['📥', '🍳', '🛎️', '✅'];
 
   if (!S.sess) {
@@ -263,6 +265,11 @@ export function OrderTabView() {
     );
   }
 
+  const isPrincipalUser = !S.sess.mob || S.sess.mob === S.me.mob;
+  const activeTableLabel =
+    S.tables.find((t) => t.id === S.activeTable)?.label ||
+    `Table ${S.activeTable}`;
+
   return (
     <>
       {S.sess.pend ? (
@@ -274,8 +281,18 @@ export function OrderTabView() {
         >
           <h1>Counter {S.sess.no}</h1>
           <p>
-            Table {S.activeTable} · one session until you pay. Show this number
+            {activeTableLabel} · one session until you pay. Show this number
             to the waiter.
+          </p>
+        </div>
+      )}
+
+      {!isPrincipalUser && S.sess.mob && (
+        <div className="wa" style={{ margin: '0 0 10px' }}>
+          <b>👥 Joined {S.sess.mob}’s Table (Clubbed Bill)</b>
+          <p className="mu" style={{ marginTop: '4px' }}>
+            Orders you place here will be added to Counter {S.sess.no} and billed
+            to {S.sess.mob}.
           </p>
         </div>
       )}
@@ -285,7 +302,11 @@ export function OrderTabView() {
           <div className="row sp">
             <h3>
               Order {o.k}
-              {o.src === 'waiter' ? ' · by waiter' : ''}
+              {o.src === 'waiter'
+                ? ' · by waiter'
+                : o.orderedByMob && o.orderedByMob !== S.sess?.mob
+                  ? ` · by ${o.orderedByMob}`
+                  : ''}
             </h3>
             <span className="tag hot">{ORDER_STATUS_LABELS[o.st]}</span>
           </div>
@@ -310,6 +331,52 @@ export function OrderTabView() {
         </div>
       ))}
 
+      {!S.paid && isPrincipalUser && (
+        <div className="card">
+          <h3>👥 Invite Friends to Your Table</h3>
+          <p className="mu" style={{ margin: '4px 0 8px' }}>
+            Invited mobile numbers can log in on their own phone and order for{' '}
+            {activeTableLabel} — all orders club into your single bill (Counter{' '}
+            {S.sess.no}).
+          </p>
+          <CountryCodeMobileInput
+            id="inv-mob"
+            value={inviteMob}
+            onChange={setInviteMob}
+            placeholder="Friend's mobile number"
+          />
+          <button
+            className="btn alt"
+            onClick={() => {
+              inviteMemberToSession(inviteMob);
+              setInviteMob('');
+            }}
+          >
+            + Invite to Table Bill
+          </button>
+          {(S.sess.invitedMobs || []).length > 0 && (
+            <div style={{ marginTop: '10px' }}>
+              <span className="mu">Invited members:</span>
+              {(S.sess.invitedMobs || []).map((m) => (
+                <div
+                  key={m}
+                  className="row sp"
+                  style={{ marginTop: '6px' }}
+                >
+                  <span>📱 {m}</span>
+                  <button
+                    className="chip"
+                    onClick={() => removeInvitedMember(m)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <button className="btn alt" onClick={() => setTab('menu')}>
         + Add more items
       </button>
@@ -318,7 +385,7 @@ export function OrderTabView() {
         onClick={() =>
           say(
             `Waiter is coming to ${
-              S.sess?.pend ? `Table ${S.activeTable}` : S.sess?.no
+              S.sess?.pend ? activeTableLabel : S.sess?.no
             } 🙋`
           )
         }

@@ -67,6 +67,8 @@ interface TadkaContextValue {
   // Ordering & Cart
   changeDraftQty: (dishId: number, delta: number) => void;
   placeOrder: (optionalMobRaw?: string, waConsent?: boolean) => void;
+  inviteMemberToSession: (rawMob: string) => void;
+  removeInvitedMember: (mobToRemove: string) => void;
   trackCounter: (rawCounter: string) => void;
 
   // Counter numbers
@@ -150,6 +152,7 @@ export function TadkaProvider({
   const channelRef = useRef<BroadcastChannel | null>(null);
   const isHydratedRef = useRef(false);
   const pendingOrderAfterLoginRef = useRef<{ waConsent?: boolean } | null>(null);
+  const placeOrderRef = useRef<((optionalMobRaw?: string, waConsent?: boolean) => void) | null>(null);
   const pullFromGoogleSheetsRef = useRef<
     ((overrideConfig?: Partial<AppState['googleConfig']>, silent?: boolean) => Promise<void>) | null
   >(null);
@@ -328,7 +331,7 @@ export function TadkaProvider({
       const staffMember = getActiveStaffMember(next.staff, next.me.mob);
       const allowed = getAllowedPortals(staffMember);
       const validatedRole = allowed.includes(next.role) ? next.role : 'c';
-      const activeUserKey = next.me.mob || next.sess?.mob || '__guest__';
+      const activeUserKey = next.sess?.mob || next.me.mob || '__guest__';
       const syncedSessionsByUser = {
         ...(next.sessionsByUser || {}),
         ...(next.sess || next.orders.length > 0
@@ -552,11 +555,24 @@ export function TadkaProvider({
         });
 
         let nextSess = prev.sess;
-        // If an existing session on this browser belonged to a DIFFERENT mobile number, do NOT reuse it — open a brand-new counter number!
         const activeUserMob = normalizedOptionalMob || prev.me.mob;
+        const isInvitedMember = Boolean(
+          nextSess &&
+            activeUserMob &&
+            (nextSess.invitedMobs || []).includes(activeUserMob)
+        );
+        const isPrincipal = Boolean(
+          nextSess && nextSess.mob && activeUserMob && nextSess.mob === activeUserMob
+        );
+
+        // NEVER reuse a session if:
+        // 1) It is already PAID (prev.paid or nextSess.status === 'paid')
+        // 2) It belongs to a different user who did NOT invite activeUserMob
         if (
           nextSess &&
-          ((nextSess.mob && activeUserMob && nextSess.mob !== activeUserMob) ||
+          (prev.paid ||
+            nextSess.status === 'paid' ||
+            (nextSess.mob && !isPrincipal && !isInvitedMember) ||
             (nextSess.mob && !activeUserMob))
         ) {
           nextSess = null;
@@ -578,6 +594,7 @@ export function TadkaProvider({
             pend: !isAuto,
             table: prev.activeTable,
             mob: activeUserMob,
+            invitedMobs: [],
             waConsent: waConsent ?? prev.waOptIn,
             status: 'open',
             businessDate: todayBizDate,
@@ -608,6 +625,7 @@ export function TadkaProvider({
           prices: pricesSnapshot,
           st: 1 as const,
           src: 'app' as const,
+          orderedByMob: activeUserMob,
           vip: prev.pts >= 100,
           rush: false,
           createdAt: nowIso,
@@ -620,6 +638,12 @@ export function TadkaProvider({
           pricesSnapshot
         );
 
+        const principalMobLabel = nextSess.mob || prev.me.mob || 'Guest';
+        const customerMobWithMember =
+          activeUserMob && nextSess.mob && activeUserMob !== nextSess.mob
+            ? `${principalMobLabel} (via ${activeUserMob})`
+            : principalMobLabel;
+
         const nextHistory = [
           {
             id: orderId,
@@ -630,7 +654,7 @@ export function TadkaProvider({
             tableNo: prev.activeTable,
             orderSeq,
             source: 'app' as const,
-            customerMob: nextSess.mob || prev.me.mob || 'Guest',
+            customerMob: customerMobWithMember,
             itemsDetailed: summary,
             totalItemsQty: totalQty,
             orderSubtotal: ordSub,
@@ -666,7 +690,60 @@ export function TadkaProvider({
         };
       });
     },
-    [S.billSrc, S.paid, S.draft, S.menu, S.cc, say, updateState]
+    [S.billSrc, S.paid, S.draft, S.menu, S.cc, S.me.mob, say, updateState]
+  );
+
+  placeOrderRef.current = placeOrder;
+
+  const inviteMemberToSession = useCallback(
+    (rawMob: string) => {
+      if (!S.sess || S.paid) {
+        say('Place an order first before inviting table friends');
+        return;
+      }
+      const m = normalizeMobile(rawMob, S.cc);
+      if (!m) {
+        say('Enter a valid 10-digit mobile number to invite');
+        return;
+      }
+      if (m === S.sess.mob) {
+        say('That is already the principal mobile number');
+        return;
+      }
+      if ((S.sess.invitedMobs || []).includes(m)) {
+        say(`${m} is already invited to this table`);
+        return;
+      }
+      updateState((prev) => {
+        if (!prev.sess) return prev;
+        const nextInvited = [...(prev.sess.invitedMobs || []), m];
+        return {
+          ...prev,
+          sess: { ...prev.sess, invitedMobs: nextInvited },
+        };
+      });
+      say(`Invited ${m} to Counter ${S.sess.no} (Clubbed Bill) ✅`);
+    },
+    [S.sess, S.paid, S.cc, say, updateState]
+  );
+
+  const removeInvitedMember = useCallback(
+    (mobToRemove: string) => {
+      updateState((prev) => {
+        if (!prev.sess) return prev;
+        return {
+          ...prev,
+          sess: {
+            ...prev.sess,
+            invitedMobs: (prev.sess.invitedMobs || []).filter(
+              (x) => x !== mobToRemove
+            ),
+          },
+        };
+      });
+      say(`Removed ${mobToRemove} from table invite`);
+    },
+    [say, updateState]
   );
 
   const trackCounter = useCallback(
@@ -1260,7 +1337,7 @@ export function TadkaProvider({
       if (pendingOrder && Object.keys(S.draft).length > 0) {
         pendingOrderAfterLoginRef.current = null;
         setTimeout(() => {
-          placeOrder(mob, pendingOrder.waConsent);
+          placeOrderRef.current?.(mob, pendingOrder.waConsent);
         }, 60);
         say(`Logged in & placing your order ✅`);
         return;
@@ -2094,6 +2171,8 @@ export function TadkaProvider({
         setCountryCode,
         changeDraftQty,
         placeOrder,
+        inviteMemberToSession,
+        removeInvitedMember,
         trackCounter,
         setMode,
         assignNo,

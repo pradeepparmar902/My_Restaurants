@@ -40,6 +40,7 @@ export interface OrderRound {
   prices?: Record<number, number>; // snapshotted prices at order time
   st: 1 | 2 | 3 | 4 | 5; // 1=Received, 2=Cooking, 3=Ready, 4=Delivered, 5=Cancelled
   src: 'app' | 'waiter';
+  orderedByMob?: string; // Mobile number of principal or invited member who placed this round
   vip?: boolean;
   rush?: boolean;
   createdAt: string;
@@ -53,7 +54,8 @@ export interface SessionData {
   no: string; // e.g. 'C27' or 'Pending'
   pend?: boolean;
   table: number;
-  mob: string;
+  mob: string; // Principal user mobile number
+  invitedMobs?: string[]; // Invited group mobile numbers whose orders club into this principal session
   waConsent?: boolean;
   staff?: boolean; // true if created by staff
   guestToken?: string;

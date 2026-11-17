@@ -237,12 +237,12 @@ export function switchUserSessionInState(
   nextMob: string,
   nextRole: PortalRole
 ): AppState {
-  const currentKey = prev.me.mob || prev.sess?.mob || '__guest__';
+  const currentKey = prev.sess?.mob || prev.me.mob || '__guest__';
   const updatedMap: Record<string, UserSessionSnapshot> = {
     ...(prev.sessionsByUser || {}),
   };
 
-  // Save current user's session under their mobile key (or guest key)
+  // Save current active session under its principal mobile key (or guest key)
   if (prev.sess || prev.orders.length > 0 || prev.pts > 0 || prev.stars > 0) {
     updatedMap[currentKey] = extractUserSessionSnapshot(prev);
     if (prev.sess?.mob) {
@@ -251,7 +251,18 @@ export function switchUserSessionInState(
   }
 
   const targetKey = nextMob || '__guest__';
-  const restored = updatedMap[targetKey];
+  // Check if nextMob has been invited to an active (unpaid) principal table session
+  const invitedGroupSnap = nextMob
+    ? Object.values(updatedMap).find(
+        (s) =>
+          s.sess &&
+          !s.paid &&
+          s.sess.status !== 'paid' &&
+          (s.sess.invitedMobs || []).includes(nextMob)
+      )
+    : undefined;
+
+  const restored = invitedGroupSnap || updatedMap[targetKey];
 
   // If Guest is logging in and there was an unlinked guest session, claim it only if target has no session yet
   if (
