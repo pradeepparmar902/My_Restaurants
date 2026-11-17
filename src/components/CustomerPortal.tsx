@@ -714,6 +714,7 @@ export function BillTabView() {
   const [friendWaMob, setFriendWaMob] = useState('');
   const [customSplitMobs, setCustomSplitMobs] = useState<string[]>([]);
   const [sentWaMobs, setSentWaMobs] = useState<string[]>([]);
+  const [contactNames, setContactNames] = useState<Record<string, string>>({});
 
   if (!S.status) {
     return (
@@ -885,6 +886,53 @@ export function BillTabView() {
               }
             };
 
+            const handlePickFromContacts = async () => {
+              const nav = navigator as Navigator & {
+                contacts?: {
+                  select?: (
+                    props: string[],
+                    opts?: { multiple?: boolean }
+                  ) => Promise<Array<{ name?: string[]; tel?: string[] }>>;
+                };
+              };
+              if (!nav.contacts?.select) {
+                say(
+                  'Phone contact picker is supported on Android Chrome/Edge. On iPhone/Desktop, tap "Share in WhatsApp Group" to pick contacts in WhatsApp.'
+                );
+                return;
+              }
+              try {
+                const picked = await nav.contacts.select(['name', 'tel'], {
+                  multiple: true,
+                });
+                if (!picked || picked.length === 0) return;
+                const newMobs: string[] = [];
+                const newNames: Record<string, string> = {};
+                for (const c of picked) {
+                  const rawTel = c.tel?.[0] || '';
+                  const norm = rawTel ? normalizeMobile(rawTel, S.cc) : '';
+                  if (
+                    norm &&
+                    norm !== S.sess?.mob &&
+                    !allSplitMobs.includes(norm) &&
+                    !newMobs.includes(norm)
+                  ) {
+                    newMobs.push(norm);
+                    if (c.name?.[0]) newNames[norm] = c.name[0];
+                  }
+                }
+                if (newMobs.length > 0) {
+                  setCustomSplitMobs((prev) => [...prev, ...newMobs]);
+                  setContactNames((prev) => ({ ...prev, ...newNames }));
+                  say(`Added ${newMobs.length} contact(s) to split list ✅`);
+                } else {
+                  say('No new valid mobile numbers found in selected contacts');
+                }
+              } catch {
+                say('Contact selection cancelled');
+              }
+            };
+
             return (
               <>
                 {(entries.length > 1 || invitedList.length > 0) && (
@@ -926,13 +974,22 @@ export function BillTabView() {
                     value={friendWaMob}
                     onChange={setFriendWaMob}
                   />
-                  <button
-                    className="btn alt"
-                    style={{ marginTop: '6px' }}
-                    onClick={handleAddFriend}
-                  >
-                    + Add Friend Number
-                  </button>
+                  <div className="row" style={{ gap: '8px', marginTop: '6px' }}>
+                    <button
+                      className="btn alt"
+                      style={{ flex: 1, marginTop: 0 }}
+                      onClick={handleAddFriend}
+                    >
+                      + Add Friend Number
+                    </button>
+                    <button
+                      className="btn alt"
+                      style={{ flex: 1, marginTop: 0 }}
+                      onClick={handlePickFromContacts}
+                    >
+                      📒 Pick from Contacts
+                    </button>
+                  </div>
                 </div>
 
                 {allSplitMobs.length > 0 && (
@@ -966,7 +1023,9 @@ export function BillTabView() {
                         >
                           <div>
                             <b>
-                              {idx + 1}. 📱 {m}
+                              {idx + 1}.{' '}
+                              {contactNames[m] ? `👤 ${contactNames[m]} · ` : ''}
+                              📱 {m}
                             </b>
                             <div className="mu" style={{ fontSize: '11px' }}>
                               Share: ₹{S.split > 1 ? per : t}
