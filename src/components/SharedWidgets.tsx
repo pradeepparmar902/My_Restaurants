@@ -164,7 +164,7 @@ export function StarsStrip() {
           paddingTop: '6px',
         }}
       >
-        {S.sess && (
+        {S.sess && S.orders.length > 0 && !S.paid && (
           <div className="row sp" style={{ marginBottom: '6px' }}>
             <span>🎟️ Counter number</span>
             <span className="tag hot" style={{ fontSize: '16px' }}>

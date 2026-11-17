@@ -239,6 +239,24 @@ export function TadkaProvider({
           }
         }
 
+        const resolvedTableId =
+          initialTableId ||
+          qrMatchedTableId ||
+          parsed.activeTable ||
+          INITIAL_STATE.activeTable;
+
+        // Never show a stale or already-paid counter number before placing an order on a fresh QR scan
+        const shouldClearStaleSession =
+          Boolean(parsed.paid) ||
+          parsed.sess?.status === 'paid' ||
+          ((initialTableId || qrMatchedTableId) &&
+            parsed.sess &&
+            parsed.sess.table !== resolvedTableId);
+
+        const finalHydratedSess = shouldClearStaleSession
+          ? null
+          : cleanedActiveSess;
+
         setS((prev) => ({
           ...prev,
           ...parsed,
@@ -247,15 +265,13 @@ export function TadkaProvider({
           counterBusinessDate: todayBizDate,
           usedCountersToday: cleanUsed,
           sessionsByUser: cleanedSessionsByUser,
-          sess: cleanedActiveSess,
-          orders: cleanedActiveSess ? parsed.orders || [] : [],
-          cart: cleanedActiveSess ? parsed.cart || {} : {},
-          status: cleanedActiveSess ? parsed.status || 0 : 0,
-          activeTable:
-            initialTableId ||
-            qrMatchedTableId ||
-            parsed.activeTable ||
-            prev.activeTable,
+          sess: finalHydratedSess,
+          orders: finalHydratedSess ? parsed.orders || [] : [],
+          cart: finalHydratedSess ? parsed.cart || {} : {},
+          status: finalHydratedSess ? parsed.status || 0 : 0,
+          paid: finalHydratedSess ? Boolean(parsed.paid) : false,
+          billSrc: finalHydratedSess ? parsed.billSrc || '' : '',
+          activeTable: resolvedTableId,
           toast: '',
         }));
       } else if (typeof window !== 'undefined' && !initialTableId) {

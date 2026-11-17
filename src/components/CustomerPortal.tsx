@@ -54,7 +54,7 @@ export function MenuTabView() {
           {activeTableLabel} 🔥
         </h1>
         <p>
-          {S.sess
+          {S.sess && S.orders.length > 0 && !S.paid
             ? S.sess.pend
               ? 'Counter number pending. Get it from the waiter or reception and enter it in the Order tab.'
               : `Counter ${S.sess.no}. Add more anytime until you pay.`
