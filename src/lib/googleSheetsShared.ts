@@ -759,19 +759,83 @@ function doPost(e) {
     }
 
     if (action === 'SYNC_ALL_SHEETS') {
-      var sheetId = extractId(payload.spreadsheetId, /\\/spreadsheets\\/d\\/([a-zA-Z0-9-_]+)/);
-      var ss = sheetId
-        ? SpreadsheetApp.openById(sheetId)
-        : SpreadsheetApp.getActiveSpreadsheet();
-      var sheets = payload.sheets || {};
+      var lock = LockService.getScriptLock();
+      lock.waitLock(10000);
+      try {
+        var sheetId = extractId(payload.spreadsheetId, /\\/spreadsheets\\/d\\/([a-zA-Z0-9-_]+)/);
+        var ss = sheetId
+          ? SpreadsheetApp.openById(sheetId)
+          : SpreadsheetApp.getActiveSpreadsheet();
+        var sheets = payload.sheets || {};
 
-      Object.keys(sheets).forEach(function(tabName) {
-        var rows = sheets[tabName];
-        if (!rows || !rows.length) return;
-        var sheet = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
-        sheet.clearContents();
-        sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
-      });
+        // Tabs that must MERGE by unique key across all devices instead of wiping other devices' rows
+        var mergeKeyFns = {
+          Orders: function(r) { return String(r[16] || (r[0] + '_' + r[3] + '_' + r[5])); },
+          Daily_Counters: function(r) { return String(r[0] || '') + '__' + String(r[3] || ''); },
+          Bills_Payments: function(r) { return String(r[14] || (r[0] + '_' + r[3])); },
+          Audit_Log: function(r) { return String(r[0] || ''); },
+          Drive_Assets: function(r) { return String(r[0] || ''); }
+        };
+
+        Object.keys(sheets).forEach(function(tabName) {
+          var incoming = sheets[tabName];
+          if (!incoming || !incoming.length) return;
+          var sheet = ss.getSheetByName(tabName) || ss.insertSheet(tabName);
+
+          if (mergeKeyFns[tabName]) {
+            var keyFn = mergeKeyFns[tabName];
+            var existingVals = sheet.getDataRange().getValues();
+            var header = incoming[0];
+            var rowMap = {};
+            var orderKeys = [];
+
+            // 1. Keep existing rows from Google Sheet first (if header matches)
+            if (existingVals && existingVals.length > 1 && String(existingVals[0][0]) === String(header[0])) {
+              for (var i = 1; i < existingVals.length; i++) {
+                var er = existingVals[i];
+                if (!er || er.join('') === '') continue;
+                var ek = keyFn(er);
+                if (!ek || ek === '__') continue;
+                // Normalize Date objects from Sheets back to YYYY-MM-DD / readable strings
+                if (er[0] instanceof Date) {
+                  er[0] = Utilities.formatDate(er[0], 'Asia/Kolkata', 'yyyy-MM-dd');
+                }
+                if (er[1] instanceof Date) {
+                  er[1] = Utilities.formatDate(er[1], 'Asia/Kolkata', 'dd MMM yyyy');
+                }
+                if (er[2] instanceof Date) {
+                  er[2] = Utilities.formatDate(er[2], 'Asia/Kolkata', 'hh:mm:ss a');
+                }
+                if (!rowMap[ek]) orderKeys.push(ek);
+                rowMap[ek] = er;
+              }
+            }
+
+            // 2. Upsert incoming rows from this browser/device
+            for (var j = 1; j < incoming.length; j++) {
+              var ir = incoming[j];
+              if (!ir) continue;
+              var ik = keyFn(ir);
+              if (!ik || ik === '__') continue;
+              if (!rowMap[ik]) orderKeys.push(ik);
+              rowMap[ik] = ir;
+            }
+
+            var merged = [header];
+            orderKeys.forEach(function(k) {
+              merged.push(rowMap[k]);
+            });
+
+            sheet.clearContents();
+            sheet.getRange(1, 1, merged.length, header.length).setValues(merged);
+          } else {
+            sheet.clearContents();
+            sheet.getRange(1, 1, incoming.length, incoming[0].length).setValues(incoming);
+          }
+        });
+      } finally {
+        lock.releaseLock();
+      }
 
       // Also save or update tadka-config.json inside the restaurant's Google Drive folder
       if (payload.configJson) {

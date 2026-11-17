@@ -251,8 +251,19 @@ export function TadkaProvider({
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(finalState));
           channelRef.current?.postMessage({ type: 'STATE_SYNC', payload: finalState });
-          // Background auto-sync to Google Sheets & local CSV mirror
-          if (finalState.googleConfig?.enabled) {
+          // Background auto-sync to Google Sheets & local CSV mirror ONLY when business data actually changes (not on UI tab/draft clicks)
+          const hasDataMutation =
+            prev.orders !== next.orders ||
+            prev.menu !== next.menu ||
+            prev.staff !== next.staff ||
+            prev.sess !== next.sess ||
+            prev.hist !== next.hist ||
+            prev.paid !== next.paid ||
+            prev.billSrc !== next.billSrc ||
+            prev.reel !== next.reel ||
+            prev.review !== next.review;
+
+          if (finalState.googleConfig?.enabled && hasDataMutation) {
             const webhookUrl = finalState.googleConfig.appsScriptWebAppUrl || '';
             if (webhookUrl.startsWith('https://script.google.com/')) {
               const sheetsPayload = buildSheetRowsForState(finalState);
