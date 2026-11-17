@@ -605,6 +605,17 @@ export function normalizeSheetDateString(raw: string): string {
     const d = String(Number(dateMatch[3])).padStart(2, '0');
     return `${y}-${m}-${d}`;
   }
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    const dt = new Date(s);
+    if (!Number.isNaN(dt.getTime())) {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(dt);
+    }
+  }
   return s;
 }
 
@@ -715,9 +726,14 @@ export function parseOrdersFromSheetRows(
     const srcRaw = String(r[6] || '').toLowerCase();
     const src: 'app' | 'waiter' = srcRaw.includes('waiter') ? 'waiter' : 'app';
     const rawMob = String(r[7] || '').replace(/^'+/, '').trim();
+    const normSheetMob = (val: string) => {
+      const cleaned = val.replace(/\s+/g, '');
+      if (/^\d{11,15}$/.test(cleaned)) return `+${cleaned}`;
+      return cleaned;
+    };
     const viaMatch = rawMob.match(/^(.+?)\s*\(via\s+([^)]+)\)\s*$/i);
-    const principalMob = viaMatch ? viaMatch[1].trim() : rawMob;
-    const orderedByMob = viaMatch ? viaMatch[2].trim() : rawMob;
+    const principalMob = normSheetMob(viaMatch ? viaMatch[1].trim() : rawMob);
+    const orderedByMob = normSheetMob(viaMatch ? viaMatch[2].trim() : rawMob);
 
     const itemsStr = String(r[8] || '').trim();
     const it: Record<number, number> = {};

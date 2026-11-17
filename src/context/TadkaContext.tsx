@@ -1828,8 +1828,8 @@ export function TadkaProvider({
               apiData.sheets.Restaurant_Config,
               apiData.sheets.Daily_Counters
             );
-            if (Array.isArray(apiData.sheets.Customer_Orders)) {
-              pulledOrderRows = apiData.sheets.Customer_Orders;
+            if (Array.isArray(apiData.sheets.Orders)) {
+              pulledOrderRows = apiData.sheets.Orders;
             }
           }
         }
@@ -1895,7 +1895,7 @@ export function TadkaProvider({
           gvizFetchTab('Menu_Items'),
           gvizFetchTab('Restaurant_Config'),
           gvizFetchTab('Daily_Counters'),
-          gvizFetchTab('Customer_Orders'),
+          gvizFetchTab('Orders'),
         ]);
         if (menuRows) pulledMenu = parseMenuFromSheetRows(menuRows);
         if (cfgRows) pulledConfig = parseConfigFromSheetRows(cfgRows);
@@ -1949,8 +1949,8 @@ export function TadkaProvider({
                   data.sheets.Restaurant_Config,
                   data.sheets.Daily_Counters
                 ),
-                orderRows: Array.isArray(data.sheets.Customer_Orders)
-                  ? data.sheets.Customer_Orders
+                orderRows: Array.isArray(data.sheets.Orders)
+                  ? data.sheets.Orders
                   : null,
               });
             } else {
@@ -1992,8 +1992,8 @@ export function TadkaProvider({
               pulledStaff = parseStaffFromSheetRows(
                 data.sheets.Staff_Access || []
               );
-              if (Array.isArray(data.sheets.Customer_Orders)) {
-                pulledOrderRows = data.sheets.Customer_Orders;
+              if (Array.isArray(data.sheets.Orders)) {
+                pulledOrderRows = data.sheets.Orders;
               }
             }
           }
@@ -2018,8 +2018,8 @@ export function TadkaProvider({
                 pulledStaff = parseStaffFromSheetRows(
                   data.sheets.Staff_Access || []
                 );
-                if (Array.isArray(data.sheets.Customer_Orders)) {
-                  pulledOrderRows = data.sheets.Customer_Orders;
+                if (Array.isArray(data.sheets.Orders)) {
+                  pulledOrderRows = data.sheets.Orders;
                 }
               }
             }
