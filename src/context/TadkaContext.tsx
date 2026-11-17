@@ -145,6 +145,9 @@ export function TadkaProvider({
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const isHydratedRef = useRef(false);
+  const pullFromGoogleSheetsRef = useRef<
+    ((overrideConfig?: Partial<AppState['googleConfig']>, silent?: boolean) => Promise<void>) | null
+  >(null);
 
   // Hydrate from localStorage + setup BroadcastChannel for cross-tab realtime sync
   useEffect(() => {
@@ -1130,7 +1133,7 @@ export function TadkaProvider({
 
       updateState((prev) => switchUserSessionInState(prev, mob, landingRole));
       // Also pull latest counter sequence from Google Sheet so a second browser/incognito tab never reuses a counter number
-      pullFromGoogleSheets(undefined, true);
+      pullFromGoogleSheetsRef.current?.(undefined, true);
 
       if (staffMember) {
         say(`Logged in as ${staffMember.r} ✅`);
@@ -1140,7 +1143,7 @@ export function TadkaProvider({
         say('Logged in ✅ Place a new order to get your counter number');
       }
     },
-    [S.lg.mob, S.staff, S.sessionsByUser, S.sess, say, updateState, pullFromGoogleSheets]
+    [S.lg.mob, S.staff, S.sessionsByUser, S.sess, say, updateState]
   );
 
   const logoutOrOpenLogin = useCallback(() => {
@@ -1749,6 +1752,8 @@ export function TadkaProvider({
     },
     [S.googleConfig, S.menu.length, say]
   );
+
+  pullFromGoogleSheetsRef.current = pullFromGoogleSheets;
 
   // Commercial Multi-Tenant Startup Loader:
   // On any new browser/device, load config from /config/restaurants.json (or NEXT_PUBLIC_REMOTE_CONFIG_JSON_URL),
