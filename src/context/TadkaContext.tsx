@@ -90,7 +90,7 @@ interface TadkaContextValue {
   bookWaiter: (
     rawMob: string,
     rawCounterNo: string,
-    forceNewCounter?: boolean
+    targetCounterNo?: string | null
   ) => void;
 
   // Billing & Payments
@@ -1130,7 +1130,7 @@ export function TadkaProvider({
   );
 
   const bookWaiter = useCallback(
-    (rawMob: string, rawCounterNo: string, forceNewCounter?: boolean) => {
+    (rawMob: string, rawCounterNo: string, targetCounterNo?: string | null) => {
       const mv = normalizeMobile(rawMob, S.cc);
       if (mv === null) {
         say('Enter a valid 10-digit mobile number');
@@ -1171,30 +1171,73 @@ export function TadkaProvider({
           }
         });
 
-        let nextSess = prev.sess;
-        const isDifferentCustomer = Boolean(
-          mv && nextSess?.mob && mv !== nextSess.mob
-        );
-        const isDifferentTable = Boolean(
-          nextSess && nextSess.table !== prev.activeTable
-        );
         const updatedSessionsByUser = { ...(prev.sessionsByUser || {}) };
-
-        if (
-          nextSess &&
-          (prev.paid ||
-            nextSess.status === 'paid' ||
-            isDifferentCustomer ||
-            isDifferentTable ||
-            forceNewCounter)
-        ) {
-          // Preserve the previous open session under its mobile or session id before opening a new table/group counter
-          if (!prev.paid && nextSess.status !== 'paid') {
-            const saveKey = nextSess.mob || nextSess.id;
-            updatedSessionsByUser[saveKey] = extractUserSessionSnapshot(prev);
-          }
-          nextSess = null;
+        if (prev.sess && !prev.paid && prev.sess.status !== 'paid') {
+          const saveKey = prev.sess.mob || prev.sess.id;
+          updatedSessionsByUser[saveKey] = extractUserSessionSnapshot(prev);
         }
+
+        let nextSess = null as AppState['sess'];
+        let baseOrders: AppState['orders'] = [];
+        let baseCart: AppState['cart'] = {};
+
+        if (targetCounterNo) {
+          if (prev.sess && !prev.paid && prev.sess.no === targetCounterNo) {
+            nextSess = prev.sess;
+            baseOrders = prev.orders;
+            baseCart = { ...prev.cart };
+          } else {
+            const matchedSnap = Object.values(updatedSessionsByUser).find(
+              (s) => s.sess && !s.paid && s.sess.no === targetCounterNo
+            );
+            if (matchedSnap?.sess) {
+              nextSess = matchedSnap.sess;
+              baseOrders = matchedSnap.orders || [];
+              baseCart = { ...(matchedSnap.cart || {}) };
+            } else {
+              const sheetMatches = sheetOrdersTodayRef.current.filter(
+                (po) =>
+                  po.counterNo === targetCounterNo &&
+                  po.billStatus !== 'PAID' &&
+                  po.st !== 5
+              );
+              const first = sheetMatches[0];
+              if (first) {
+                nextSess = {
+                  id: `sess-${targetCounterNo}-${Date.now()}`,
+                  no: targetCounterNo,
+                  pend: false,
+                  table: first.table || prev.activeTable,
+                  mob: first.principalMob || mv || '',
+                  invitedMobs: [],
+                  staff: true,
+                  status: 'open',
+                  businessDate: todayBizDate,
+                  createdAt: new Date().toISOString(),
+                };
+                baseOrders = sheetMatches.map((po, idx) => {
+                  for (const [idStr, q] of Object.entries(po.it)) {
+                    const id = Number(idStr);
+                    baseCart[id] = (baseCart[id] || 0) + q;
+                  }
+                  return {
+                    id: po.id,
+                    k: po.round || idx + 1,
+                    it: po.it,
+                    prices: po.prices,
+                    st: po.st,
+                    src: po.src,
+                    orderedByMob: po.orderedByMob,
+                    vip: po.vip,
+                    rush: po.rush,
+                    createdAt: new Date().toISOString(),
+                  };
+                });
+              }
+            }
+          }
+        }
+
         const isStartingNewSess = !nextSess;
         if (!nextSess) {
           if (prev.cmode === 'auto') {
@@ -1239,8 +1282,7 @@ export function TadkaProvider({
 
         targetLabel = nextSess.pend ? `Table ${prev.activeTable}` : nextSess.no;
 
-        const baseOrders = isStartingNewSess ? [] : prev.orders;
-        const nextCart = isStartingNewSess ? {} : { ...prev.cart };
+        const nextCart = { ...baseCart };
         const pricesSnapshot: Record<number, number> = {};
         for (const idStr of Object.keys(it)) {
           const id = Number(idStr);
@@ -1314,7 +1356,7 @@ export function TadkaProvider({
           paid: isStartingNewSess ? false : prev.paid,
           WD: {},
           status: 1,
-          wtab: 'serve',
+          wtab: 'book',
         };
       });
 
