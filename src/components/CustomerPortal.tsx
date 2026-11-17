@@ -313,39 +313,95 @@ export function OrderTabView() {
         </div>
       )}
 
-      {S.orders.map((o) => (
-        <div key={o.id || o.k} className="card">
-          <div className="row sp">
-            <h3>
-              Order {o.k}
-              {o.src === 'waiter'
-                ? ' · by waiter'
-                : o.orderedByMob && o.orderedByMob !== S.sess?.mob
-                  ? ` · by ${o.orderedByMob}`
-                  : ''}
-            </h3>
-            <span className="tag hot">{ORDER_STATUS_LABELS[o.st]}</span>
-          </div>
-          <div className="steps" style={{ margin: '10px 0 6px' }}>
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className={`step ${o.st >= i ? 'on' : ''}`}>
-                <i>{stepIcons[i - 1]}</i>
-                {ORDER_STATUS_LABELS[i]}
-              </div>
-            ))}
-          </div>
-          {S.menu
-            .filter((m) => o.it[m.id])
-            .map((m) => (
-              <div key={m.id} className="line">
-                <span>
-                  {m.e} {m.n[S.lang]} × {o.it[m.id]}
+      {(() => {
+        const groupsMap = new Map<string, typeof S.orders>();
+        const principalKey = S.sess!.mob || 'Guest';
+        S.orders.forEach((o) => {
+          const mobKey = o.orderedByMob || principalKey;
+          const arr = groupsMap.get(mobKey) || [];
+          arr.push(o);
+          groupsMap.set(mobKey, arr);
+        });
+        const sortedGroups = Array.from(groupsMap.entries()).sort(([a], [b]) => {
+          if (a === principalKey) return -1;
+          if (b === principalKey) return 1;
+          return a.localeCompare(b);
+        });
+
+        return sortedGroups.map(([mobKey, mobOrders]) => {
+          let groupSubtotal = 0;
+          mobOrders
+            .filter((o) => o.st !== 5)
+            .forEach((o) => {
+              S.menu.forEach((m) => {
+                const q = o.it[m.id] || 0;
+                if (q > 0) groupSubtotal += (o.prices?.[m.id] ?? m.p) * q;
+              });
+            });
+          const isPrincipalMob = mobKey === S.sess?.mob;
+
+          return (
+            <div key={mobKey} className="card">
+              <div
+                className="row sp"
+                style={{
+                  paddingBottom: '8px',
+                  marginBottom: '10px',
+                  borderBottom: '1px solid #382562',
+                }}
+              >
+                <div>
+                  <b>📱 {mobKey}</b>{' '}
+                  <span className="tag" style={{ fontSize: '11px' }}>
+                    {isPrincipalMob ? 'Principal' : 'Invited'}
+                  </span>
+                </div>
+                <span className="mu" style={{ fontSize: '12px' }}>
+                  {mobOrders.length} order{mobOrders.length === 1 ? '' : 's'} · ₹
+                  {groupSubtotal}
                 </span>
-                <span>₹{(o.prices?.[m.id] ?? m.p) * o.it[m.id]}</span>
               </div>
-            ))}
-        </div>
-      ))}
+
+              {mobOrders.map((o, idx) => (
+                <div
+                  key={o.id || o.k}
+                  style={{
+                    marginTop: idx > 0 ? '12px' : '0',
+                    paddingTop: idx > 0 ? '10px' : '0',
+                    borderTop: idx > 0 ? '1px dashed #382562' : 'none',
+                  }}
+                >
+                  <div className="row sp">
+                    <h3 style={{ margin: 0 }}>
+                      Order {o.k}
+                      {o.src === 'waiter' ? ' · by waiter' : ''}
+                    </h3>
+                    <span className="tag hot">{ORDER_STATUS_LABELS[o.st]}</span>
+                  </div>
+                  <div className="steps" style={{ margin: '10px 0 6px' }}>
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className={`step ${o.st >= i ? 'on' : ''}`}>
+                        <i>{stepIcons[i - 1]}</i>
+                        {ORDER_STATUS_LABELS[i]}
+                      </div>
+                    ))}
+                  </div>
+                  {S.menu
+                    .filter((m) => o.it[m.id])
+                    .map((m) => (
+                      <div key={m.id} className="line">
+                        <span>
+                          {m.e} {m.n[S.lang]} × {o.it[m.id]}
+                        </span>
+                        <span>₹{(o.prices?.[m.id] ?? m.p) * o.it[m.id]}</span>
+                      </div>
+                    ))}
+                </div>
+              ))}
+            </div>
+          );
+        });
+      })()}
 
       {!S.paid && isPrincipalUser && (
         <div className="card">
