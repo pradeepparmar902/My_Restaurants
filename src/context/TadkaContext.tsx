@@ -189,27 +189,54 @@ export function TadkaProvider({
             ? null
             : parsed.sess ?? null;
 
-        // Check if user arrived via QR query string (?t=<token> or ?table=<id>)
+        // Check if user arrived via QR query string (?t=<token>&table=<id>&label=<label>)
         let qrMatchedTableId: number | undefined;
+        let qrDynamicTables: AppState['tables'] | undefined;
         if (typeof window !== 'undefined') {
           const sp = new URLSearchParams(window.location.search);
-          const qToken = sp.get('t');
+          const qToken = sp.get('t') || '';
           const qTable = sp.get('table');
-          const tableList = parsed.tables || prevTablesFallback();
+          const qLabel = sp.get('label');
+          const tableList = [...(parsed.tables || INITIAL_STATE.tables)];
+
           if (qToken) {
             const found = tableList.find((tb) => tb.token === qToken);
-            if (found) qrMatchedTableId = found.id;
+            if (found) {
+              qrMatchedTableId = found.id;
+            } else {
+              // Extract table number from token like qr-tadka-t7-m05a or ?table=7
+              const tokenNumMatch = qToken.match(/-t(\d+)-/i);
+              const derivedId =
+                (qTable && Number(qTable) > 0 ? Number(qTable) : 0) ||
+                (tokenNumMatch ? Number(tokenNumMatch[1]) : 0) ||
+                1;
+              qrMatchedTableId = derivedId;
+              const derivedLabel = qLabel || `Table ${derivedId}`;
+              const existingIdx = tableList.findIndex((tb) => tb.id === derivedId);
+              if (existingIdx !== -1) {
+                tableList[existingIdx] = {
+                  ...tableList[existingIdx],
+                  label: derivedLabel,
+                  token: qToken,
+                };
+              } else {
+                tableList.push({
+                  id: derivedId,
+                  label: derivedLabel,
+                  token: qToken,
+                });
+              }
+              qrDynamicTables = tableList;
+            }
           } else if (qTable && Number(qTable) > 0) {
             qrMatchedTableId = Number(qTable);
           }
-        }
-        function prevTablesFallback() {
-          return INITIAL_STATE.tables;
         }
 
         setS((prev) => ({
           ...prev,
           ...parsed,
+          tables: qrDynamicTables || parsed.tables || prev.tables,
           ctr: cleanCtr,
           counterBusinessDate: todayBizDate,
           usedCountersToday: cleanUsed,
@@ -227,11 +254,41 @@ export function TadkaProvider({
         }));
       } else if (typeof window !== 'undefined' && !initialTableId) {
         const sp = new URLSearchParams(window.location.search);
-        const qToken = sp.get('t');
+        const qToken = sp.get('t') || '';
         const qTable = sp.get('table');
+        const qLabel = sp.get('label');
         if (qToken) {
-          const found = INITIAL_STATE.tables.find((tb) => tb.token === qToken);
-          if (found) setS((prev) => ({ ...prev, activeTable: found.id }));
+          const tableList = [...INITIAL_STATE.tables];
+          const found = tableList.find((tb) => tb.token === qToken);
+          if (found) {
+            setS((prev) => ({ ...prev, activeTable: found.id }));
+          } else {
+            const tokenNumMatch = qToken.match(/-t(\d+)-/i);
+            const derivedId =
+              (qTable && Number(qTable) > 0 ? Number(qTable) : 0) ||
+              (tokenNumMatch ? Number(tokenNumMatch[1]) : 0) ||
+              1;
+            const derivedLabel = qLabel || `Table ${derivedId}`;
+            const existingIdx = tableList.findIndex((tb) => tb.id === derivedId);
+            if (existingIdx !== -1) {
+              tableList[existingIdx] = {
+                ...tableList[existingIdx],
+                label: derivedLabel,
+                token: qToken,
+              };
+            } else {
+              tableList.push({
+                id: derivedId,
+                label: derivedLabel,
+                token: qToken,
+              });
+            }
+            setS((prev) => ({
+              ...prev,
+              tables: tableList,
+              activeTable: derivedId,
+            }));
+          }
         } else if (qTable && Number(qTable) > 0) {
           setS((prev) => ({ ...prev, activeTable: Number(qTable) }));
         }

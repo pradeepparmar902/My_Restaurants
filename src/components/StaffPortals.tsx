@@ -1090,7 +1090,9 @@ export function AdminPortalView() {
                         : ''
                     }`
                   : 'https://pradeepparmar902.github.io/My_Restaurants';
-              const qrTargetUrl = `${baseUrl}/?t=${encodeURIComponent(t.token)}`;
+              const qrTargetUrl = `${baseUrl}/?t=${encodeURIComponent(
+                t.token
+              )}&table=${t.id}&label=${encodeURIComponent(t.label)}`;
               const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
                 qrTargetUrl
               )}`;
