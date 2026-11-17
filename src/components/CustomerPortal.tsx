@@ -167,7 +167,12 @@ export function MenuTabView() {
         disabled={cnt() === 0}
         onClick={() => placeOrder(optMob, S.waOptIn)}
       >
-        {S.sess ? 'Add to my order' : 'Place order'} · ₹{dsub()}
+        {!S.me.mob
+          ? 'Login & Place order'
+          : S.sess
+            ? 'Add to my order'
+            : 'Place order'}{' '}
+        · ₹{dsub()}
       </button>
     </>
   );

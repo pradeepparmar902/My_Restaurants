@@ -149,6 +149,7 @@ export function TadkaProvider({
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const isHydratedRef = useRef(false);
+  const pendingOrderAfterLoginRef = useRef<{ waConsent?: boolean } | null>(null);
   const pullFromGoogleSheetsRef = useRef<
     ((overrideConfig?: Partial<AppState['googleConfig']>, silent?: boolean) => Promise<void>) | null
   >(null);
@@ -491,6 +492,18 @@ export function TadkaProvider({
       const it = filterPositiveItems(S.draft);
       if (Object.keys(it).length === 0) return;
 
+      // Require user to be logged in before placing an order
+      if (!S.me.mob && !(optionalMobRaw && optionalMobRaw.trim())) {
+        pendingOrderAfterLoginRef.current = { waConsent };
+        updateState((prev) => ({
+          ...prev,
+          showLogin: true,
+          lg: { step: 0, mob: '' },
+        }));
+        say('Please login with your mobile number to place your order 📱');
+        return;
+      }
+
       // Check availability
       for (const idStr of Object.keys(it)) {
         const dish = S.menu.find((m) => m.id === Number(idStr));
@@ -502,12 +515,16 @@ export function TadkaProvider({
 
       let normalizedOptionalMob = '';
       if (optionalMobRaw && optionalMobRaw.trim()) {
-        const m = normalizeMobile(optionalMobRaw, S.cc);
-        if (m === null) {
-          say('Enter a valid 10-digit mobile number');
-          return;
+        if (optionalMobRaw.trim().startsWith('+')) {
+          normalizedOptionalMob = optionalMobRaw.trim();
+        } else {
+          const m = normalizeMobile(optionalMobRaw, S.cc);
+          if (m === null) {
+            say('Enter a valid 10-digit mobile number');
+            return;
+          }
+          normalizedOptionalMob = m;
         }
-        normalizedOptionalMob = m;
       }
 
       updateState((prev) => {
@@ -1239,6 +1256,16 @@ export function TadkaProvider({
       // Also pull latest counter sequence from Google Sheet so a second browser/incognito tab never reuses a counter number
       pullFromGoogleSheetsRef.current?.(undefined, true);
 
+      const pendingOrder = pendingOrderAfterLoginRef.current;
+      if (pendingOrder && Object.keys(S.draft).length > 0) {
+        pendingOrderAfterLoginRef.current = null;
+        setTimeout(() => {
+          placeOrder(mob, pendingOrder.waConsent);
+        }, 60);
+        say(`Logged in & placing your order ✅`);
+        return;
+      }
+
       if (staffMember) {
         say(`Logged in as ${staffMember.r} ✅`);
       } else if (hasExistingOrder) {
@@ -1247,7 +1274,7 @@ export function TadkaProvider({
         say('Logged in ✅ Place a new order to get your counter number');
       }
     },
-    [S.lg.mob, S.staff, S.sessionsByUser, S.sess, say, updateState]
+    [S.lg.mob, S.staff, S.sessionsByUser, S.sess, S.draft, say, updateState, placeOrder]
   );
 
   const logoutOrOpenLogin = useCallback(() => {

@@ -304,7 +304,7 @@ export function switchUserSessionInState(
     pm: snap.pm,
     pts: snap.pts,
     stars: snap.stars,
-    draft: {},
+    draft: !prev.me.mob && nextMob ? prev.draft : {},
     track: '',
     trackRes: '',
     sessionsByUser: updatedMap,
