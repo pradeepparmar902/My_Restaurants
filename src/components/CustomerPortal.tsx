@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import { Language, PaymentMethod } from '@/types/tadka';
 import { ORDER_STATUS_LABELS } from '@/lib/constants';
+import { normalizeMobile } from '@/lib/helpers';
 import {
   ConnectedAccountsCard,
   CountryCodeMobileInput,
@@ -707,8 +708,10 @@ export function BillTabView() {
     sendBill,
     startNewOrder,
     updateState,
+    say,
   } = useTadka();
   const [waInput, setWaInput] = useState('');
+  const [friendWaMob, setFriendWaMob] = useState('');
 
   if (!S.status) {
     return (
@@ -765,6 +768,162 @@ export function BillTabView() {
             </p>
           </div>
         )}
+
+        <div className="card">
+          <h3>💸 Split Paid Bill & Send on WhatsApp</h3>
+          <p className="mu" style={{ margin: '4px 0 8px' }}>
+            Total Paid: <b>₹{t}</b> (Counter {S.sess?.no || '—'} · Table{' '}
+            {S.activeTable})
+          </p>
+          <div className="row" style={{ flexWrap: 'wrap', marginTop: '6px' }}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                className={`chip ${S.split === n ? 'on' : ''}`}
+                onClick={() => updateState((p) => ({ ...p, split: n }))}
+              >
+                {n === 1 ? 'Just me' : `${n} people`}
+              </button>
+            ))}
+          </div>
+          {S.split > 1 && (
+            <p style={{ marginTop: '8px', fontSize: '14px' }}>
+              Each person&apos;s share: <b>₹{per}</b> ({S.split} ways)
+            </p>
+          )}
+
+          {(() => {
+            const memberTotals: Record<string, number> = {};
+            S.orders
+              .filter((o) => o.st !== 5)
+              .forEach((o) => {
+                const who = o.orderedByMob || S.sess?.mob || 'Principal';
+                let amt = 0;
+                S.menu.forEach((d) => {
+                  const q = o.it[d.id] || 0;
+                  if (q > 0) amt += (o.prices?.[d.id] ?? d.p) * q;
+                });
+                memberTotals[who] = (memberTotals[who] || 0) + amt;
+              });
+            const entries = Object.entries(memberTotals);
+            const invitedList = S.sess?.invitedMobs || [];
+            if (entries.length <= 1 && invitedList.length === 0) return null;
+
+            return (
+              <div
+                style={{
+                  borderTop: '1px dashed #5a4690',
+                  marginTop: '10px',
+                  paddingTop: '8px',
+                }}
+              >
+                <div className="mu" style={{ marginBottom: '4px', fontSize: '12px' }}>
+                  👥 Order-wise breakdown (tap a friend to prefill WhatsApp):
+                </div>
+                {entries.map(([who, amt]) => (
+                  <div key={who} className="line mu">
+                    <span>
+                      {who === S.sess?.mob ? `${who} (Principal)` : `${who} (Invited)`}
+                    </span>
+                    <span>₹{amt} (before GST/disc)</span>
+                  </div>
+                ))}
+                {invitedList.length > 0 && (
+                  <div className="row" style={{ flexWrap: 'wrap', marginTop: '6px' }}>
+                    {invitedList.map((m) => (
+                      <button
+                        key={m}
+                        className="chip"
+                        style={{ fontSize: '12px' }}
+                        onClick={() => setFriendWaMob(m)}
+                      >
+                        📱 {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          <div style={{ marginTop: '10px' }}>
+            <div className="mu" style={{ marginBottom: '4px', fontSize: '12px' }}>
+              Friend&apos;s WhatsApp number (optional — leave blank to choose in WhatsApp):
+            </div>
+            <CountryCodeMobileInput
+              id="paid-split-wa"
+              value={friendWaMob}
+              onChange={setFriendWaMob}
+            />
+          </div>
+
+          {(() => {
+            const buildSplitMsg = () => {
+              const itemsText = S.menu
+                .filter((m) => S.cart[m.id])
+                .map((m) => `• ${m.n.en} × ${S.cart[m.id]} (₹${m.p * S.cart[m.id]})`)
+                .join('\n');
+              const splitLine =
+                S.split > 1
+                  ? `Split (${S.split} people): *₹${per} per person*`
+                  : `Total Bill: *₹${t}*`;
+              return (
+                `🧾 *Tadka Truck — Paid Bill Split*\n` +
+                `Counter: ${S.sess?.no || '—'} · Table ${S.activeTable}\n` +
+                `Paid by: ${S.sess?.mob || 'Principal'} (${S.pm})\n\n` +
+                (itemsText ? `*Items:*\n${itemsText}\n\n` : '') +
+                `Total Paid: *₹${t}*\n` +
+                `${splitLine}\n` +
+                `Please settle your share! 🙏`
+              );
+            };
+
+            const handleSendWhatsApp = () => {
+              const msg = buildSplitMsg();
+              const normalized = friendWaMob.trim()
+                ? normalizeMobile(friendWaMob, S.cc)
+                : '';
+              const digits = normalized ? normalized.replace(/\D/g, '') : '';
+              const waUrl = digits
+                ? `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`
+                : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+              window.open(waUrl, '_blank', 'noopener,noreferrer');
+              say(
+                digits
+                  ? `Opening WhatsApp for ${normalized} ✅`
+                  : 'Opening WhatsApp to share split ✅'
+              );
+            };
+
+            const handleCopySplit = async () => {
+              const msg = buildSplitMsg();
+              try {
+                await navigator.clipboard.writeText(msg);
+                say('Split bill copied to clipboard ✅');
+              } catch {
+                say('Could not copy automatically — use Send on WhatsApp');
+              }
+            };
+
+            return (
+              <div className="row" style={{ gap: '8px', marginTop: '8px' }}>
+                <button
+                  className="btn alt"
+                  style={{ flex: 1, marginTop: 0 }}
+                  onClick={handleSendWhatsApp}
+                >
+                  📲 Send Split on WhatsApp
+                </button>
+                <button
+                  className="chip"
+                  onClick={handleCopySplit}
+                >
+                  📋 Copy
+                </button>
+              </div>
+            );
+          })()}
+        </div>
 
         <ReviewAndShareCard />
 
