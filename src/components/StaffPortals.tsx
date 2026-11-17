@@ -1543,12 +1543,24 @@ export function AdminPortalView() {
     regenerateTableQr,
     setActiveTable,
     resetDemoState,
+    saveGoogleConfig,
+    syncToGoogleSheets,
     say,
   } = useTadka();
 
   const [staffName, setStaffName] = useState('');
   const [staffMob, setStaffMob] = useState('');
   const [checkMob, setCheckMob] = useState('');
+  const [revUrlInput, setRevUrlInput] = useState(
+    S.googleConfig.googleReviewUrl || ''
+  );
+  const [igHandleInput, setIgHandleInput] = useState(
+    S.googleConfig.instagramHandle || '@tadkatruck'
+  );
+  const [fbUrlInput, setFbUrlInput] = useState(S.googleConfig.facebookUrl || '');
+  const [socTagInput, setSocTagInput] = useState(
+    S.googleConfig.socialTag || '#TadkaTruck @tadkatruck'
+  );
 
   const [openAdminSections, setOpenAdminSections] = useState<
     Record<string, boolean>
@@ -1559,6 +1571,7 @@ export function AdminPortalView() {
     loginTest: false,
     menuAdmin: false,
     tablesQr: false,
+    socialLinks: false,
     storage: false,
     resetDemo: false,
   });
@@ -1574,6 +1587,7 @@ export function AdminPortalView() {
       loginTest: val,
       menuAdmin: val,
       tablesQr: val,
+      socialLinks: val,
       storage: val,
       resetDemo: val,
     });
@@ -2147,6 +2161,85 @@ export function AdminPortalView() {
           </div>
         )}
       </div>
+
+      <CollapsibleSection
+        title="📣 Social Media & Google Review Links"
+        badge={S.googleConfig.googleReviewUrl ? 'Configured' : undefined}
+        isOpen={!!openAdminSections.socialLinks}
+        onToggle={() => toggleAdminSection('socialLinks')}
+      >
+        <p className="mu" style={{ margin: '0 0 8px', fontSize: '12px' }}>
+          Customers open these real links when posting a Google Review or
+          sharing reels/snaps. Saved to Google Sheets (`Restaurant_Config`) so
+          every customer device gets them automatically.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div>
+            <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+              ⭐ Google Review URL (from Google Business Profile → Ask for reviews)
+            </div>
+            <input
+              value={revUrlInput}
+              onChange={(e) => setRevUrlInput(e.target.value)}
+              placeholder="https://g.page/r/.../review"
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+              📸 Instagram Handle or Profile URL
+            </div>
+            <input
+              value={igHandleInput}
+              onChange={(e) => setIgHandleInput(e.target.value)}
+              placeholder="@tadkatruck or https://instagram.com/tadkatruck"
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+              📘 Facebook Page URL (optional)
+            </div>
+            <input
+              value={fbUrlInput}
+              onChange={(e) => setFbUrlInput(e.target.value)}
+              placeholder="https://facebook.com/tadkatruck"
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+              #️⃣ Caption / Tag for Customer Reels &amp; Snaps
+            </div>
+            <input
+              value={socTagInput}
+              onChange={(e) => setSocTagInput(e.target.value)}
+              placeholder="#TadkaTruck @tadkatruck"
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <button
+            className="btn alt"
+            onClick={async () => {
+              const nextSocial = {
+                googleReviewUrl: revUrlInput.trim(),
+                instagramHandle: igHandleInput.trim(),
+                facebookUrl: fbUrlInput.trim(),
+                socialTag: socTagInput.trim(),
+              };
+              saveGoogleConfig(nextSocial);
+              await syncToGoogleSheets(nextSocial);
+              say('Social & Google Review links saved & synced ✅');
+            }}
+          >
+            Save &amp; Sync Social Links
+          </button>
+        </div>
+      </CollapsibleSection>
 
       <CollapsibleSection
         title="☁️ Google Drive & Sheets Storage"

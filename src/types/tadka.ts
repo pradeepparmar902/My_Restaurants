@@ -140,6 +140,10 @@ export interface GoogleCloudStorageConfig {
   appsScriptWebAppUrl: string;
   spreadsheetId: string;
   driveFolderId: string;
+  googleReviewUrl?: string;
+  instagramHandle?: string;
+  facebookUrl?: string;
+  socialTag?: string;
   lastSyncedAt?: string;
   lastSyncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
   lastSyncError?: string;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import { COUNTRY_CODES, SOCIAL_PLATFORMS } from '@/lib/constants';
 import {
@@ -220,35 +220,69 @@ export function BillReadyBanner() {
   );
 }
 
+function buildInstagramUrl(handleOrUrl?: string): string {
+  const v = (handleOrUrl || '@tadkatruck').trim();
+  if (v.startsWith('http://') || v.startsWith('https://')) return v;
+  return `https://www.instagram.com/${v.replace(/^@/, '')}/`;
+}
+
 export function ConnectedAccountsCard() {
   const { S, updateState, say } = useTadka();
+  const igUrl = buildInstagramUrl(S.googleConfig.instagramHandle);
+  const fbUrl =
+    (S.googleConfig.facebookUrl || '').trim() || 'https://www.facebook.com/';
+
   return (
     <div className="card">
-      <h3>🔗 Connected accounts</h3>
-      <p className="mu">Link once, then post in one tap. Disconnect anytime.</p>
+      <h3>🔗 Connected social accounts</h3>
+      <p className="mu">
+        Follow {S.googleConfig.instagramHandle || '@tadkatruck'} &amp; link once
+        to share snaps/reels in one tap.
+      </p>
       {SOCIAL_PLATFORMS.map(([p, icon]) => {
         const isConnected = !!S.soc[p];
+        const profileUrl =
+          p === 'Instagram'
+            ? igUrl
+            : p === 'Facebook'
+              ? fbUrl
+              : p === 'Snapchat'
+                ? 'https://www.snapchat.com/'
+                : 'https://wa.me/';
         return (
           <div key={p} className="row sp" style={{ marginTop: '10px' }}>
             <span>
               {icon} {p}
               <br />
-              <span className="mu">
-                {isConnected ? 'Connected as @you.eats' : 'Not connected'}
+              <span className="mu" style={{ fontSize: '12px' }}>
+                {isConnected ? 'Ready to share' : 'Not linked'}
               </span>
             </span>
-            <button
-              className={`chip ${isConnected ? '' : 'on'}`}
-              onClick={() => {
-                updateState((prev) => ({
-                  ...prev,
-                  soc: { ...prev.soc, [p]: !isConnected },
-                }));
-                if (!isConnected) say(`${p} connected ✅`);
-              }}
-            >
-              {isConnected ? 'Disconnect' : 'Connect'}
-            </button>
+            <div className="row" style={{ gap: '6px' }}>
+              {(p === 'Instagram' || p === 'Facebook') && (
+                <a
+                  href={profileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="chip"
+                  style={{ textDecoration: 'none', fontSize: '11px' }}
+                >
+                  Open ↗
+                </a>
+              )}
+              <button
+                className={`chip ${isConnected ? '' : 'on'}`}
+                onClick={() => {
+                  updateState((prev) => ({
+                    ...prev,
+                    soc: { ...prev.soc, [p]: !isConnected },
+                  }));
+                  if (!isConnected) say(`${p} connected ✅`);
+                }}
+              >
+                {isConnected ? 'Disconnect' : 'Connect'}
+              </button>
+            </div>
           </div>
         );
       })}
@@ -259,81 +293,207 @@ export function ConnectedAccountsCard() {
 export function ShareMomentCard() {
   const { S, updateState, say, uploadMediaToDrive } = useTadka();
   const platforms = ['Instagram', 'WhatsApp Status', 'Snapchat', 'Facebook'];
+  const snapInputRef = useRef<HTMLInputElement | null>(null);
+  const reelInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [caption, setCaption] = useState('');
+
+  const defaultTag = S.googleConfig.socialTag || '#TadkaTruck @tadkatruck';
+
+  const handleFilePicked = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    kind: 'snap' | 'reel'
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedFile(file);
+    try {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    } catch {
+      // ignore preview error
+    }
+    updateState((prev) => ({ ...prev, media: kind }));
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = typeof reader.result === 'string' ? reader.result : '';
+      uploadMediaToDrive({
+        fileName:
+          file.name ||
+          `tadka_${kind}_table${S.activeTable}_${Date.now()}.${
+            kind === 'reel' ? 'mp4' : 'jpg'
+          }`,
+        kind,
+        mimeType: file.type || (kind === 'reel' ? 'video/mp4' : 'image/jpeg'),
+        base64Data: base64,
+        caption: caption.trim() || `${defaultTag} · Table ${S.activeTable}`,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleShareToPlatform = async (platform: string) => {
+    const shareText = `${
+      caption.trim() || 'Great food at Tadka Truck!'
+    } ${defaultTag}`;
+    try {
+      await navigator.clipboard?.writeText(shareText);
+    } catch {
+      // ignore clipboard error
+    }
+
+    const nav = navigator as Navigator & {
+      canShare?: (data: ShareData) => boolean;
+    };
+
+    if (selectedFile && typeof nav.share === 'function') {
+      try {
+        if (!nav.canShare || nav.canShare({ files: [selectedFile] })) {
+          await nav.share({
+            files: [selectedFile],
+            title: 'Tadka Truck',
+            text: shareText,
+          });
+          updateState((prev) => ({
+            ...prev,
+            soc: { ...prev.soc, [platform]: true },
+            pts: !prev.shared ? prev.pts + 10 : prev.pts,
+            shared: true,
+          }));
+          say(`Shared to ${platform} (+10 pts) 🎉`);
+          return;
+        }
+      } catch {
+        // user cancelled or browser fell back
+      }
+    }
+
+    const targetUrl =
+      platform === 'Instagram'
+        ? buildInstagramUrl(S.googleConfig.instagramHandle)
+        : platform === 'WhatsApp Status'
+          ? `https://wa.me/?text=${encodeURIComponent(shareText)}`
+          : platform === 'Facebook'
+            ? (S.googleConfig.facebookUrl || '').trim() ||
+              `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(
+                shareText
+              )}`
+            : 'https://www.snapchat.com/';
+
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    updateState((prev) => ({
+      ...prev,
+      soc: { ...prev.soc, [platform]: true },
+      pts: !prev.shared ? prev.pts + 10 : prev.pts,
+      shared: true,
+    }));
+    say(`Tag copied! Opening ${platform} (+10 pts) 🎉`);
+  };
+
   return (
     <div className="card">
       <h3>📸 Share your moment</h3>
       <p className="mu">
-        Snap or record your dish. Tag @tadkatruck and earn 10 bonus points.
+        Take a photo or record a reel from your phone, tag{' '}
+        <b>{defaultTag}</b>, and earn <b>10 bonus points</b>.
       </p>
+
+      <input
+        ref={snapInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => handleFilePicked(e, 'snap')}
+      />
+      <input
+        ref={reelInputRef}
+        type="file"
+        accept="video/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => handleFilePicked(e, 'reel')}
+      />
+
       {S.media ? (
         <>
-          <p style={{ margin: '8px 0' }}>
-            ✅ {S.media === 'reel' ? 'Reel' : 'Snap'} ready & saved to Google Drive. Share it:
+          {previewUrl &&
+            (S.media === 'reel' ? (
+              <video
+                src={previewUrl}
+                controls
+                style={{
+                  width: '100%',
+                  maxHeight: '220px',
+                  borderRadius: '10px',
+                  marginTop: '8px',
+                }}
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt="Your snap preview"
+                style={{
+                  width: '100%',
+                  maxHeight: '220px',
+                  objectFit: 'cover',
+                  borderRadius: '10px',
+                  marginTop: '8px',
+                }}
+              />
+            ))}
+          <p style={{ margin: '8px 0 4px', fontSize: '13px' }}>
+            ✅ {S.media === 'reel' ? 'Reel' : 'Snap'} saved to Google Drive. Tap
+            a platform to share:
           </p>
-          <div className="row" style={{ flexWrap: 'wrap' }}>
-            {platforms.map((p) =>
-              S.soc[p] ? (
-                <button
-                  key={p}
-                  className="chip on"
-                  onClick={() => {
-                    updateState((prev) => ({
-                      ...prev,
-                      pts: !prev.shared ? prev.pts + 10 : prev.pts,
-                      shared: true,
-                    }));
-                    say(`Shared to ${p} 🎉`);
-                  }}
-                >
-                  Share to {p}
-                </button>
-              ) : (
-                <button
-                  key={p}
-                  className="chip"
-                  onClick={() => {
-                    updateState((prev) => ({
-                      ...prev,
-                      soc: { ...prev.soc, [p]: true },
-                    }));
-                    say(`${p} connected ✅`);
-                  }}
-                >
-                  Connect {p}
-                </button>
-              )
-            )}
+          <input
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder={`Add caption (${defaultTag})`}
+            className="inp"
+            style={{ width: '100%', marginBottom: '8px' }}
+          />
+          <div className="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
+            {platforms.map((p) => (
+              <button
+                key={p}
+                className={`chip ${S.soc[p] ? 'on' : ''}`}
+                onClick={() => handleShareToPlatform(p)}
+              >
+                📲 Share to {p}
+              </button>
+            ))}
           </div>
-        </>
-      ) : (
-        <div className="row">
           <button
-            className="btn alt"
+            className="btn ghost"
+            style={{ marginTop: '8px' }}
             onClick={() => {
-              updateState((prev) => ({ ...prev, media: 'snap' }));
-              uploadMediaToDrive({
-                fileName: `tadka_snap_table${S.activeTable}_${Date.now()}.jpg`,
-                kind: 'snap',
-                mimeType: 'image/jpeg',
-                caption: `Moment snap at Table ${S.activeTable}`,
-              });
+              setSelectedFile(null);
+              setPreviewUrl('');
+              updateState((prev) => ({ ...prev, media: null }));
             }}
           >
-            📸 Take snap
+            🔄 Upload another snap / reel
+          </button>
+        </>
+      ) : (
+        <div className="row" style={{ gap: '8px', marginTop: '8px' }}>
+          <button
+            className="btn alt"
+            style={{ flex: 1, marginTop: 0 }}
+            onClick={() => snapInputRef.current?.click()}
+          >
+            📸 Take / Upload Snap
           </button>
           <button
             className="btn alt"
-            onClick={() => {
-              updateState((prev) => ({ ...prev, media: 'reel' }));
-              uploadMediaToDrive({
-                fileName: `tadka_moment_reel_table${S.activeTable}_${Date.now()}.mp4`,
-                kind: 'reel',
-                mimeType: 'video/mp4',
-                caption: `Moment reel at Table ${S.activeTable}`,
-              });
-            }}
+            style={{ flex: 1, marginTop: 0 }}
+            onClick={() => reelInputRef.current?.click()}
           >
-            🎬 Record reel
+            🎬 Record / Upload Reel
           </button>
         </div>
       )}
@@ -345,17 +505,74 @@ export function ReviewAndShareCard() {
   const { S, updateState, say } = useTadka();
   const platforms = ['Instagram', 'WhatsApp Status', 'Snapchat', 'Facebook'];
   const g = S.review || S.reviewed;
+  const defaultTag = S.googleConfig.socialTag || '#TadkaTruck @tadkatruck';
+  const googleReviewLink =
+    (S.googleConfig.googleReviewUrl || '').trim() ||
+    'https://www.google.com/search?q=Tadka+Truck+reviews';
+
+  const handleOpenGoogleReview = () => {
+    window.open(googleReviewLink, '_blank', 'noopener,noreferrer');
+    updateState((prev) => ({
+      ...prev,
+      reviewed: prev.paid ? true : prev.reviewed,
+      review: prev.paid ? prev.review : true,
+    }));
+    say(
+      S.paid
+        ? 'Opening Google Review — thank you! ⭐'
+        : 'Opening Google Review · ₹50 off applied ✅'
+    );
+  };
+
+  const handleQuickShare = async (p: string) => {
+    const shareText = `Loved the food at Tadka Truck! ${defaultTag}`;
+    try {
+      await navigator.clipboard?.writeText(shareText);
+    } catch {
+      // ignore
+    }
+    const targetUrl =
+      p === 'Instagram'
+        ? buildInstagramUrl(S.googleConfig.instagramHandle)
+        : p === 'WhatsApp Status'
+          ? `https://wa.me/?text=${encodeURIComponent(shareText)}`
+          : p === 'Facebook'
+            ? (S.googleConfig.facebookUrl || '').trim() ||
+              `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(
+                shareText
+              )}`
+            : 'https://www.snapchat.com/';
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    updateState((prev) => ({
+      ...prev,
+      soc: { ...prev.soc, [p]: true },
+      pts: !prev.shared ? prev.pts + 10 : prev.pts,
+      shared: true,
+    }));
+    say(`Tag copied! Opening ${p} (+10 pts) 🎉`);
+  };
 
   return (
     <div className="card">
       <h3>⭐ Review and share</h3>
       <p className="mu">
         {S.paid
-          ? 'Loved it? Tell others and earn bonus points.'
+          ? 'Loved it? Post a Google Review or share on social media for 10 bonus points.'
           : 'Post a Google review to save ₹50 on this bill, or share on social media for 10 bonus points.'}
       </p>
       {g ? (
-        <p style={{ margin: '8px 0' }}>✅ Google review posted</p>
+        <div className="row sp" style={{ margin: '8px 0' }}>
+          <span>✅ Google review posted</span>
+          <a
+            href={googleReviewLink}
+            target="_blank"
+            rel="noreferrer"
+            className="chip"
+            style={{ textDecoration: 'none', fontSize: '11px' }}
+          >
+            Open Google ↗
+          </a>
+        </div>
       ) : (
         <>
           <div className="stars" style={{ marginTop: '6px' }}>
@@ -370,17 +587,8 @@ export function ReviewAndShareCard() {
             ))}
           </div>
           {S.rating >= 4 ? (
-            <button
-              className="btn alt"
-              onClick={() =>
-                updateState((prev) => ({
-                  ...prev,
-                  reviewed: prev.paid ? true : prev.reviewed,
-                  review: prev.paid ? prev.review : true,
-                }))
-              }
-            >
-              Post on Google{S.paid ? '' : ' · ₹50 off'}
+            <button className="btn alt" onClick={handleOpenGoogleReview}>
+              ⭐ Post on Google{S.paid ? '' : ' · ₹50 off'}
             </button>
           ) : S.rating ? (
             <p className="mu">
@@ -389,39 +597,16 @@ export function ReviewAndShareCard() {
           ) : null}
         </>
       )}
-      <div className="row" style={{ flexWrap: 'wrap', marginTop: '10px' }}>
-        {platforms.map((p) =>
-          S.soc[p] ? (
-            <button
-              key={p}
-              className="chip on"
-              onClick={() => {
-                updateState((prev) => ({
-                  ...prev,
-                  pts: !prev.shared ? prev.pts + 10 : prev.pts,
-                  shared: true,
-                }));
-                say(`Shared to ${p} 🎉`);
-              }}
-            >
-              Share to {p}
-            </button>
-          ) : (
-            <button
-              key={p}
-              className="chip"
-              onClick={() => {
-                updateState((prev) => ({
-                  ...prev,
-                  soc: { ...prev.soc, [p]: true },
-                }));
-                say(`${p} connected ✅`);
-              }}
-            >
-              Connect {p}
-            </button>
-          )
-        )}
+      <div className="row" style={{ flexWrap: 'wrap', marginTop: '10px', gap: '6px' }}>
+        {platforms.map((p) => (
+          <button
+            key={p}
+            className={`chip ${S.soc[p] ? 'on' : ''}`}
+            onClick={() => handleQuickShare(p)}
+          >
+            📲 Share to {p}
+          </button>
+        ))}
       </div>
     </div>
   );

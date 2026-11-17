@@ -41,6 +41,10 @@ export function buildSheetRowsForState(
     ['appsScriptWebAppUrl', state.googleConfig?.appsScriptWebAppUrl || '', new Date().toISOString()],
     ['spreadsheetId', state.googleConfig?.spreadsheetId || '', new Date().toISOString()],
     ['driveFolderId', state.googleConfig?.driveFolderId || '', new Date().toISOString()],
+    ['googleReviewUrl', state.googleConfig?.googleReviewUrl || '', new Date().toISOString()],
+    ['instagramHandle', state.googleConfig?.instagramHandle || '', new Date().toISOString()],
+    ['facebookUrl', state.googleConfig?.facebookUrl || '', new Date().toISOString()],
+    ['socialTag', state.googleConfig?.socialTag || '', new Date().toISOString()],
     ['counter_mode', state.cmode, new Date().toISOString()],
     ['whatsapp_final_bill', state.wab, new Date().toISOString()],
     ['counter_business_date', businessDateToday, new Date().toISOString()],
@@ -644,6 +648,10 @@ export function parseConfigFromSheetRows(
     if (key === 'appsScriptWebAppUrl' && val) cfg.appsScriptWebAppUrl = val;
     if (key === 'spreadsheetId' && val) cfg.spreadsheetId = val;
     if (key === 'driveFolderId' && val) cfg.driveFolderId = val;
+    if (key === 'googleReviewUrl' && val) cfg.googleReviewUrl = val;
+    if (key === 'instagramHandle' && val) cfg.instagramHandle = val;
+    if (key === 'facebookUrl' && val) cfg.facebookUrl = val;
+    if (key === 'socialTag' && val) cfg.socialTag = val;
   }
   return Object.keys(cfg).length > 0 ? cfg : null;
 }
