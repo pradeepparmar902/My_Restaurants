@@ -40,13 +40,24 @@ export function getDiscount(subtotal: number, reel: 'wait' | 'ok' | null, review
   return Math.min(subtotal, reelDisc + reviewDisc);
 }
 
-export function getGST(subtotal: number, discount: number): number {
-  return Math.round(Math.max(0, subtotal - discount) * 0.05);
+export function getGST(
+  subtotal: number,
+  discount: number,
+  gstEnabled = true,
+  gstRate = 5
+): number {
+  if (!gstEnabled || gstRate <= 0) return 0;
+  return Math.round(Math.max(0, subtotal - discount) * (gstRate / 100));
 }
 
-export function getTotal(subtotal: number, discount: number): number {
+export function getTotal(
+  subtotal: number,
+  discount: number,
+  gstEnabled = true,
+  gstRate = 5
+): number {
   const net = Math.max(0, subtotal - discount);
-  return Math.max(0, Math.round(net * 1.05));
+  return Math.max(0, net + getGST(subtotal, discount, gstEnabled, gstRate));
 }
 
 export function getActiveStaffMember(staff: StaffMember[], mob: string): StaffMember | undefined {

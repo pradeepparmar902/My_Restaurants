@@ -822,6 +822,9 @@ export function BillTabView() {
   const per = Math.ceil(t / S.split);
   const s = sub();
   const g = gst();
+  const gstEnabled = S.googleConfig?.gstEnabled !== false;
+  const gstRate = gstEnabled ? (S.googleConfig?.gstRate ?? 5) : 0;
+  const gstin = (S.googleConfig?.gstin || '').trim();
 
   if (S.paid) {
     return (
@@ -939,6 +942,7 @@ export function BillTabView() {
           <p className="mu" style={{ margin: '4px 0 8px', fontSize: '12px' }}>
             Counter {S.sess?.no || '—'} · Table {S.activeTable} ·{' '}
             {S.sess?.mob || 'Guest'}
+            {gstin ? ` · GSTIN: ${gstin}` : ''}
           </p>
           {S.menu
             .filter((m) => S.cart[m.id])
@@ -960,10 +964,12 @@ export function BillTabView() {
               <span>−₹{disc()}</span>
             </div>
           )}
-          <div className="line mu" style={{ fontSize: '12px' }}>
-            <span>GST 5%</span>
-            <span>₹{g}</span>
-          </div>
+          {gstEnabled && gstRate > 0 && (
+            <div className="line mu" style={{ fontSize: '12px' }}>
+              <span>GST {gstRate}%</span>
+              <span>₹{g}</span>
+            </div>
+          )}
           <div className="line tot">
             <span>Total Paid</span>
             <span>₹{t}</span>
@@ -979,12 +985,13 @@ export function BillTabView() {
                 : '';
               return (
                 `🧾 *Tadka Truck — Paid Receipt*\n` +
+                (gstin ? `GSTIN: ${gstin}\n` : '') +
                 `Counter: ${S.sess?.no || '—'} · Table ${S.activeTable}\n` +
                 `Payment: ${S.pm}\n\n` +
                 `${lines}\n\n` +
                 `Subtotal: ₹${s}\n` +
                 (disc() > 0 ? `Discounts: -₹${disc()}\n` : '') +
-                `GST (5%): ₹${g}\n` +
+                (gstEnabled && gstRate > 0 ? `GST (${gstRate}%): ₹${g}\n` : '') +
                 `*Total Paid: ₹${t}*` +
                 `${couponLine}\n\nThank you for dining with us! 🙏`
               );
@@ -1485,10 +1492,12 @@ export function BillTabView() {
             <span>−₹50</span>
           </div>
         )}
-        <div className="line">
-          <span>GST 5%</span>
-          <span>₹{g}</span>
-        </div>
+        {gstEnabled && gstRate > 0 && (
+          <div className="line">
+            <span>GST {gstRate}%{gstin ? ` (${gstin})` : ''}</span>
+            <span>₹{g}</span>
+          </div>
+        )}
         <div className="line tot">
           <span>Total</span>
           <span>₹{t}</span>

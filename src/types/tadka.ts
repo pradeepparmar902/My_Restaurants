@@ -146,6 +146,9 @@ export interface GoogleCloudStorageConfig {
   socialTag?: string;
   upiId?: string;
   upiName?: string;
+  gstEnabled?: boolean;
+  gstRate?: number;
+  gstin?: string;
   lastSyncedAt?: string;
   lastSyncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
   lastSyncError?: string;

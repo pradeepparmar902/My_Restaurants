@@ -456,13 +456,23 @@ export function TadkaProvider({
   const gst = useCallback(() => {
     const s = getSubtotal(S.menu, S.cart);
     const d = getDiscount(s, S.reel, S.review);
-    return getGST(s, d);
-  }, [S.menu, S.cart, S.reel, S.review]);
+    return getGST(
+      s,
+      d,
+      S.googleConfig?.gstEnabled !== false,
+      S.googleConfig?.gstRate ?? 5
+    );
+  }, [S.menu, S.cart, S.reel, S.review, S.googleConfig?.gstEnabled, S.googleConfig?.gstRate]);
   const total = useCallback(() => {
     const s = getSubtotal(S.menu, S.cart);
     const d = getDiscount(s, S.reel, S.review);
-    return getTotal(s, d);
-  }, [S.menu, S.cart, S.reel, S.review]);
+    return getTotal(
+      s,
+      d,
+      S.googleConfig?.gstEnabled !== false,
+      S.googleConfig?.gstRate ?? 5
+    );
+  }, [S.menu, S.cart, S.reel, S.review, S.googleConfig?.gstEnabled, S.googleConfig?.gstRate]);
 
   const staffOf = useCallback(() => getActiveStaffMember(S.staff, S.me.mob), [S.staff, S.me.mob]);
   const portals = useCallback(() => getAllowedPortals(staffOf()), [staffOf]);
@@ -1585,8 +1595,10 @@ export function TadkaProvider({
       updateState((prev) => {
         const s = getSubtotal(prev.menu, prev.cart);
         const d = getDiscount(s, prev.reel, prev.review);
-        const g = getGST(s, d);
-        const t = getTotal(s, d);
+        const gstEnabled = prev.googleConfig?.gstEnabled !== false;
+        const gstRate = prev.googleConfig?.gstRate ?? 5;
+        const g = getGST(s, d, gstEnabled, gstRate);
+        const t = getTotal(s, d, gstEnabled, gstRate);
         const { summary } = formatItemsSummary(prev.menu, prev.cart);
         const todayBizDate =
           prev.sess?.businessDate ||

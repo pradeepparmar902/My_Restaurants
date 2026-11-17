@@ -1651,6 +1651,13 @@ export function AdminPortalView() {
   const [upiNameInput, setUpiNameInput] = useState(
     S.googleConfig.upiName || 'Tadka Truck'
   );
+  const [gstEnabledInput, setGstEnabledInput] = useState(
+    S.googleConfig.gstEnabled !== false
+  );
+  const [gstRateInput, setGstRateInput] = useState(
+    String(S.googleConfig.gstRate ?? 5)
+  );
+  const [gstinInput, setGstinInput] = useState(S.googleConfig.gstin || '');
 
   const [openAdminSections, setOpenAdminSections] = useState<
     Record<string, boolean>
@@ -1658,6 +1665,7 @@ export function AdminPortalView() {
     team: true,
     giveAccess: false,
     whatsappBill: false,
+    gstSettings: false,
     loginTest: false,
     menuAdmin: false,
     tablesQr: false,
@@ -1674,6 +1682,7 @@ export function AdminPortalView() {
       team: val,
       giveAccess: val,
       whatsappBill: val,
+      gstSettings: val,
       loginTest: val,
       menuAdmin: val,
       tablesQr: val,
@@ -1865,6 +1874,100 @@ export function AdminPortalView() {
             ? 'After payment, customers who gave their WhatsApp number get the final bill.'
             : 'No bill is sent on WhatsApp. Customers still see it in the app.'}
         </p>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="🧾 GST &amp; GSTIN Master"
+        badge={
+          S.googleConfig.gstEnabled !== false
+            ? `${S.googleConfig.gstRate ?? 5}%${
+                S.googleConfig.gstin ? ` · ${S.googleConfig.gstin}` : ''
+              }`
+            : 'Off'
+        }
+        isOpen={!!openAdminSections.gstSettings}
+        onToggle={() => toggleAdminSection('gstSettings')}
+      >
+        <p className="mu" style={{ margin: '0 0 8px', fontSize: '12px' }}>
+          Configure GST billing rate and your restaurant&apos;s GSTIN number.
+          Shown on customer bills &amp; digital GST receipts, and synced via
+          Google Sheets (`Restaurant_Config`).
+        </p>
+        <div className="row" style={{ gap: '6px', marginBottom: '10px' }}>
+          <button
+            className={`chip ${gstEnabledInput ? 'on' : ''}`}
+            onClick={() => setGstEnabledInput(true)}
+          >
+            ✅ Charge GST
+          </button>
+          <button
+            className={`chip ${!gstEnabledInput ? 'on' : ''}`}
+            onClick={() => setGstEnabledInput(false)}
+          >
+            🚫 No GST (Exempt)
+          </button>
+        </div>
+
+        {gstEnabledInput && (
+          <div style={{ marginBottom: '10px' }}>
+            <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
+              GST Rate (%):
+            </div>
+            <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+              {['5', '12', '18'].map((r) => (
+                <button
+                  key={r}
+                  className={`chip ${gstRateInput === r ? 'on' : ''}`}
+                  onClick={() => setGstRateInput(r)}
+                >
+                  {r}%
+                </button>
+              ))}
+              <input
+                type="number"
+                min="0"
+                max="28"
+                step="0.5"
+                value={gstRateInput}
+                onChange={(e) => setGstRateInput(e.target.value)}
+                placeholder="%"
+                className="inp"
+                style={{ width: '80px', padding: '5px 8px', fontSize: '12px' }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginBottom: '10px' }}>
+          <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
+            GSTIN Number (Master):
+          </div>
+          <input
+            value={gstinInput}
+            onChange={(e) => setGstinInput(e.target.value.toUpperCase())}
+            placeholder="e.g. 24ABCDE1234F1Z5"
+            maxLength={15}
+            className="inp"
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        <button
+          className="btn alt"
+          onClick={async () => {
+            const parsedRate = Math.max(0, Number(gstRateInput) || 0);
+            const nextGst = {
+              gstEnabled: gstEnabledInput,
+              gstRate: gstEnabledInput ? parsedRate : 0,
+              gstin: gstinInput.trim().toUpperCase(),
+            };
+            saveGoogleConfig(nextGst);
+            await syncToGoogleSheets(nextGst);
+            say('GST & GSTIN settings saved & synced ✅');
+          }}
+        >
+          Save &amp; Sync GST Settings
+        </button>
       </CollapsibleSection>
 
       <CollapsibleSection

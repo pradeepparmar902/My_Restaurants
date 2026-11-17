@@ -28,8 +28,10 @@ export function buildSheetRowsForState(
 ): Record<SheetTabName, (string | number | boolean)[][]> {
   const subtotal = getSubtotal(state.menu, state.cart);
   const discount = getDiscount(subtotal, state.reel, state.review);
-  const gst = getGST(subtotal, discount);
-  const total = getTotal(subtotal, discount);
+  const gstEnabled = state.googleConfig?.gstEnabled !== false;
+  const gstRate = state.googleConfig?.gstRate ?? 5;
+  const gst = getGST(subtotal, discount, gstEnabled, gstRate);
+  const total = getTotal(subtotal, discount, gstEnabled, gstRate);
 
   const businessDateToday =
     state.counterBusinessDate || getCurrentBusinessDate();
@@ -47,6 +49,9 @@ export function buildSheetRowsForState(
     ['socialTag', state.googleConfig?.socialTag || '', new Date().toISOString()],
     ['upiId', state.googleConfig?.upiId || '', new Date().toISOString()],
     ['upiName', state.googleConfig?.upiName || '', new Date().toISOString()],
+    ['gst_enabled', gstEnabled, new Date().toISOString()],
+    ['gst_rate', gstRate, new Date().toISOString()],
+    ['gstin', state.googleConfig?.gstin || '', new Date().toISOString()],
     ['counter_mode', state.cmode, new Date().toISOString()],
     ['whatsapp_final_bill', state.wab, new Date().toISOString()],
     ['counter_business_date', businessDateToday, new Date().toISOString()],
@@ -656,6 +661,14 @@ export function parseConfigFromSheetRows(
     if (key === 'socialTag' && val) cfg.socialTag = val;
     if (key === 'upiId' && val) cfg.upiId = val;
     if (key === 'upiName' && val) cfg.upiName = val;
+    if (key === 'gst_enabled' && val !== '') {
+      cfg.gstEnabled = val.toUpperCase() !== 'FALSE' && val !== '0';
+    }
+    if (key === 'gst_rate' && val !== '') {
+      const parsed = Number(val);
+      if (!Number.isNaN(parsed) && parsed >= 0) cfg.gstRate = parsed;
+    }
+    if (key === 'gstin' && val) cfg.gstin = val;
   }
   return Object.keys(cfg).length > 0 ? cfg : null;
 }
