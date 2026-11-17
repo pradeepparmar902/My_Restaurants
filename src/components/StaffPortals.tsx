@@ -208,6 +208,7 @@ export function WaiterPortalView() {
     pullFromGoogleSheets,
     setWTab,
     setActiveTable,
+    addTable,
     assignNo,
     setNo,
     changeWaiterDraftQty,
@@ -216,6 +217,7 @@ export function WaiterPortalView() {
   } = useTadka();
   const [wnoInput, setWnoInput] = useState('');
   const [wmobInput, setWmobInput] = useState('');
+  const [manualTableInput, setManualTableInput] = useState('');
   const [selectedWorkspaceCounter, setSelectedWorkspaceCounter] = useState<string | null>(null);
   const pullRef = useRef(pullFromGoogleSheets);
   pullRef.current = pullFromGoogleSheets;
@@ -545,21 +547,72 @@ export function WaiterPortalView() {
               </h3>
 
               {!selectedWs && (
-                <div
-                  className="row"
-                  style={{ flexWrap: 'wrap', gap: '6px', margin: '8px 0 10px' }}
-                >
-                  {S.tables.map((t) => (
+                <>
+                  <div
+                    className="row"
+                    style={{ flexWrap: 'wrap', gap: '6px', margin: '8px 0 6px' }}
+                  >
+                    {S.tables.map((t) => (
+                      <button
+                        key={t.id}
+                        className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
+                        style={{ fontSize: '12px' }}
+                        onClick={() => setActiveTable(t.id)}
+                      >
+                        🪑 {t.label || `Table ${t.id}`}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="row" style={{ gap: '6px', marginBottom: '10px' }}>
+                    <input
+                      id="waiter-manual-table"
+                      value={manualTableInput}
+                      onChange={(e) => setManualTableInput(e.target.value)}
+                      placeholder="Add/select table # (e.g. 5 or VIP 2)"
+                      className="inp"
+                      style={{ flex: 1, fontSize: '12px', padding: '7px 10px' }}
+                    />
                     <button
-                      key={t.id}
-                      className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
+                      type="button"
+                      className="chip on"
                       style={{ fontSize: '12px' }}
-                      onClick={() => setActiveTable(t.id)}
+                      onClick={() => {
+                        const raw = manualTableInput.trim();
+                        if (!raw) {
+                          say('Enter a table number or name');
+                          return;
+                        }
+                        const numMatch = raw.match(/^(?:table\s*)?(\d+)$/i);
+                        if (numMatch) {
+                          const num = Number(numMatch[1]);
+                          if (num <= 0) {
+                            say('Table number must be greater than 0');
+                            return;
+                          }
+                          if (!S.tables.some((t) => t.id === num)) {
+                            addTable('', num);
+                          }
+                          setActiveTable(num);
+                        } else {
+                          const existing = S.tables.find(
+                            (t) => t.label.toLowerCase() === raw.toLowerCase()
+                          );
+                          if (existing) {
+                            setActiveTable(existing.id);
+                          } else {
+                            const nextId =
+                              Math.max(0, ...S.tables.map((t) => t.id)) + 1;
+                            addTable(raw, nextId);
+                            setActiveTable(nextId);
+                          }
+                        }
+                        setManualTableInput('');
+                      }}
                     >
-                      🪑 {t.label || `Table ${t.id}`}
+                      + Set Table
                     </button>
-                  ))}
-                </div>
+                  </div>
+                </>
               )}
 
               {S.menu
