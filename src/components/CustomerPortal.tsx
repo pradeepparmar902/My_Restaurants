@@ -245,8 +245,14 @@ export function EnterCounterNumberCard() {
 }
 
 export function OrderTabView() {
-  const { S, setTab, say, inviteMemberToSession, removeInvitedMember } =
-    useTadka();
+  const {
+    S,
+    setTab,
+    say,
+    inviteMemberToSession,
+    removeInvitedMember,
+    pullFromGoogleSheets,
+  } = useTadka();
   const [inviteMob, setInviteMob] = useState('');
   const stepIcons = ['📥', '🍳', '🛎️', '✅'];
 
@@ -355,23 +361,93 @@ export function OrderTabView() {
             + Invite to Table Bill
           </button>
           {(S.sess.invitedMobs || []).length > 0 && (
-            <div style={{ marginTop: '10px' }}>
-              <span className="mu">Invited members:</span>
-              {(S.sess.invitedMobs || []).map((m) => (
-                <div
-                  key={m}
-                  className="row sp"
-                  style={{ marginTop: '6px' }}
+            <div style={{ marginTop: '12px' }}>
+              <div className="row sp" style={{ marginBottom: '6px' }}>
+                <span className="mu">Invited members & their orders:</span>
+                <button
+                  className="chip"
+                  style={{ fontSize: '11px', padding: '3px 8px' }}
+                  onClick={() => pullFromGoogleSheets()}
                 >
-                  <span>📱 {m}</span>
-                  <button
-                    className="chip"
-                    onClick={() => removeInvitedMember(m)}
+                  🔄 Refresh
+                </button>
+              </div>
+              {(S.sess.invitedMobs || []).map((m) => {
+                const memberOrders = S.orders.filter(
+                  (o) => o.orderedByMob === m && o.st !== 5
+                );
+                let memberQty = 0;
+                let memberSubtotal = 0;
+                const memberItems: { name: string; qty: number; amt: number; status: string }[] = [];
+
+                memberOrders.forEach((o) => {
+                  S.menu.forEach((dish) => {
+                    const q = o.it[dish.id] || 0;
+                    if (q > 0) {
+                      const amt = (o.prices?.[dish.id] ?? dish.p) * q;
+                      memberQty += q;
+                      memberSubtotal += amt;
+                      memberItems.push({
+                        name: `${dish.e} ${dish.n[S.lang]}`,
+                        qty: q,
+                        amt,
+                        status: ORDER_STATUS_LABELS[o.st],
+                      });
+                    }
+                  });
+                });
+
+                return (
+                  <div
+                    key={m}
+                    style={{
+                      background: 'var(--bg)',
+                      borderRadius: '12px',
+                      padding: '10px',
+                      marginTop: '8px',
+                      border: '1px solid #5a4690',
+                    }}
                   >
-                    Remove
-                  </button>
-                </div>
-              ))}
+                    <div className="row sp">
+                      <span>
+                        <b>📱 {m}</b>
+                        <br />
+                        <span className="mu" style={{ fontSize: '12px' }}>
+                          {memberQty > 0
+                            ? `${memberQty} item(s) · ₹${memberSubtotal}`
+                            : '⏳ No order placed yet'}
+                        </span>
+                      </span>
+                      <button
+                        className="chip"
+                        onClick={() => removeInvitedMember(m)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    {memberItems.length > 0 && (
+                      <div
+                        style={{
+                          marginTop: '6px',
+                          paddingTop: '6px',
+                          borderTop: '1px dashed #382562',
+                          fontSize: '13px',
+                        }}
+                      >
+                        {memberItems.map((it, idx) => (
+                          <div key={idx} className="line">
+                            <span>
+                              {it.name} × {it.qty}{' '}
+                              <span className="mu">({it.status})</span>
+                            </span>
+                            <span>₹{it.amt}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -693,6 +769,46 @@ export function BillTabView() {
               <span>₹{m.p * S.cart[m.id]}</span>
             </div>
           ))}
+        {(() => {
+          const memberTotals: Record<string, number> = {};
+          S.orders
+            .filter((o) => o.st !== 5)
+            .forEach((o) => {
+              const who = o.orderedByMob || S.sess?.mob || 'Principal';
+              let amt = 0;
+              S.menu.forEach((d) => {
+                const q = o.it[d.id] || 0;
+                if (q > 0) amt += (o.prices?.[d.id] ?? d.p) * q;
+              });
+              memberTotals[who] = (memberTotals[who] || 0) + amt;
+            });
+          const entries = Object.entries(memberTotals);
+          if (entries.length <= 1 && !(S.sess?.invitedMobs || []).length) {
+            return null;
+          }
+          return (
+            <div
+              style={{
+                borderTop: '1px dashed #5a4690',
+                marginTop: '6px',
+                paddingTop: '6px',
+                marginBottom: '6px',
+              }}
+            >
+              <div className="mu" style={{ marginBottom: '4px' }}>
+                👥 Member-wise order breakdown:
+              </div>
+              {entries.map(([who, amt]) => (
+                <div key={who} className="line mu">
+                  <span>
+                    {who === S.sess?.mob ? `${who} (Principal)` : `${who} (Invited)`}
+                  </span>
+                  <span>₹{amt}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         <div className="line">
           <span>Subtotal</span>
           <span>₹{s}</span>
