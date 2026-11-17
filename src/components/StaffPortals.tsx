@@ -457,23 +457,21 @@ export function WaiterPortalView() {
             </>
           )}
 
-          {S.sess && S.sess.mob ? (
-            <p className="mu" style={{ margin: '8px 0' }}>
-              Customer WhatsApp: {S.sess.mob}
+          {S.sess && !S.paid && S.sess.mob && (
+            <p className="mu" style={{ margin: '8px 0 4px' }}>
+              Current session: <b>{S.sess.no}</b> ({S.sess.mob})
             </p>
-          ) : (
-            <>
-              <p className="mu" style={{ margin: '8px 0' }}>
-                Customer WhatsApp number with country code (optional). They see
-                this order after login, and the final bill goes here.
-              </p>
-              <CountryCodeMobileInput
-                id="wmob"
-                value={wmobInput}
-                onChange={setWmobInput}
-              />
-            </>
           )}
+          <p className="mu" style={{ margin: '6px 0' }}>
+            {S.sess && !S.paid && S.sess.mob
+              ? `Enter a customer's mobile number for a new order, or leave blank to add to ${S.sess.no}:`
+              : 'Customer WhatsApp / Mobile number (optional — for order tracking & final bill):'}
+          </p>
+          <CountryCodeMobileInput
+            id="wmob"
+            value={wmobInput}
+            onChange={setWmobInput}
+          />
 
           <button
             className="btn"

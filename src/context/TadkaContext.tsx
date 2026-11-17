@@ -1161,6 +1161,16 @@ export function TadkaProvider({
         });
 
         let nextSess = prev.sess;
+        const isDifferentCustomer = Boolean(
+          mv && nextSess?.mob && mv !== nextSess.mob
+        );
+        if (
+          nextSess &&
+          (prev.paid || nextSess.status === 'paid' || isDifferentCustomer)
+        ) {
+          nextSess = null;
+        }
+        const isStartingNewSess = !nextSess;
         if (!nextSess) {
           if (prev.cmode === 'auto') {
             while (usedToday.includes(`C${nextCtr}`)) {
@@ -1174,6 +1184,7 @@ export function TadkaProvider({
               pend: false,
               table: prev.activeTable,
               mob: mv || '',
+              invitedMobs: [],
               staff: true,
               status: 'open',
               businessDate: todayBizDate,
@@ -1190,6 +1201,7 @@ export function TadkaProvider({
               pend: !v,
               table: prev.activeTable,
               mob: mv || '',
+              invitedMobs: [],
               staff: true,
               status: 'open',
               businessDate: todayBizDate,
@@ -1202,7 +1214,8 @@ export function TadkaProvider({
 
         targetLabel = nextSess.pend ? `Table ${prev.activeTable}` : nextSess.no;
 
-        const nextCart = { ...prev.cart };
+        const baseOrders = isStartingNewSess ? [] : prev.orders;
+        const nextCart = isStartingNewSess ? {} : { ...prev.cart };
         const pricesSnapshot: Record<number, number> = {};
         for (const idStr of Object.keys(it)) {
           const id = Number(idStr);
@@ -1212,7 +1225,7 @@ export function TadkaProvider({
         }
 
         const nowIso = new Date().toISOString();
-        const orderSeq = prev.orders.length + 1;
+        const orderSeq = baseOrders.length + 1;
         const orderId = `ord-${Date.now()}-${orderSeq}`;
 
         const newOrder = {
@@ -1222,6 +1235,7 @@ export function TadkaProvider({
           prices: pricesSnapshot,
           st: 1 as const,
           src: 'waiter' as const,
+          orderedByMob: mv || nextSess.mob || prev.me.mob,
           vip: prev.pts >= 100,
           rush: false,
           createdAt: nowIso,
@@ -1270,7 +1284,8 @@ export function TadkaProvider({
           dailyOrderHistory: nextHistory,
           sess: nextSess,
           cart: nextCart,
-          orders: [...prev.orders, newOrder],
+          orders: [...baseOrders, newOrder],
+          paid: isStartingNewSess ? false : prev.paid,
           WD: {},
           status: 1,
           wtab: 'serve',
