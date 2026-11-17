@@ -156,6 +156,20 @@ export function buildSheetRowsForState(
         ? `${principalMob} (via ${ordererMob})`
         : ordererMob;
 
+      const receivedTime = formatIndianDateTime(o.createdAt).timeFormatted;
+      const cookingTime = o.cookingAt
+        ? formatIndianDateTime(o.cookingAt).timeFormatted
+        : '';
+      const readyTime = o.readyAt
+        ? formatIndianDateTime(o.readyAt).timeFormatted
+        : '';
+      const deliveredTime = o.deliveredAt
+        ? formatIndianDateTime(o.deliveredAt).timeFormatted
+        : '';
+      const paidTime = o.paidAt
+        ? formatIndianDateTime(o.paidAt).timeFormatted
+        : '';
+
       return [
         state.sess?.businessDate || businessDateToday,
         dateFormatted,
@@ -174,6 +188,11 @@ export function buildSheetRowsForState(
         !!o.vip,
         !!o.rush,
         o.id,
+        receivedTime,
+        cookingTime,
+        readyTime,
+        deliveredTime,
+        paidTime,
       ];
     }
   );
@@ -200,6 +219,11 @@ export function buildSheetRowsForState(
       false,
       false,
       h.id,
+      h.timeFormatted || '',
+      '',
+      '',
+      '',
+      '',
     ]);
 
   const Orders: (string | number | boolean)[][] = [
@@ -221,6 +245,11 @@ export function buildSheetRowsForState(
       'VIP',
       'Rush',
       'Order_ID',
+      'Received_Time',
+      'Cooking_Time',
+      'Ready_Time',
+      'Delivered_Time',
+      'Paid_Time',
     ],
     ...activeOrderRows,
     ...historicalOrderRows,
@@ -753,6 +782,11 @@ export interface PulledSheetOrder {
   paymentMethod: string;
   vip: boolean;
   rush: boolean;
+  receivedTime?: string;
+  cookingTime?: string;
+  readyTime?: string;
+  deliveredTime?: string;
+  paidTime?: string;
 }
 
 export function buildSingleOrderSheetRows(
@@ -777,6 +811,11 @@ export function buildSingleOrderSheetRows(
       'VIP',
       'Rush',
       'Order_ID',
+      'Received_Time',
+      'Cooking_Time',
+      'Ready_Time',
+      'Delivered_Time',
+      'Paid_Time',
     ],
     [
       o.businessDate,
@@ -796,6 +835,11 @@ export function buildSingleOrderSheetRows(
       o.vip,
       o.rush,
       o.id,
+      o.receivedTime || o.timeFormatted || '',
+      o.cookingTime || '',
+      o.readyTime || '',
+      o.deliveredTime || '',
+      o.paidTime || '',
     ],
   ];
 }
@@ -867,6 +911,18 @@ export function parseOrdersFromSheetRows(
       String(r[16] || '').trim() ||
       `sheet-${businessDate}-${counterNo}-${round}-${orderedByMob}`;
 
+    const normPunch = (val: unknown) => {
+      const s = String(val || '').trim();
+      if (!s) return '';
+      if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+        const dt = new Date(s);
+        if (!Number.isNaN(dt.getTime())) {
+          return formatIndianDateTime(s).timeFormatted;
+        }
+      }
+      return s;
+    };
+
     if (Object.keys(it).length > 0) {
       out.push({
         id: orderId,
@@ -891,6 +947,11 @@ export function parseOrdersFromSheetRows(
         paymentMethod,
         vip,
         rush,
+        receivedTime: normPunch(r[17]) || String(r[2] || '').trim(),
+        cookingTime: normPunch(r[18]),
+        readyTime: normPunch(r[19]),
+        deliveredTime: normPunch(r[20]),
+        paidTime: normPunch(r[21]),
       });
     }
   }
@@ -1023,6 +1084,15 @@ function doPost(e) {
                 if (er[2] instanceof Date) {
                   er[2] = Utilities.formatDate(er[2], 'Asia/Kolkata', 'hh:mm:ss a');
                 }
+                if (tabName === 'Orders') {
+                  for (var tc = 17; tc <= 21; tc++) {
+                    if (er[tc] instanceof Date) {
+                      er[tc] = Utilities.formatDate(er[tc], 'Asia/Kolkata', 'hh:mm:ss a');
+                    }
+                  }
+                }
+                while (er.length < header.length) er.push('');
+                if (er.length > header.length) er = er.slice(0, header.length);
                 if (!rowMap[ek]) orderKeys.push(ek);
                 rowMap[ek] = er;
               }
@@ -1032,8 +1102,18 @@ function doPost(e) {
             for (var j = 1; j < incoming.length; j++) {
               var ir = incoming[j];
               if (!ir) continue;
+              while (ir.length < header.length) ir.push('');
+              if (ir.length > header.length) ir = ir.slice(0, header.length);
               var ik = keyFn(ir);
               if (!ik || ik === '__') continue;
+              if (tabName === 'Orders' && rowMap[ik]) {
+                var prevOrdRow = rowMap[ik];
+                for (var pc = 17; pc <= 21; pc++) {
+                  if (!ir[pc] && prevOrdRow[pc]) {
+                    ir[pc] = prevOrdRow[pc];
+                  }
+                }
+              }
               if (!rowMap[ik]) orderKeys.push(ik);
               rowMap[ik] = ir;
             }

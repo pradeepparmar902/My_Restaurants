@@ -923,10 +923,20 @@ export function TadkaProvider({
 
   const advanceOrderStatus = useCallback(
     (orderIndex: number, nextStatus: 1 | 2 | 3 | 4 | 5) => {
+      const nowIso = new Date().toISOString();
       updateState((prev) => {
         const targetOrder = prev.orders[orderIndex];
         const nextOrders = prev.orders.map((o, idx) =>
-          idx === orderIndex ? { ...o, st: nextStatus } : o
+          idx === orderIndex
+            ? {
+                ...o,
+                st: nextStatus,
+                cookingAt: nextStatus === 2 ? o.cookingAt || nowIso : o.cookingAt,
+                readyAt: nextStatus === 3 ? o.readyAt || nowIso : o.readyAt,
+                deliveredAt:
+                  nextStatus === 4 ? o.deliveredAt || nowIso : o.deliveredAt,
+              }
+            : o
         );
         const nextHistory = (prev.dailyOrderHistory || []).map((h) =>
           targetOrder && h.id === targetOrder.id
@@ -985,13 +995,28 @@ export function TadkaProvider({
 
   const updateSheetOrderStatus = useCallback(
     (orderId: string, nextStatus: 1 | 2 | 3 | 4 | 5) => {
+      const nowIso = new Date().toISOString();
+      const punchTime = formatIndianDateTime(nowIso).timeFormatted;
       pendingOrderOverridesRef.current[orderId] = {
         ...pendingOrderOverridesRef.current[orderId],
         st: nextStatus,
         until: Date.now() + 15000,
       };
       const target = sheetOrdersTodayRef.current.find((po) => po.id === orderId);
-      const updatedTarget = target ? { ...target, st: nextStatus } : null;
+      const updatedTarget = target
+        ? {
+            ...target,
+            st: nextStatus,
+            cookingTime:
+              nextStatus === 2 ? target.cookingTime || punchTime : target.cookingTime,
+            readyTime:
+              nextStatus === 3 ? target.readyTime || punchTime : target.readyTime,
+            deliveredTime:
+              nextStatus === 4
+                ? target.deliveredTime || punchTime
+                : target.deliveredTime,
+          }
+        : null;
       if (updatedTarget) {
         sheetOrdersTodayRef.current = sheetOrdersTodayRef.current.map((po) =>
           po.id === orderId ? updatedTarget : po
@@ -1003,7 +1028,19 @@ export function TadkaProvider({
         const idx = prev.orders.findIndex((o) => o.id === orderId);
         const nextOrders =
           idx >= 0
-            ? prev.orders.map((o, i) => (i === idx ? { ...o, st: nextStatus } : o))
+            ? prev.orders.map((o, i) =>
+                i === idx
+                  ? {
+                      ...o,
+                      st: nextStatus,
+                      cookingAt:
+                        nextStatus === 2 ? o.cookingAt || nowIso : o.cookingAt,
+                      readyAt: nextStatus === 3 ? o.readyAt || nowIso : o.readyAt,
+                      deliveredAt:
+                        nextStatus === 4 ? o.deliveredAt || nowIso : o.deliveredAt,
+                    }
+                  : o
+              )
             : prev.orders;
         const nextHistory = (prev.dailyOrderHistory || []).map((h) =>
           h.id === orderId
@@ -1339,6 +1376,12 @@ export function TadkaProvider({
             : h
         );
 
+        const paidNowIso = new Date().toISOString();
+        const nextPaidOrders = prev.orders.map((o) => ({
+          ...o,
+          paidAt: o.paidAt || paidNowIso,
+        }));
+
         fetch(by === 'owner' ? '/api/payments/tag-offline' : '/api/payments/webhook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1346,6 +1389,7 @@ export function TadkaProvider({
         }).catch(() => {});
         return {
           ...prev,
+          orders: nextPaidOrders,
           pm: method,
           paid: true,
           pts: prev.pts + Math.floor(t / 10),

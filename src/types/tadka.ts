@@ -44,8 +44,10 @@ export interface OrderRound {
   vip?: boolean;
   rush?: boolean;
   createdAt: string;
+  cookingAt?: string;
   readyAt?: string;
   deliveredAt?: string;
+  paidAt?: string;
   deliveredBy?: string;
 }
 
