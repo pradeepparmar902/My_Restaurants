@@ -762,9 +762,12 @@ export function AdminPortalView() {
     toggleStaffActive,
     checkLogin,
     saveMenuDish,
+    addTable,
+    removeTable,
     regenerateTableQr,
     setActiveTable,
     resetDemoState,
+    say,
   } = useTadka();
 
   const [staffName, setStaffName] = useState('');
@@ -780,7 +783,11 @@ export function AdminPortalView() {
   const [newDishEmoji, setNewDishEmoji] = useState('🍲');
   const [newDishVeg, setNewDishVeg] = useState(true);
 
-  const [showQrAdmin, setShowQrAdmin] = useState(false);
+  const [showQrAdmin, setShowQrAdmin] = useState(true);
+  const [newTableLabel, setNewTableLabel] = useState('');
+  const [selectedQrTableId, setSelectedQrTableId] = useState<number>(
+    S.activeTable || 1
+  );
 
   const assignableRoles: StaffRoleName[] = [
     'Manager',
@@ -1044,43 +1051,178 @@ export function AdminPortalView() {
 
       <div className="card">
         <div className="row sp">
-          <h3>📱 Table QR Codes</h3>
+          <h3>📱 Tables & QR Code Generator</h3>
           <button
             className="chip"
             onClick={() => setShowQrAdmin((prev) => !prev)}
           >
-            {showQrAdmin ? 'Close' : 'View tables'}
+            {showQrAdmin ? 'Close' : 'Manage tables'}
           </button>
         </div>
         {showQrAdmin && (
           <div style={{ marginTop: '10px' }}>
-            {S.tables.map((t) => (
-              <div
-                key={t.id}
-                className="line"
-                style={{ alignItems: 'center' }}
+            {/* Add New Table */}
+            <div className="row" style={{ marginBottom: '12px' }}>
+              <input
+                value={newTableLabel}
+                onChange={(e) => setNewTableLabel(e.target.value)}
+                placeholder="New table (e.g. Table 7, Patio 1, Counter)"
+                className="inp"
+              />
+              <button
+                className="chip on"
+                onClick={() => {
+                  addTable(newTableLabel);
+                  setNewTableLabel('');
+                }}
               >
-                <span>
-                  <b>{t.label}</b>
-                  <br />
-                  <span className="mu">/r/tadka-truck/t/{t.token}</span>
-                </span>
-                <div className="row">
-                  <button
-                    className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
-                    onClick={() => setActiveTable(t.id)}
-                  >
-                    {S.activeTable === t.id ? 'Active' : 'Switch'}
-                  </button>
-                  <button
-                    className="chip"
-                    onClick={() => regenerateTableQr(t.id)}
-                  >
-                    Regenerate
-                  </button>
+                + Add Table
+              </button>
+            </div>
+
+            {/* Table List */}
+            {S.tables.map((t) => {
+              const baseUrl =
+                typeof window !== 'undefined'
+                  ? `${window.location.origin}${
+                      window.location.pathname.includes('/My_Restaurants')
+                        ? '/My_Restaurants'
+                        : ''
+                    }`
+                  : 'https://pradeepparmar902.github.io/My_Restaurants';
+              const qrTargetUrl = `${baseUrl}/?t=${encodeURIComponent(t.token)}`;
+              const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                qrTargetUrl
+              )}`;
+              const isQrOpen = selectedQrTableId === t.id;
+
+              return (
+                <div
+                  key={t.id}
+                  style={{
+                    borderTop: '1px dashed #5a4690',
+                    paddingTop: '10px',
+                    marginTop: '10px',
+                  }}
+                >
+                  <div className="row sp" style={{ flexWrap: 'wrap', gap: '6px' }}>
+                    <span>
+                      <b>{t.label}</b>{' '}
+                      {S.activeTable === t.id && (
+                        <span className="tag ok">Active</span>
+                      )}
+                      <br />
+                      <span className="mu" style={{ fontSize: '11px' }}>
+                        Token: {t.token}
+                      </span>
+                    </span>
+                    <div className="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
+                      <button
+                        className={`chip ${isQrOpen ? 'on' : ''}`}
+                        onClick={() => setSelectedQrTableId(t.id)}
+                      >
+                        📷 {isQrOpen ? 'Viewing QR' : 'Create QR'}
+                      </button>
+                      <button
+                        className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
+                        onClick={() => setActiveTable(t.id)}
+                      >
+                        {S.activeTable === t.id ? 'Active' : 'Use'}
+                      </button>
+                      <button
+                        className="chip"
+                        onClick={() => regenerateTableQr(t.id)}
+                      >
+                        ↻ New Token
+                      </button>
+                      {S.tables.length > 1 && (
+                        <button
+                          className="chip"
+                          style={{ color: '#f87171' }}
+                          onClick={() => removeTable(t.id)}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {isQrOpen && (
+                    <div
+                      style={{
+                        marginTop: '10px',
+                        background: '#fff',
+                        color: '#1b1030',
+                        borderRadius: '16px',
+                        padding: '14px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <b style={{ fontSize: '18px' }}>
+                        Tadka Truck · {t.label}
+                      </b>
+                      <p style={{ fontSize: '12px', color: '#4a3680', margin: '4px 0 10px' }}>
+                        Scan to view menu, order & pay
+                      </p>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={qrImageUrl}
+                        alt={`QR Code for ${t.label}`}
+                        width={180}
+                        height={180}
+                        style={{
+                          display: 'block',
+                          margin: '0 auto',
+                          borderRadius: '8px',
+                        }}
+                      />
+                      <p
+                        style={{
+                          fontSize: '10px',
+                          color: '#5a4690',
+                          wordBreak: 'break-all',
+                          marginTop: '8px',
+                        }}
+                      >
+                        {qrTargetUrl}
+                      </p>
+                      <div
+                        className="row"
+                        style={{
+                          justifyContent: 'center',
+                          marginTop: '10px',
+                          gap: '8px',
+                        }}
+                      >
+                        <button
+                          className="chip on"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(qrTargetUrl);
+                            say(`Copied ${t.label} QR link ✅`);
+                          }}
+                        >
+                          📋 Copy Link
+                        </button>
+                        <a
+                          href={qrImageUrl}
+                          download={`Tadka_${t.label.replace(/\s+/g, '_')}_QR.png`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="chip"
+                          style={{
+                            textDecoration: 'none',
+                            color: '#1b1030',
+                            borderColor: '#1b1030',
+                          }}
+                        >
+                          ⬇️ Open / Print QR
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

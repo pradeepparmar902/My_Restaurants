@@ -142,7 +142,7 @@ export const INITIAL_STATE: AppState = {
 
   menu: INITIAL_MENU,
   tables: INITIAL_TABLES,
-  activeTable: 4,
+  activeTable: 1,
 
   draft: {},
   cart: {},

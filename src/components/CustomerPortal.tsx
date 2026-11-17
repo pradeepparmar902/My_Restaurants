@@ -41,13 +41,17 @@ export function MenuTabView() {
     (m) => m.available && (!S.veg || m.v === 1) && (!S.jainOnly || m.jain)
   );
 
+  const activeTableLabel =
+    S.tables.find((t) => t.id === S.activeTable)?.label ||
+    `Table ${S.activeTable}`;
+
   return (
     <>
       <div className="hero">
         <h1>
           Tadka Truck
           <br />
-          Table {S.activeTable} 🔥
+          {activeTableLabel} 🔥
         </h1>
         <p>
           {S.sess

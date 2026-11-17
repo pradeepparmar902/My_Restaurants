@@ -103,6 +103,8 @@ interface TadkaContextValue {
 
   // Menu & Table Admin
   saveMenuDish: (dish: Partial<Dish> & { id?: number }) => void;
+  addTable: (label: string) => void;
+  removeTable: (tableId: number) => void;
   regenerateTableQr: (tableId: number) => void;
   setActiveTable: (tableId: number) => void;
   resetDemoState: () => void;
@@ -187,6 +189,24 @@ export function TadkaProvider({
             ? null
             : parsed.sess ?? null;
 
+        // Check if user arrived via QR query string (?t=<token> or ?table=<id>)
+        let qrMatchedTableId: number | undefined;
+        if (typeof window !== 'undefined') {
+          const sp = new URLSearchParams(window.location.search);
+          const qToken = sp.get('t');
+          const qTable = sp.get('table');
+          const tableList = parsed.tables || prevTablesFallback();
+          if (qToken) {
+            const found = tableList.find((tb) => tb.token === qToken);
+            if (found) qrMatchedTableId = found.id;
+          } else if (qTable && Number(qTable) > 0) {
+            qrMatchedTableId = Number(qTable);
+          }
+        }
+        function prevTablesFallback() {
+          return INITIAL_STATE.tables;
+        }
+
         setS((prev) => ({
           ...prev,
           ...parsed,
@@ -198,9 +218,23 @@ export function TadkaProvider({
           orders: cleanedActiveSess ? parsed.orders || [] : [],
           cart: cleanedActiveSess ? parsed.cart || {} : {},
           status: cleanedActiveSess ? parsed.status || 0 : 0,
-          activeTable: initialTableId || parsed.activeTable || prev.activeTable,
+          activeTable:
+            initialTableId ||
+            qrMatchedTableId ||
+            parsed.activeTable ||
+            prev.activeTable,
           toast: '',
         }));
+      } else if (typeof window !== 'undefined' && !initialTableId) {
+        const sp = new URLSearchParams(window.location.search);
+        const qToken = sp.get('t');
+        const qTable = sp.get('table');
+        if (qToken) {
+          const found = INITIAL_STATE.tables.find((tb) => tb.token === qToken);
+          if (found) setS((prev) => ({ ...prev, activeTable: found.id }));
+        } else if (qTable && Number(qTable) > 0) {
+          setS((prev) => ({ ...prev, activeTable: Number(qTable) }));
+        }
       }
     } catch {
       // Ignore storage read errors
@@ -1276,6 +1310,49 @@ export function TadkaProvider({
     [say, updateState]
   );
 
+  const addTable = useCallback(
+    (label: string) => {
+      const cleanLabel = label.trim().replace(/[<>&"']/g, '');
+      if (!cleanLabel) {
+        say('Enter a table name (e.g. Table 7 or Patio 1)');
+        return;
+      }
+      updateState((prev) => {
+        const nextId = Math.max(0, ...prev.tables.map((t) => t.id)) + 1;
+        const token = `qr-tadka-t${nextId}-${Math.random().toString(36).slice(2, 6)}`;
+        return {
+          ...prev,
+          tables: [...prev.tables, { id: nextId, label: cleanLabel, token }],
+        };
+      });
+      say(`Added ${cleanLabel} with QR code ✅`);
+    },
+    [say, updateState]
+  );
+
+  const removeTable = useCallback(
+    (tableId: number) => {
+      if (S.tables.length <= 1) {
+        say('Keep at least one table');
+        return;
+      }
+      updateState((prev) => {
+        const nextTables = prev.tables.filter((t) => t.id !== tableId);
+        const nextActive =
+          prev.activeTable === tableId
+            ? nextTables[0]?.id || 1
+            : prev.activeTable;
+        return {
+          ...prev,
+          tables: nextTables,
+          activeTable: nextActive,
+        };
+      });
+      say('Table removed');
+    },
+    [S.tables.length, say, updateState]
+  );
+
   const regenerateTableQr = useCallback(
     (tableId: number) => {
       updateState((prev) => {
@@ -1903,6 +1980,8 @@ export function TadkaProvider({
         toggleStaffActive,
         checkLogin,
         saveMenuDish,
+        addTable,
+        removeTable,
         regenerateTableQr,
         setActiveTable,
         resetDemoState,
