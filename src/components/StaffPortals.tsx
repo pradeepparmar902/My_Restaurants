@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import { StaffRoleName } from '@/types/tadka';
 import { ROLE_DESCRIPTIONS } from '@/lib/constants';
@@ -28,14 +28,16 @@ export function ChefPortalView() {
     staffOf,
     say,
   } = useTadka();
+  const pullRef = useRef(pullFromGoogleSheets);
+  pullRef.current = pullFromGoogleSheets;
 
   useEffect(() => {
-    pullFromGoogleSheets(undefined, true);
+    pullRef.current(undefined, true);
     const id = setInterval(() => {
-      pullFromGoogleSheets(undefined, true);
+      pullRef.current(undefined, true);
     }, 8000);
     return () => clearInterval(id);
-  }, [pullFromGoogleSheets]);
+  }, []);
 
   // Combine live Google Sheet orders for today + any local S.orders not yet synced
   const combinedQueue = (() => {
@@ -213,14 +215,16 @@ export function WaiterPortalView() {
   } = useTadka();
   const [wnoInput, setWnoInput] = useState('');
   const [wmobInput, setWmobInput] = useState('');
+  const pullRef = useRef(pullFromGoogleSheets);
+  pullRef.current = pullFromGoogleSheets;
 
   useEffect(() => {
-    pullFromGoogleSheets(undefined, true);
+    pullRef.current(undefined, true);
     const id = setInterval(() => {
-      pullFromGoogleSheets(undefined, true);
+      pullRef.current(undefined, true);
     }, 8000);
     return () => clearInterval(id);
-  }, [pullFromGoogleSheets]);
+  }, []);
 
   const readyList = (() => {
     const map = new Map<

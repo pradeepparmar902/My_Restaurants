@@ -156,6 +156,9 @@ export function TadkaProvider({
   const [sheetOrdersToday, setSheetOrdersToday] = useState<PulledSheetOrder[]>([]);
   const sheetOrdersTodayRef = useRef<PulledSheetOrder[]>([]);
   sheetOrdersTodayRef.current = sheetOrdersToday;
+  const pendingOrderOverridesRef = useRef<
+    Record<string, { st?: 1 | 2 | 3 | 4 | 5; rush?: boolean; until: number }>
+  >({});
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -982,6 +985,11 @@ export function TadkaProvider({
 
   const updateSheetOrderStatus = useCallback(
     (orderId: string, nextStatus: 1 | 2 | 3 | 4 | 5) => {
+      pendingOrderOverridesRef.current[orderId] = {
+        ...pendingOrderOverridesRef.current[orderId],
+        st: nextStatus,
+        until: Date.now() + 15000,
+      };
       const target = sheetOrdersTodayRef.current.find((po) => po.id === orderId);
       const updatedTarget = target ? { ...target, st: nextStatus } : null;
       if (updatedTarget) {
@@ -1019,7 +1027,13 @@ export function TadkaProvider({
   const toggleSheetOrderRush = useCallback(
     (orderId: string) => {
       const target = sheetOrdersTodayRef.current.find((po) => po.id === orderId);
-      const updatedTarget = target ? { ...target, rush: !target.rush } : null;
+      const nextRush = target ? !target.rush : true;
+      pendingOrderOverridesRef.current[orderId] = {
+        ...pendingOrderOverridesRef.current[orderId],
+        rush: nextRush,
+        until: Date.now() + 15000,
+      };
+      const updatedTarget = target ? { ...target, rush: nextRush } : null;
       if (updatedTarget) {
         sheetOrdersTodayRef.current = sheetOrdersTodayRef.current.map((po) =>
           po.id === orderId ? updatedTarget : po
@@ -2132,10 +2146,34 @@ export function TadkaProvider({
         (pulledOrderRows && pulledOrderRows.length > 1)
       ) {
         const todayBizDateOuter = getCurrentBusinessDate();
+        const nowMs = Date.now();
+        const applyOverrides = (po: PulledSheetOrder): PulledSheetOrder => {
+          const ov = pendingOrderOverridesRef.current[po.id];
+          if (!ov) return po;
+          if (nowMs > ov.until) {
+            delete pendingOrderOverridesRef.current[po.id];
+            return po;
+          }
+          const stSynced = ov.st === undefined || po.st === ov.st;
+          const rushSynced = ov.rush === undefined || po.rush === ov.rush;
+          if (stSynced && rushSynced) {
+            delete pendingOrderOverridesRef.current[po.id];
+            return po;
+          }
+          return {
+            ...po,
+            st: ov.st ?? po.st,
+            rush: ov.rush ?? po.rush,
+          };
+        };
+
         if (pulledOrderRows && pulledOrderRows.length > 1) {
           const menuForParse =
             pulledMenu && pulledMenu.length > 0 ? pulledMenu : S.menu;
-          const allParsed = parseOrdersFromSheetRows(pulledOrderRows, menuForParse);
+          const allParsed = parseOrdersFromSheetRows(
+            pulledOrderRows,
+            menuForParse
+          ).map(applyOverrides);
           setSheetOrdersToday(
             allParsed.filter((po) => po.businessDate === todayBizDateOuter)
           );
@@ -2169,7 +2207,7 @@ export function TadkaProvider({
             const parsedSheetOrders = parseOrdersFromSheetRows(
               pulledOrderRows,
               effectiveMenu
-            );
+            ).map(applyOverrides);
             const sessBizDate = prev.sess.businessDate || todayBizDate;
             const invitedList = prev.sess.invitedMobs || [];
             const matchingSheetOrders = parsedSheetOrders.filter(
