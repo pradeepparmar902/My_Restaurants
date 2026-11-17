@@ -1284,8 +1284,92 @@ export function BillForOpenSessionCard() {
   );
 }
 
+function CollapsibleSection({
+  title,
+  badge,
+  isOpen,
+  onToggle,
+  wrapInCard = true,
+  children,
+}: {
+  title: string;
+  badge?: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  wrapInCard?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="card">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="row sp"
+        style={{
+          width: '100%',
+          background: 'none',
+          border: 0,
+          color: 'inherit',
+          padding: 0,
+          cursor: 'pointer',
+          textAlign: 'left',
+          font: 'inherit',
+        }}
+      >
+        <span className="row" style={{ gap: '8px' }}>
+          <h3 style={{ margin: 0 }}>{title}</h3>
+          {badge && (
+            <span className="tag" style={{ fontSize: '11px' }}>
+              {badge}
+            </span>
+          )}
+        </span>
+        <span className="chip" style={{ fontSize: '11px', padding: '3px 9px' }}>
+          {isOpen ? '▲ Collapse' : '▼ Expand'}
+        </span>
+      </button>
+      {isOpen && (
+        <div
+          style={{
+            marginTop: '10px',
+            paddingTop: wrapInCard ? '10px' : 0,
+            borderTop: wrapInCard ? '1px dashed #382562' : 'none',
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function OwnerPortalView() {
   const { S, updateState, say } = useTadka();
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    bills: true,
+    counter: false,
+    openSession: false,
+    rewards: false,
+    bestsellers: false,
+    growth: false,
+    offer: false,
+    storage: false,
+  });
+
+  const toggleSection = (key: string) =>
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const setAllOwner = (val: boolean) =>
+    setOpenSections({
+      bills: val,
+      counter: val,
+      openSession: val,
+      rewards: val,
+      bestsellers: val,
+      growth: val,
+      offer: val,
+      storage: val,
+    });
 
   const bestSellers: [string, number][] = [
     ['Paneer Kathi Roll', 90],
@@ -1303,14 +1387,64 @@ export function OwnerPortalView() {
         <p>64 orders · 38% repeat customers</p>
       </div>
 
-      <LiveAndPendingBillsCard />
-      <CounterNumbersModeCard />
-      <BillForOpenSessionCard />
+      <div className="row sp" style={{ marginBottom: '10px' }}>
+        <span className="mu" style={{ fontSize: '12px' }}>
+          Tap any section to expand or collapse
+        </span>
+        <div className="row" style={{ gap: '6px' }}>
+          <button
+            className="chip"
+            style={{ fontSize: '11px' }}
+            onClick={() => setAllOwner(true)}
+          >
+            Expand All
+          </button>
+          <button
+            className="chip"
+            style={{ fontSize: '11px' }}
+            onClick={() => setAllOwner(false)}
+          >
+            Collapse All
+          </button>
+        </div>
+      </div>
 
-      <div className="card">
-        <h3>Reward approvals</h3>
+      <CollapsibleSection
+        title="💳 Live & Pending Bills"
+        isOpen={!!openSections.bills}
+        onToggle={() => toggleSection('bills')}
+        wrapInCard={false}
+      >
+        <LiveAndPendingBillsCard />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="🎟️ Counter Numbers Mode"
+        badge={S.cmode === 'auto' ? 'Auto' : 'Manual'}
+        isOpen={!!openSections.counter}
+        onToggle={() => toggleSection('counter')}
+        wrapInCard={false}
+      >
+        <CounterNumbersModeCard />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="🧾 Bill for Open Session"
+        isOpen={!!openSections.openSession}
+        onToggle={() => toggleSection('openSession')}
+        wrapInCard={false}
+      >
+        <BillForOpenSessionCard />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="🎬 Reward Approvals"
+        badge={S.reel === 'wait' ? '1 pending' : undefined}
+        isOpen={!!openSections.rewards}
+        onToggle={() => toggleSection('rewards')}
+      >
         {S.reel === 'wait' ? (
-          <div className="row sp" style={{ marginTop: '8px' }}>
+          <div className="row sp">
             <span>
               🎬 Table {S.activeTable} reel
               {S.reelCaption ? ` (“${S.reelCaption}”)` : ''}
@@ -1323,14 +1457,17 @@ export function OwnerPortalView() {
             </button>
           </div>
         ) : (
-          <p className="mu" style={{ marginTop: '6px' }}>
+          <p className="mu">
             Nothing waiting. Upload a reel as a customer to see it here.
           </p>
         )}
-      </div>
+      </CollapsibleSection>
 
-      <div className="card">
-        <h3>Best sellers</h3>
+      <CollapsibleSection
+        title="🏆 Best Sellers"
+        isOpen={!!openSections.bestsellers}
+        onToggle={() => toggleSection('bestsellers')}
+      >
         {bestSellers.map(([n, w]) => (
           <React.Fragment key={n}>
             <div className="mu" style={{ marginTop: '8px' }}>
@@ -1339,10 +1476,13 @@ export function OwnerPortalView() {
             <div className="bar" style={{ width: `${w}%` }} />
           </React.Fragment>
         ))}
-      </div>
+      </CollapsibleSection>
 
-      <div className="card">
-        <h3>Growth this week</h3>
+      <CollapsibleSection
+        title="📈 Growth This Week"
+        isOpen={!!openSections.growth}
+        onToggle={() => toggleSection('growth')}
+      >
         <div className="line">
           <span>Google reviews</span>
           <b>+{S.review || S.reviewed ? 24 : 23}</b>
@@ -1359,10 +1499,13 @@ export function OwnerPortalView() {
           <span>Coupons used</span>
           <b>31</b>
         </div>
-      </div>
+      </CollapsibleSection>
 
-      <div className="card">
-        <h3>Send WhatsApp offer</h3>
+      <CollapsibleSection
+        title="📲 Send WhatsApp Offer"
+        isOpen={!!openSections.offer}
+        onToggle={() => toggleSection('offer')}
+      >
         <p className="mu">Customers who haven’t visited in 30 days</p>
         <button
           className="btn"
@@ -1370,9 +1513,16 @@ export function OwnerPortalView() {
         >
           Send “We miss you” offer
         </button>
-      </div>
+      </CollapsibleSection>
 
-      <GoogleStorageAdminCard />
+      <CollapsibleSection
+        title="☁️ Google Drive & Sheets Storage"
+        isOpen={!!openSections.storage}
+        onToggle={() => toggleSection('storage')}
+        wrapInCard={false}
+      >
+        <GoogleStorageAdminCard />
+      </CollapsibleSection>
     </>
   );
 }
@@ -1400,6 +1550,37 @@ export function AdminPortalView() {
   const [staffMob, setStaffMob] = useState('');
   const [checkMob, setCheckMob] = useState('');
 
+  const [openAdminSections, setOpenAdminSections] = useState<
+    Record<string, boolean>
+  >({
+    team: true,
+    giveAccess: false,
+    whatsappBill: false,
+    loginTest: false,
+    menuAdmin: false,
+    tablesQr: false,
+    storage: false,
+    resetDemo: false,
+  });
+
+  const toggleAdminSection = (key: string) =>
+    setOpenAdminSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const setAllAdmin = (val: boolean) => {
+    setOpenAdminSections({
+      team: val,
+      giveAccess: val,
+      whatsappBill: val,
+      loginTest: val,
+      menuAdmin: val,
+      tablesQr: val,
+      storage: val,
+      resetDemo: val,
+    });
+    setShowMenuAdmin(val);
+    setShowQrAdmin(val);
+  };
+
   // Menu editor collapsible state
   const [showMenuAdmin, setShowMenuAdmin] = useState(false);
   const [newDishEn, setNewDishEn] = useState('');
@@ -1409,7 +1590,7 @@ export function AdminPortalView() {
   const [newDishEmoji, setNewDishEmoji] = useState('🍲');
   const [newDishVeg, setNewDishVeg] = useState(true);
 
-  const [showQrAdmin, setShowQrAdmin] = useState(true);
+  const [showQrAdmin, setShowQrAdmin] = useState(false);
   const [newTableNo, setNewTableNo] = useState('');
   const [newTableLabel, setNewTableLabel] = useState('');
   const [editingTableId, setEditingTableId] = useState<number | null>(null);
@@ -1439,12 +1620,38 @@ export function AdminPortalView() {
         </p>
       </div>
 
-      <div className="card">
-        <h3>Team</h3>
+      <div className="row sp" style={{ marginBottom: '10px' }}>
+        <span className="mu" style={{ fontSize: '12px' }}>
+          Tap any section to expand or collapse
+        </span>
+        <div className="row" style={{ gap: '6px' }}>
+          <button
+            className="chip"
+            style={{ fontSize: '11px' }}
+            onClick={() => setAllAdmin(true)}
+          >
+            Expand All
+          </button>
+          <button
+            className="chip"
+            style={{ fontSize: '11px' }}
+            onClick={() => setAllAdmin(false)}
+          >
+            Collapse All
+          </button>
+        </div>
+      </div>
+
+      <CollapsibleSection
+        title="👥 Team"
+        badge={`${S.staff.length}`}
+        isOpen={!!openAdminSections.team}
+        onToggle={() => toggleAdminSection('team')}
+      >
         {S.staff.map((x, i) => (
           <div
             key={x.id || x.ph}
-            style={{ marginTop: '12px', opacity: x.on ? 1 : 0.5 }}
+            style={{ marginTop: i > 0 ? '12px' : 0, opacity: x.on ? 1 : 0.5 }}
           >
             <div className="row sp">
               <b>{x.n}</b>
@@ -1481,11 +1688,14 @@ export function AdminPortalView() {
             )}
           </div>
         ))}
-      </div>
+      </CollapsibleSection>
 
-      <div className="card">
-        <h3>Give access</h3>
-        <p className="mu" style={{ margin: '6px 0 8px' }}>
+      <CollapsibleSection
+        title="🔑 Give Access"
+        isOpen={!!openAdminSections.giveAccess}
+        onToggle={() => toggleAdminSection('giveAccess')}
+      >
+        <p className="mu" style={{ margin: '0 0 8px' }}>
           Enter their mobile number. They log in with it and see their portal.
         </p>
         <div className="row" style={{ marginBottom: '8px' }}>
@@ -1524,11 +1734,15 @@ export function AdminPortalView() {
         >
           Give access
         </button>
-      </div>
+      </CollapsibleSection>
 
-      <div className="card">
-        <h3>💬 Final bill on WhatsApp</h3>
-        <div className="row" style={{ marginTop: '8px' }}>
+      <CollapsibleSection
+        title="💬 Final Bill on WhatsApp"
+        badge={S.wab ? 'On' : 'Off'}
+        isOpen={!!openAdminSections.whatsappBill}
+        onToggle={() => toggleAdminSection('whatsappBill')}
+      >
+        <div className="row">
           <button
             className={`chip ${S.wab ? 'on' : ''}`}
             onClick={() => updateState((p) => ({ ...p, wab: true }))}
@@ -1547,11 +1761,14 @@ export function AdminPortalView() {
             ? 'After payment, customers who gave their WhatsApp number get the final bill.'
             : 'No bill is sent on WhatsApp. Customers still see it in the app.'}
         </p>
-      </div>
+      </CollapsibleSection>
 
-      <div className="card">
-        <h3>What happens at login?</h3>
-        <p className="mu" style={{ margin: '6px 0 8px' }}>
+      <CollapsibleSection
+        title="🔐 What Happens at Login?"
+        isOpen={!!openAdminSections.loginTest}
+        onToggle={() => toggleAdminSection('loginTest')}
+      >
+        <p className="mu" style={{ margin: '0 0 8px' }}>
           Try a number to see which portal opens.
         </p>
         <CountryCodeMobileInput
@@ -1563,7 +1780,7 @@ export function AdminPortalView() {
           Check
         </button>
         {S.alr && <p style={{ marginTop: '8px' }}>{S.alr}</p>}
-      </div>
+      </CollapsibleSection>
 
       <div className="card">
         <div className="row sp">
@@ -1931,16 +2148,27 @@ export function AdminPortalView() {
         )}
       </div>
 
-      <GoogleStorageAdminCard />
+      <CollapsibleSection
+        title="☁️ Google Drive & Sheets Storage"
+        isOpen={!!openAdminSections.storage}
+        onToggle={() => toggleAdminSection('storage')}
+        wrapInCard={false}
+      >
+        <GoogleStorageAdminCard />
+      </CollapsibleSection>
 
-      <div className="card">
+      <CollapsibleSection
+        title="🔄 Reset Prototype / Demo State"
+        isOpen={!!openAdminSections.resetDemo}
+        onToggle={() => toggleAdminSection('resetDemo')}
+      >
         <div className="row sp">
           <span className="mu">Reset prototype / demo state</span>
           <button className="chip" onClick={resetDemoState}>
             Reset All
           </button>
         </div>
-      </div>
+      </CollapsibleSection>
     </>
   );
 }
