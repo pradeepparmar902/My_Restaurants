@@ -213,12 +213,16 @@ export function WaiterPortalView() {
     setNo,
     changeWaiterDraftQty,
     bookWaiter,
+    updateWorkspaceTable,
+    updateOrderItemQty,
     say,
   } = useTadka();
   const [wnoInput, setWnoInput] = useState('');
   const [wmobInput, setWmobInput] = useState('');
   const [manualTableInput, setManualTableInput] = useState('');
   const [selectedWorkspaceCounter, setSelectedWorkspaceCounter] = useState<string | null>(null);
+  const [showEditWsTable, setShowEditWsTable] = useState(false);
+  const [editWsTableInput, setEditWsTableInput] = useState('');
   const pullRef = useRef(pullFromGoogleSheets);
   pullRef.current = pullFromGoogleSheets;
 
@@ -378,6 +382,9 @@ export function WaiterPortalView() {
             itemsText: string;
             amt: number;
             status: string;
+            st: 1 | 2 | 3 | 4 | 5;
+            it: Record<number, number>;
+            prices?: Record<number, number>;
           };
           type WorkspaceBox = {
             counterNo: string;
@@ -433,6 +440,9 @@ export function WaiterPortalView() {
                 itemsText,
                 amt,
                 status: ORDER_STATUS_LABELS[po.st] || String(po.st),
+                st: po.st,
+                it: po.it,
+                prices: po.prices,
               });
             });
 
@@ -464,6 +474,9 @@ export function WaiterPortalView() {
                     itemsText,
                     amt,
                     status: ORDER_STATUS_LABELS[o.st] || String(o.st),
+                    st: o.st,
+                    it: o.it,
+                    prices: o.prices,
                   }
                 );
               });
@@ -769,14 +782,61 @@ export function WaiterPortalView() {
                         <h3 style={{ margin: 0 }}>
                           📋 {selectedWs.counterNo} · Table {selectedWs.table}
                         </h3>
-                        <button
-                          className="chip"
-                          style={{ fontSize: '11px' }}
-                          onClick={() => setSelectedWorkspaceCounter(null)}
-                        >
-                          ✕ Close
-                        </button>
+                        <div className="row" style={{ gap: '6px' }}>
+                          <button
+                            className="chip"
+                            style={{ fontSize: '11px' }}
+                            onClick={() => {
+                              setShowEditWsTable((prev) => !prev);
+                              setEditWsTableInput(String(selectedWs.table));
+                            }}
+                          >
+                            ✏️ Edit Table
+                          </button>
+                          <button
+                            className="chip"
+                            style={{ fontSize: '11px' }}
+                            onClick={() => {
+                              setSelectedWorkspaceCounter(null);
+                              setShowEditWsTable(false);
+                            }}
+                          >
+                            ✕ Close
+                          </button>
+                        </div>
                       </div>
+                      {showEditWsTable && (
+                        <div className="row" style={{ gap: '6px', marginTop: '8px' }}>
+                          <input
+                            value={editWsTableInput}
+                            onChange={(e) => setEditWsTableInput(e.target.value)}
+                            placeholder="New table # (e.g. 5)"
+                            className="inp"
+                            style={{ flex: 1, fontSize: '12px', padding: '6px 10px' }}
+                          />
+                          <button
+                            type="button"
+                            className="chip on"
+                            style={{ fontSize: '12px' }}
+                            onClick={() => {
+                              const num = Number(
+                                editWsTableInput.replace(/[^\d]/g, '')
+                              );
+                              if (!num || num <= 0) {
+                                say('Enter a valid table number');
+                                return;
+                              }
+                              if (!S.tables.some((t) => t.id === num)) {
+                                addTable('', num);
+                              }
+                              updateWorkspaceTable(selectedWs.counterNo, num);
+                              setShowEditWsTable(false);
+                            }}
+                          >
+                            Save Table
+                          </button>
+                        </div>
+                      )}
                       <p
                         className="mu"
                         style={{ margin: '4px 0 8px', fontSize: '12px' }}
@@ -784,32 +844,117 @@ export function WaiterPortalView() {
                         Customer: <b>📱 {selectedWs.mob}</b> · Total:{' '}
                         <b>₹{selectedWs.totalAmt}</b>
                       </p>
-                      {selectedWs.orders.map((ord) => (
-                        <div
-                          key={ord.id}
-                          style={{
-                            padding: '8px',
-                            borderRadius: '10px',
-                            background: 'var(--bg)',
-                            border: '1px solid #382562',
-                            marginBottom: '6px',
-                          }}
-                        >
-                          <div className="row sp">
-                            <b>Order {ord.round}</b>
-                            <span className="tag" style={{ fontSize: '11px' }}>
-                              {ord.status}
-                            </span>
-                          </div>
+                      {selectedWs.orders.map((ord) => {
+                        const isEditable = ord.st === 1;
+                        return (
                           <div
-                            className="line"
-                            style={{ marginTop: '4px', fontSize: '13px' }}
+                            key={ord.id}
+                            style={{
+                              padding: '8px',
+                              borderRadius: '10px',
+                              background: 'var(--bg)',
+                              border: '1px solid #382562',
+                              marginBottom: '6px',
+                            }}
                           >
-                            <span>{ord.itemsText}</span>
-                            <span>₹{ord.amt}</span>
+                            <div className="row sp">
+                              <b>Order {ord.round}</b>
+                              <div className="row" style={{ gap: '6px' }}>
+                                <span className="tag" style={{ fontSize: '11px' }}>
+                                  {ord.status}
+                                </span>
+                                {isEditable && (
+                                  <button
+                                    type="button"
+                                    className="chip"
+                                    style={{
+                                      fontSize: '11px',
+                                      color: '#f87171',
+                                      borderColor: '#f87171',
+                                    }}
+                                    onClick={() => {
+                                      updateSheetOrderStatus(ord.id, 5);
+                                      say(`Order ${ord.round} deleted`);
+                                    }}
+                                  >
+                                    🗑 Delete
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {isEditable ? (
+                              <div style={{ marginTop: '6px' }}>
+                                {S.menu
+                                  .filter((m) => (ord.it[m.id] || 0) > 0)
+                                  .map((m) => {
+                                    const q = ord.it[m.id] || 0;
+                                    const price = ord.prices?.[m.id] ?? m.p;
+                                    return (
+                                      <div
+                                        key={m.id}
+                                        className="row sp"
+                                        style={{
+                                          marginTop: '4px',
+                                          fontSize: '13px',
+                                        }}
+                                      >
+                                        <span>
+                                          {m.e} {m.n.en} (₹{price * q})
+                                        </span>
+                                        <span className="row" style={{ gap: '4px' }}>
+                                          <button
+                                            type="button"
+                                            className="chip"
+                                            style={{
+                                              padding: '2px 8px',
+                                              fontSize: '12px',
+                                            }}
+                                            onClick={() =>
+                                              updateOrderItemQty(ord.id, m.id, -1)
+                                            }
+                                          >
+                                            −
+                                          </button>
+                                          <b>{q}</b>
+                                          <button
+                                            type="button"
+                                            className="chip"
+                                            style={{
+                                              padding: '2px 8px',
+                                              fontSize: '12px',
+                                            }}
+                                            onClick={() =>
+                                              updateOrderItemQty(ord.id, m.id, 1)
+                                            }
+                                          >
+                                            +
+                                          </button>
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            ) : (
+                              <>
+                                <div
+                                  className="line"
+                                  style={{ marginTop: '4px', fontSize: '13px' }}
+                                >
+                                  <span>{ord.itemsText}</span>
+                                  <span>₹{ord.amt}</span>
+                                </div>
+                                <div
+                                  className="mu"
+                                  style={{ fontSize: '11px', marginTop: '2px' }}
+                                >
+                                  🔒 In kitchen ({ord.status}) — cannot edit/delete
+                                </div>
+                              </>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
 
                       <div
                         style={{

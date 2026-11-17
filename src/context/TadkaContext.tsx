@@ -92,6 +92,8 @@ interface TadkaContextValue {
     rawCounterNo: string,
     targetCounterNo?: string | null
   ) => void;
+  updateWorkspaceTable: (counterNo: string, newTableId: number) => void;
+  updateOrderItemQty: (orderId: string, dishId: number, delta: number) => void;
 
   // Billing & Payments
   pushWaiter: (rawMob?: string) => void;
@@ -1094,6 +1096,169 @@ export function TadkaProvider({
       });
     },
     [pushUpdatedSheetOrder, updateState]
+  );
+
+  const updateWorkspaceTable = useCallback(
+    (counterNo: string, newTableId: number) => {
+      if (!counterNo || newTableId <= 0) return;
+
+      const updatedSheetOrders: PulledSheetOrder[] = [];
+      sheetOrdersTodayRef.current = sheetOrdersTodayRef.current.map((po) => {
+        if (po.counterNo === counterNo && po.billStatus !== 'PAID') {
+          const nextPo = { ...po, table: newTableId };
+          updatedSheetOrders.push(nextPo);
+          return nextPo;
+        }
+        return po;
+      });
+      if (updatedSheetOrders.length > 0) {
+        setSheetOrdersToday(sheetOrdersTodayRef.current);
+        updatedSheetOrders.forEach((po) => pushUpdatedSheetOrder(po));
+      }
+
+      updateState((prev) => {
+        const nextSess =
+          prev.sess && prev.sess.no === counterNo
+            ? { ...prev.sess, table: newTableId }
+            : prev.sess;
+        const nextActiveTable =
+          prev.sess && prev.sess.no === counterNo ? newTableId : prev.activeTable;
+        const nextSessionsByUser = { ...(prev.sessionsByUser || {}) };
+        for (const [k, snap] of Object.entries(nextSessionsByUser)) {
+          if (snap.sess && snap.sess.no === counterNo && !snap.paid) {
+            nextSessionsByUser[k] = {
+              ...snap,
+              sess: { ...snap.sess, table: newTableId },
+            };
+          }
+        }
+        const nextHistory = (prev.dailyOrderHistory || []).map((h) =>
+          h.counterNo === counterNo && h.billStatus !== 'PAID'
+            ? { ...h, tableNo: newTableId }
+            : h
+        );
+        return {
+          ...prev,
+          sess: nextSess,
+          activeTable: nextActiveTable,
+          sessionsByUser: nextSessionsByUser,
+          dailyOrderHistory: nextHistory,
+        };
+      });
+      say(`Updated ${counterNo} to Table ${newTableId} ✅`);
+    },
+    [pushUpdatedSheetOrder, say, updateState]
+  );
+
+  const updateOrderItemQty = useCallback(
+    (orderId: string, dishId: number, delta: number) => {
+      const targetSheet = sheetOrdersTodayRef.current.find(
+        (po) => po.id === orderId
+      );
+      if (targetSheet && targetSheet.st >= 2) {
+        say('Order is already cooking — cannot modify');
+        return;
+      }
+
+      if (targetSheet) {
+        const nextIt = { ...targetSheet.it };
+        const nextQty = (nextIt[dishId] || 0) + delta;
+        if (nextQty <= 0) {
+          delete nextIt[dishId];
+        } else {
+          nextIt[dishId] = nextQty;
+        }
+
+        const remainingCount = Object.values(nextIt).reduce(
+          (a, b) => a + (b || 0),
+          0
+        );
+        if (remainingCount <= 0) {
+          updateSheetOrderStatus(orderId, 5);
+          say('Order removed (0 items left)');
+          return;
+        }
+
+        const { summary, totalQty, subtotal } = formatItemsSummary(
+          S.menu,
+          nextIt,
+          targetSheet.prices
+        );
+        const updatedTarget: PulledSheetOrder = {
+          ...targetSheet,
+          it: nextIt,
+          itemsRaw: summary,
+          totalQty,
+          amountInr: subtotal,
+        };
+        sheetOrdersTodayRef.current = sheetOrdersTodayRef.current.map((po) =>
+          po.id === orderId ? updatedTarget : po
+        );
+        setSheetOrdersToday(sheetOrdersTodayRef.current);
+        pushUpdatedSheetOrder(updatedTarget);
+      }
+
+      updateState((prev) => {
+        const idx = prev.orders.findIndex((o) => o.id === orderId);
+        if (idx < 0) return prev;
+        const target = prev.orders[idx];
+        if (target.st >= 2) return prev;
+
+        const nextIt = { ...target.it };
+        const nextQty = (nextIt[dishId] || 0) + delta;
+        if (nextQty <= 0) {
+          delete nextIt[dishId];
+        } else {
+          nextIt[dishId] = nextQty;
+        }
+
+        const remainingCount = Object.values(nextIt).reduce(
+          (a, b) => a + (b || 0),
+          0
+        );
+        const nextCart = { ...prev.cart };
+        if (delta !== 0) {
+          const nextCartQty = (nextCart[dishId] || 0) + delta;
+          if (nextCartQty <= 0) delete nextCart[dishId];
+          else nextCart[dishId] = nextCartQty;
+        }
+
+        const nextOrders =
+          remainingCount <= 0
+            ? prev.orders.map((o, i) =>
+                i === idx ? { ...o, it: {}, st: 5 as const } : o
+              )
+            : prev.orders.map((o, i) =>
+                i === idx ? { ...o, it: nextIt } : o
+              );
+
+        const { summary, totalQty, subtotal } = formatItemsSummary(
+          prev.menu,
+          nextIt,
+          target.prices
+        );
+        const nextHistory = (prev.dailyOrderHistory || []).map((h) =>
+          h.id === orderId
+            ? remainingCount <= 0
+              ? { ...h, orderStatus: 'Cancelled' }
+              : {
+                  ...h,
+                  itemsDetailed: summary,
+                  totalItemsQty: totalQty,
+                  orderSubtotal: subtotal,
+                }
+            : h
+        );
+
+        return {
+          ...prev,
+          orders: nextOrders,
+          cart: nextCart,
+          dailyOrderHistory: nextHistory,
+        };
+      });
+    },
+    [S.menu, pushUpdatedSheetOrder, say, updateSheetOrderStatus, updateState]
   );
 
   const toggleDishStock = useCallback(
@@ -2565,6 +2730,8 @@ export function TadkaProvider({
         toggleDishStock,
         changeWaiterDraftQty,
         bookWaiter,
+        updateWorkspaceTable,
+        updateOrderItemQty,
         pushWaiter,
         cancelWaiter,
         doPay,
