@@ -596,6 +596,18 @@ export function parseConfigFromSheetRows(
   return Object.keys(cfg).length > 0 ? cfg : null;
 }
 
+export function normalizeSheetDateString(raw: string): string {
+  const s = (raw || '').trim();
+  const dateMatch = s.match(/^Date\((\d{4}),\s*(\d{1,2}),\s*(\d{1,2})\)$/);
+  if (dateMatch) {
+    const y = dateMatch[1];
+    const m = String(Number(dateMatch[2]) + 1).padStart(2, '0');
+    const d = String(Number(dateMatch[3])).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return s;
+}
+
 export function parseDailyCountersAndStateFromSheets(
   configRows?: unknown[][],
   dailyCountersRows?: unknown[][]
@@ -630,11 +642,11 @@ export function parseDailyCountersAndStateFromSheets(
       if (!r || !r[0]) continue;
       const k = String(r[0]).trim();
       const v = String(r[1] ?? '').trim();
-      if (k === 'counter_business_date') cfgDate = v;
+      if (k === 'counter_business_date') cfgDate = normalizeSheetDateString(v);
       if (k === 'next_counter_number') cfgNextCtr = Number(v) || 0;
       if (k === 'used_counters_today') cfgUsed = v;
     }
-      if (cfgDate === todayBizDate) {
+    if (cfgDate === todayBizDate) {
       if (cfgNextCtr > maxNumberSeen + 1 && cfgNextCtr < 24) {
         maxNumberSeen = cfgNextCtr - 1;
       }
@@ -651,11 +663,11 @@ export function parseDailyCountersAndStateFromSheets(
     for (let i = 1; i < dailyCountersRows.length; i++) {
       const r = dailyCountersRows[i];
       if (!r || !r[0]) continue;
-      const rowBizDate = String(r[0] || '').trim();
+      const rowBizDate = normalizeSheetDateString(String(r[0] || ''));
       const rowCounterNo = String(r[3] || '').trim();
       const rowMob = String(r[6] || '').trim();
       const rowPayStatus = String(r[9] || '').trim();
-      if (!rowBizDate || rowBizDate === todayBizDate) {
+      if (rowBizDate === todayBizDate && !/^C2[3-9]$/i.test(rowCounterNo)) {
         recordCounter(rowCounterNo, rowMob, rowPayStatus);
       }
     }

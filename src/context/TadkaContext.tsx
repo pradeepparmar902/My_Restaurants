@@ -1543,7 +1543,9 @@ export function TadkaProvider({
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   const dataRows = resp.table.rows.map((r: any) =>
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    (r.c || []).map((cell: any) => (cell ? cell.v ?? '' : ''))
+                    (r.c || []).map((cell: any) =>
+                      cell ? (cell.f ?? cell.v ?? '') : ''
+                    )
                   );
                   resolve([header, ...dataRows]);
                   return;
@@ -1556,7 +1558,7 @@ export function TadkaProvider({
 
             script.src = `https://docs.google.com/spreadsheets/d/${cleanSheetId}/gviz/tq?sheet=${encodeURIComponent(
               tabName
-            )}&tqx=responseHandler:${cbName}`;
+            )}&headers=1&tqx=responseHandler:${cbName}`;
             script.onerror = () => {
               cleanup();
               resolve(null);
