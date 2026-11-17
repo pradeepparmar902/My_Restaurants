@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import { Language, PaymentMethod } from '@/types/tadka';
 import { ORDER_STATUS_LABELS } from '@/lib/constants';
@@ -255,6 +255,16 @@ export function OrderTabView() {
   } = useTadka();
   const [inviteMob, setInviteMob] = useState('');
   const stepIcons = ['📥', '🍳', '🛎️', '✅'];
+  const hasInvitedMobs = (S.sess?.invitedMobs || []).length > 0;
+
+  useEffect(() => {
+    if (!S.sess || S.paid || S.sess.status === 'paid' || !hasInvitedMobs) return;
+    pullFromGoogleSheets(undefined, true);
+    const id = setInterval(() => {
+      pullFromGoogleSheets(undefined, true);
+    }, 10000);
+    return () => clearInterval(id);
+  }, [S.sess, S.paid, hasInvitedMobs, pullFromGoogleSheets]);
 
   if (!S.sess) {
     return (

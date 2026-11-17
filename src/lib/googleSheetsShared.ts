@@ -681,6 +681,107 @@ export function parseDailyCountersAndStateFromSheets(
   };
 }
 
+export interface PulledSheetOrder {
+  id: string;
+  businessDate: string;
+  counterNo: string;
+  table: number;
+  round: number;
+  src: 'app' | 'waiter';
+  principalMob: string;
+  orderedByMob: string;
+  it: Record<number, number>;
+  prices: Record<number, number>;
+  st: 1 | 2 | 3 | 4 | 5;
+  billStatus: string;
+  vip: boolean;
+  rush: boolean;
+}
+
+export function parseOrdersFromSheetRows(
+  rows: unknown[][],
+  menu: Dish[]
+): PulledSheetOrder[] {
+  if (!Array.isArray(rows) || rows.length < 2) return [];
+  const out: PulledSheetOrder[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r[0]) continue;
+    const businessDate = normalizeSheetDateString(String(r[0] || ''));
+    const counterNo = String(r[3] || '').trim();
+    const table = Number(r[4]) || 1;
+    const round = Number(r[5]) || 1;
+    const srcRaw = String(r[6] || '').toLowerCase();
+    const src: 'app' | 'waiter' = srcRaw.includes('waiter') ? 'waiter' : 'app';
+    const rawMob = String(r[7] || '').replace(/^'+/, '').trim();
+    const viaMatch = rawMob.match(/^(.+?)\s*\(via\s+([^)]+)\)\s*$/i);
+    const principalMob = viaMatch ? viaMatch[1].trim() : rawMob;
+    const orderedByMob = viaMatch ? viaMatch[2].trim() : rawMob;
+
+    const itemsStr = String(r[8] || '').trim();
+    const it: Record<number, number> = {};
+    const prices: Record<number, number> = {};
+    if (itemsStr) {
+      const parts = itemsStr.split(',').map((p) => p.trim()).filter(Boolean);
+      for (const part of parts) {
+        const m = part.match(/^(\d+)\s*[×x]\s*(.+?)(?:\s*\(₹\s*(\d+)\))?$/i);
+        if (!m) continue;
+        const qty = Number(m[1]) || 0;
+        const nameLower = m[2].trim().toLowerCase();
+        const lineAmt = m[3] ? Number(m[3]) : 0;
+        if (qty <= 0) continue;
+        const dish = menu.find(
+          (d) =>
+            d.n.en.toLowerCase() === nameLower ||
+            d.n.hi.toLowerCase() === nameLower ||
+            d.n.gu.toLowerCase() === nameLower
+        );
+        if (dish) {
+          it[dish.id] = (it[dish.id] || 0) + qty;
+          prices[dish.id] =
+            lineAmt && qty ? Math.round(lineAmt / qty) : dish.p;
+        }
+      }
+    }
+
+    const ks = String(r[11] || '').trim().toLowerCase();
+    let st: 1 | 2 | 3 | 4 | 5 = 1;
+    if (ks === 'cooking') st = 2;
+    else if (ks === 'ready') st = 3;
+    else if (ks === 'delivered') st = 4;
+    else if (ks === 'cancelled') st = 5;
+
+    const billStatus = String(r[12] || 'OPEN').trim().toUpperCase();
+    const vip = r[14] === true || String(r[14] || '').toUpperCase() === 'TRUE';
+    const rush = r[15] === true || String(r[15] || '').toUpperCase() === 'TRUE';
+    const orderId =
+      String(r[16] || '').trim() ||
+      `sheet-${businessDate}-${counterNo}-${round}-${orderedByMob}`;
+
+    if (Object.keys(it).length > 0) {
+      out.push({
+        id: orderId,
+        businessDate,
+        counterNo,
+        table,
+        round,
+        src,
+        principalMob,
+        orderedByMob,
+        it,
+        prices,
+        st,
+        billStatus,
+        vip,
+        rush,
+      });
+    }
+  }
+
+  return out;
+}
+
 export const GOOGLE_APPS_SCRIPT_TEMPLATE = `/**
  * Tadka Restaurant Growth Platform — 2-Way Google Sheets & Google Drive Storage Bridge
  * 

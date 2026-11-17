@@ -38,6 +38,7 @@ import {
   parseDailyCountersAndStateFromSheets,
   ParsedSheetCounterState,
   parseMenuFromSheetRows,
+  parseOrdersFromSheetRows,
   parseStaffFromSheetRows,
 } from '@/lib/googleSheetsShared';
 
@@ -738,6 +739,7 @@ export function TadkaProvider({
           sess: { ...prev.sess, invitedMobs: nextInvited },
         };
       });
+      setTimeout(() => pullFromGoogleSheetsRef.current?.(undefined, true), 100);
       say(`Invited ${m} to Counter ${S.sess.no} (Clubbed Bill) ✅`);
     },
     [S.sess, S.paid, S.cc, say, updateState]
@@ -1800,6 +1802,7 @@ export function TadkaProvider({
       let pulledStaff: AppState['staff'] | null = null;
       let pulledConfig: Partial<AppState['googleConfig']> | null = null;
       let pulledCounters: ParsedSheetCounterState | null = null;
+      let pulledOrderRows: unknown[][] | null = null;
 
       // 1. Try Server Proxy (/api/storage/sheets?pull=1) — avoids all browser CORS redirect issues on localhost
       try {
@@ -1825,6 +1828,9 @@ export function TadkaProvider({
               apiData.sheets.Restaurant_Config,
               apiData.sheets.Daily_Counters
             );
+            if (Array.isArray(apiData.sheets.Customer_Orders)) {
+              pulledOrderRows = apiData.sheets.Customer_Orders;
+            }
           }
         }
       } catch {
@@ -1885,13 +1891,15 @@ export function TadkaProvider({
             document.body.appendChild(script);
           });
 
-        const [menuRows, cfgRows, dailyCounterRows] = await Promise.all([
+        const [menuRows, cfgRows, dailyCounterRows, orderRows] = await Promise.all([
           gvizFetchTab('Menu_Items'),
           gvizFetchTab('Restaurant_Config'),
           gvizFetchTab('Daily_Counters'),
+          gvizFetchTab('Customer_Orders'),
         ]);
         if (menuRows) pulledMenu = parseMenuFromSheetRows(menuRows);
         if (cfgRows) pulledConfig = parseConfigFromSheetRows(cfgRows);
+        if (orderRows) pulledOrderRows = orderRows;
         if (cfgRows || dailyCounterRows) {
           pulledCounters = parseDailyCountersAndStateFromSheets(
             cfgRows || undefined,
@@ -1911,12 +1919,13 @@ export function TadkaProvider({
           staff: AppState['staff'] | null;
           config: Partial<AppState['googleConfig']> | null;
           counters: ParsedSheetCounterState | null;
+          orderRows: unknown[][] | null;
         }>((resolve) => {
           const cbName = `__tadkaScriptCb_${Date.now()}`;
           const script = document.createElement('script');
           const timer = setTimeout(() => {
             cleanup();
-            resolve({ menu: null, staff: null, config: null, counters: null });
+            resolve({ menu: null, staff: null, config: null, counters: null, orderRows: null });
           }, 6000);
 
           function cleanup() {
@@ -1940,9 +1949,12 @@ export function TadkaProvider({
                   data.sheets.Restaurant_Config,
                   data.sheets.Daily_Counters
                 ),
+                orderRows: Array.isArray(data.sheets.Customer_Orders)
+                  ? data.sheets.Customer_Orders
+                  : null,
               });
             } else {
-              resolve({ menu: null, staff: null, config: null, counters: null });
+              resolve({ menu: null, staff: null, config: null, counters: null, orderRows: null });
             }
           };
 
@@ -1952,7 +1964,7 @@ export function TadkaProvider({
           )}&t=${Date.now()}`;
           script.onerror = () => {
             cleanup();
-            resolve({ menu: null, staff: null, config: null, counters: null });
+            resolve({ menu: null, staff: null, config: null, counters: null, orderRows: null });
           };
           document.body.appendChild(script);
         });
@@ -1960,6 +1972,7 @@ export function TadkaProvider({
         if (jsonpResult.staff) pulledStaff = jsonpResult.staff;
         if (jsonpResult.config) pulledConfig = jsonpResult.config;
         if (jsonpResult.counters) pulledCounters = jsonpResult.counters;
+        if (jsonpResult.orderRows) pulledOrderRows = jsonpResult.orderRows;
       }
 
       // 4. Fallback: Direct Apps Script GET / POST from browser
@@ -1979,6 +1992,9 @@ export function TadkaProvider({
               pulledStaff = parseStaffFromSheetRows(
                 data.sheets.Staff_Access || []
               );
+              if (Array.isArray(data.sheets.Customer_Orders)) {
+                pulledOrderRows = data.sheets.Customer_Orders;
+              }
             }
           }
         } catch {
@@ -2002,6 +2018,9 @@ export function TadkaProvider({
                 pulledStaff = parseStaffFromSheetRows(
                   data.sheets.Staff_Access || []
                 );
+                if (Array.isArray(data.sheets.Customer_Orders)) {
+                  pulledOrderRows = data.sheets.Customer_Orders;
+                }
               }
             }
           } catch {
@@ -2010,9 +2029,16 @@ export function TadkaProvider({
         }
       }
 
-      if ((pulledMenu && pulledMenu.length > 0) || pulledConfig || pulledCounters) {
+      if (
+        (pulledMenu && pulledMenu.length > 0) ||
+        pulledConfig ||
+        pulledCounters ||
+        (pulledOrderRows && pulledOrderRows.length > 1)
+      ) {
         setS((prev) => {
           const todayBizDate = getCurrentBusinessDate();
+          const effectiveMenu =
+            pulledMenu && pulledMenu.length > 0 ? pulledMenu : prev.menu;
           const mergedUsed = Array.from(
             new Set([
               ...(prev.counterBusinessDate === todayBizDate
@@ -2026,10 +2052,80 @@ export function TadkaProvider({
             pulledCounters?.nextCtr || 1
           );
 
+          let nextOrders = prev.orders;
+          let nextCart = prev.cart;
+          if (
+            pulledOrderRows &&
+            pulledOrderRows.length > 1 &&
+            prev.sess &&
+            !prev.paid &&
+            prev.sess.status !== 'paid'
+          ) {
+            const parsedSheetOrders = parseOrdersFromSheetRows(
+              pulledOrderRows,
+              effectiveMenu
+            );
+            const sessBizDate = prev.sess.businessDate || todayBizDate;
+            const invitedList = prev.sess.invitedMobs || [];
+            const matchingSheetOrders = parsedSheetOrders.filter(
+              (po) =>
+                po.businessDate === sessBizDate &&
+                po.billStatus !== 'PAID' &&
+                po.st !== 5 &&
+                (invitedList.includes(po.orderedByMob) ||
+                  (prev.sess!.mob &&
+                    po.principalMob === prev.sess!.mob &&
+                    po.counterNo === prev.sess!.no))
+            );
+
+            if (matchingSheetOrders.length > 0) {
+              const updatedOrders = prev.orders.map((existing) => {
+                const match = matchingSheetOrders.find(
+                  (po) => po.id === existing.id
+                );
+                return match && match.st !== existing.st
+                  ? { ...existing, st: match.st }
+                  : existing;
+              });
+              const existingIds = new Set(updatedOrders.map((o) => o.id));
+              const newFromSheet = matchingSheetOrders.filter(
+                (po) => !existingIds.has(po.id)
+              );
+              if (newFromSheet.length > 0) {
+                const updatedCart = { ...prev.cart };
+                let nextK = updatedOrders.length + 1;
+                const appended = newFromSheet.map((po) => {
+                  for (const [idStr, qty] of Object.entries(po.it)) {
+                    const id = Number(idStr);
+                    updatedCart[id] = (updatedCart[id] || 0) + qty;
+                  }
+                  return {
+                    id: po.id,
+                    k: nextK++,
+                    it: po.it,
+                    prices: po.prices,
+                    st: po.st,
+                    src: po.src,
+                    orderedByMob: po.orderedByMob,
+                    vip: po.vip,
+                    rush: po.rush,
+                    createdAt: new Date().toISOString(),
+                  };
+                });
+                nextOrders = [...updatedOrders, ...appended];
+                nextCart = updatedCart;
+              } else {
+                nextOrders = updatedOrders;
+              }
+            }
+          }
+
           const nextState: AppState = {
             ...prev,
-            menu: pulledMenu && pulledMenu.length > 0 ? pulledMenu : prev.menu,
+            menu: effectiveMenu,
             staff: pulledStaff || prev.staff,
+            orders: nextOrders,
+            cart: nextCart,
             counterBusinessDate: todayBizDate,
             ctr: highestCtr,
             usedCountersToday: mergedUsed,
