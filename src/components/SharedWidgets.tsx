@@ -460,6 +460,15 @@ export function ShareMomentCard() {
             style={{ width: '100%', marginBottom: '8px' }}
           />
           <div className="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
+            {selectedFile && (
+              <button
+                className="btn alt"
+                style={{ width: '100%', marginTop: 0, marginBottom: '4px' }}
+                onClick={() => handleShareToPlatform('Social App')}
+              >
+                📲 Share Photo/Reel to Any App (FB / IG / WA)
+              </button>
+            )}
             {platforms.map((p) => (
               <button
                 key={p}
