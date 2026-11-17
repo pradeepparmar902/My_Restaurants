@@ -291,7 +291,17 @@ export function switchUserSessionInState(
     };
   }
 
-  const snap = restored || getEmptyUserSessionSnapshot();
+  const todayBizDate = getCurrentBusinessDate();
+  const isStaleSession = Boolean(
+    restored?.sess?.businessDate && restored.sess.businessDate !== todayBizDate
+  );
+  const snap = isStaleSession
+    ? {
+        ...getEmptyUserSessionSnapshot(),
+        pts: restored!.pts,
+        stars: restored!.stars,
+      }
+    : restored || getEmptyUserSessionSnapshot();
 
   return {
     ...prev,

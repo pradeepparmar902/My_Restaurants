@@ -621,7 +621,8 @@ export function normalizeSheetDateString(raw: string): string {
 
 export function parseDailyCountersAndStateFromSheets(
   configRows?: unknown[][],
-  dailyCountersRows?: unknown[][]
+  dailyCountersRows?: unknown[][],
+  orderRows?: unknown[][]
 ): ParsedSheetCounterState {
   const todayBizDate = getCurrentBusinessDate();
   const usedSet = new Set<string>();
@@ -678,6 +679,20 @@ export function parseDailyCountersAndStateFromSheets(
       const rowCounterNo = String(r[3] || '').trim();
       const rowMob = String(r[6] || '').trim();
       const rowPayStatus = String(r[9] || '').trim();
+      if (rowBizDate === todayBizDate && !/^C2[3-9]$/i.test(rowCounterNo)) {
+        recordCounter(rowCounterNo, rowMob, rowPayStatus);
+      }
+    }
+  }
+
+  if (Array.isArray(orderRows) && orderRows.length > 1) {
+    for (let i = 1; i < orderRows.length; i++) {
+      const r = orderRows[i];
+      if (!r || !r[0]) continue;
+      const rowBizDate = normalizeSheetDateString(String(r[0] || ''));
+      const rowCounterNo = String(r[3] || '').trim();
+      const rowMob = String(r[7] || '').replace(/^'+/, '').trim();
+      const rowPayStatus = String(r[12] || '').trim();
       if (rowBizDate === todayBizDate && !/^C2[3-9]$/i.test(rowCounterNo)) {
         recordCounter(rowCounterNo, rowMob, rowPayStatus);
       }

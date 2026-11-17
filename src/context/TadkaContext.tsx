@@ -1826,7 +1826,8 @@ export function TadkaProvider({
             );
             pulledCounters = parseDailyCountersAndStateFromSheets(
               apiData.sheets.Restaurant_Config,
-              apiData.sheets.Daily_Counters
+              apiData.sheets.Daily_Counters,
+              apiData.sheets.Orders
             );
             if (Array.isArray(apiData.sheets.Orders)) {
               pulledOrderRows = apiData.sheets.Orders;
@@ -1900,10 +1901,11 @@ export function TadkaProvider({
         if (menuRows) pulledMenu = parseMenuFromSheetRows(menuRows);
         if (cfgRows) pulledConfig = parseConfigFromSheetRows(cfgRows);
         if (orderRows) pulledOrderRows = orderRows;
-        if (cfgRows || dailyCounterRows) {
+        if (cfgRows || dailyCounterRows || orderRows) {
           pulledCounters = parseDailyCountersAndStateFromSheets(
             cfgRows || undefined,
-            dailyCounterRows || undefined
+            dailyCounterRows || undefined,
+            orderRows || undefined
           );
         }
       }
@@ -1947,7 +1949,8 @@ export function TadkaProvider({
                 ),
                 counters: parseDailyCountersAndStateFromSheets(
                   data.sheets.Restaurant_Config,
-                  data.sheets.Daily_Counters
+                  data.sheets.Daily_Counters,
+                  data.sheets.Orders
                 ),
                 orderRows: Array.isArray(data.sheets.Orders)
                   ? data.sheets.Orders
