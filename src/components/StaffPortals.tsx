@@ -763,7 +763,9 @@ export function AdminPortalView() {
     checkLogin,
     saveMenuDish,
     addTable,
+    updateTable,
     removeTable,
+    resetTables,
     regenerateTableQr,
     setActiveTable,
     resetDemoState,
@@ -784,7 +786,11 @@ export function AdminPortalView() {
   const [newDishVeg, setNewDishVeg] = useState(true);
 
   const [showQrAdmin, setShowQrAdmin] = useState(true);
+  const [newTableNo, setNewTableNo] = useState('');
   const [newTableLabel, setNewTableLabel] = useState('');
+  const [editingTableId, setEditingTableId] = useState<number | null>(null);
+  const [editTableNo, setEditTableNo] = useState('');
+  const [editTableLabel, setEditTableLabel] = useState('');
   const [selectedQrTableId, setSelectedQrTableId] = useState<number>(
     S.activeTable || 1
   );
@@ -1052,31 +1058,50 @@ export function AdminPortalView() {
       <div className="card">
         <div className="row sp">
           <h3>📱 Tables & QR Code Generator</h3>
-          <button
-            className="chip"
-            onClick={() => setShowQrAdmin((prev) => !prev)}
-          >
-            {showQrAdmin ? 'Close' : 'Manage tables'}
-          </button>
+          <div className="row" style={{ gap: '6px' }}>
+            <button
+              className="chip"
+              style={{ fontSize: '12px' }}
+              onClick={resetTables}
+            >
+              🔄 Reset Tables
+            </button>
+            <button
+              className="chip"
+              onClick={() => setShowQrAdmin((prev) => !prev)}
+            >
+              {showQrAdmin ? 'Close' : 'Manage tables'}
+            </button>
+          </div>
         </div>
         {showQrAdmin && (
           <div style={{ marginTop: '10px' }}>
-            {/* Add New Table */}
-            <div className="row" style={{ marginBottom: '12px' }}>
+            {/* Add / Set Manual Table Number */}
+            <div className="row" style={{ marginBottom: '12px', gap: '6px' }}>
+              <input
+                value={newTableNo}
+                onChange={(e) => setNewTableNo(e.target.value.replace(/\D/g, ''))}
+                placeholder="No. (e.g. 10)"
+                inputMode="numeric"
+                className="inp"
+                style={{ maxWidth: '100px' }}
+              />
               <input
                 value={newTableLabel}
                 onChange={(e) => setNewTableLabel(e.target.value)}
-                placeholder="New table (e.g. Table 7, Patio 1, Counter)"
+                placeholder="Name (e.g. Table 10, Patio 1)"
                 className="inp"
               />
               <button
                 className="chip on"
                 onClick={() => {
-                  addTable(newTableLabel);
+                  const parsedNo = Number(newTableNo) || undefined;
+                  addTable(newTableLabel, parsedNo);
+                  setNewTableNo('');
                   setNewTableLabel('');
                 }}
               >
-                + Add Table
+                + Add
               </button>
             </div>
 
@@ -1097,6 +1122,7 @@ export function AdminPortalView() {
                 qrTargetUrl
               )}`;
               const isQrOpen = selectedQrTableId === t.id;
+              const isEditing = editingTableId === t.id;
 
               return (
                 <div
@@ -1107,47 +1133,99 @@ export function AdminPortalView() {
                     marginTop: '10px',
                   }}
                 >
-                  <div className="row sp" style={{ flexWrap: 'wrap', gap: '6px' }}>
-                    <span>
-                      <b>{t.label}</b>{' '}
-                      {S.activeTable === t.id && (
-                        <span className="tag ok">Active</span>
-                      )}
-                      <br />
-                      <span className="mu" style={{ fontSize: '11px' }}>
-                        Token: {t.token}
-                      </span>
-                    </span>
-                    <div className="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
+                  {isEditing ? (
+                    <div className="row" style={{ gap: '6px', marginBottom: '8px' }}>
+                      <input
+                        value={editTableNo}
+                        onChange={(e) =>
+                          setEditTableNo(e.target.value.replace(/\D/g, ''))
+                        }
+                        placeholder="No."
+                        inputMode="numeric"
+                        className="inp"
+                        style={{ maxWidth: '72px' }}
+                      />
+                      <input
+                        value={editTableLabel}
+                        onChange={(e) => setEditTableLabel(e.target.value)}
+                        placeholder="Table label"
+                        className="inp"
+                      />
                       <button
-                        className={`chip ${isQrOpen ? 'on' : ''}`}
-                        onClick={() => setSelectedQrTableId(t.id)}
+                        className="chip on"
+                        onClick={() => {
+                          updateTable(
+                            t.id,
+                            editTableLabel,
+                            Number(editTableNo) || t.id
+                          );
+                          setEditingTableId(null);
+                        }}
                       >
-                        📷 {isQrOpen ? 'Viewing QR' : 'Create QR'}
-                      </button>
-                      <button
-                        className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
-                        onClick={() => setActiveTable(t.id)}
-                      >
-                        {S.activeTable === t.id ? 'Active' : 'Use'}
+                        Save
                       </button>
                       <button
                         className="chip"
-                        onClick={() => regenerateTableQr(t.id)}
+                        onClick={() => setEditingTableId(null)}
                       >
-                        ↻ New Token
+                        Cancel
                       </button>
-                      {S.tables.length > 1 && (
+                    </div>
+                  ) : (
+                    <div className="row sp" style={{ flexWrap: 'wrap', gap: '6px' }}>
+                      <span>
+                        <b>
+                          #{t.id} · {t.label}
+                        </b>{' '}
+                        {S.activeTable === t.id && (
+                          <span className="tag ok">Active</span>
+                        )}
+                        <br />
+                        <span className="mu" style={{ fontSize: '11px' }}>
+                          Token: {t.token}
+                        </span>
+                      </span>
+                      <div className="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
+                        <button
+                          className={`chip ${isQrOpen ? 'on' : ''}`}
+                          onClick={() => setSelectedQrTableId(t.id)}
+                        >
+                          📷 {isQrOpen ? 'Viewing QR' : 'Create QR'}
+                        </button>
+                        <button
+                          className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
+                          onClick={() => setActiveTable(t.id)}
+                        >
+                          {S.activeTable === t.id ? 'Active' : 'Use'}
+                        </button>
                         <button
                           className="chip"
-                          style={{ color: '#f87171' }}
-                          onClick={() => removeTable(t.id)}
+                          onClick={() => {
+                            setEditingTableId(t.id);
+                            setEditTableNo(String(t.id));
+                            setEditTableLabel(t.label);
+                          }}
                         >
-                          ✕
+                          ✏️ Edit
                         </button>
-                      )}
+                        <button
+                          className="chip"
+                          onClick={() => regenerateTableQr(t.id)}
+                        >
+                          ↻ Token
+                        </button>
+                        {S.tables.length > 1 && (
+                          <button
+                            className="chip"
+                            style={{ color: '#f87171' }}
+                            onClick={() => removeTable(t.id)}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {isQrOpen && (
                     <div

@@ -103,8 +103,10 @@ interface TadkaContextValue {
 
   // Menu & Table Admin
   saveMenuDish: (dish: Partial<Dish> & { id?: number }) => void;
-  addTable: (label: string) => void;
+  addTable: (label: string, manualId?: number) => void;
+  updateTable: (oldId: number, newLabel: string, newId?: number) => void;
   removeTable: (tableId: number) => void;
+  resetTables: () => void;
   regenerateTableQr: (tableId: number) => void;
   setActiveTable: (tableId: number) => void;
   resetDemoState: () => void;
@@ -1368,24 +1370,76 @@ export function TadkaProvider({
   );
 
   const addTable = useCallback(
-    (label: string) => {
+    (label: string, manualId?: number) => {
       const cleanLabel = label.trim().replace(/[<>&"']/g, '');
-      if (!cleanLabel) {
-        say('Enter a table name (e.g. Table 7 or Patio 1)');
+      const hasManualId = typeof manualId === 'number' && manualId > 0;
+      if (!cleanLabel && !hasManualId) {
+        say('Enter a table number or name (e.g. 10 or Patio 1)');
         return;
       }
+      if (hasManualId && S.tables.some((t) => t.id === manualId)) {
+        say(`Table #${manualId} already exists. Edit or remove it first.`);
+        return;
+      }
+      let createdLabel = '';
       updateState((prev) => {
-        const nextId = Math.max(0, ...prev.tables.map((t) => t.id)) + 1;
+        const nextId = hasManualId
+          ? manualId!
+          : Math.max(0, ...prev.tables.map((t) => t.id)) + 1;
+        createdLabel = cleanLabel || `Table ${nextId}`;
         const token = `qr-tadka-t${nextId}-${Math.random().toString(36).slice(2, 6)}`;
         return {
           ...prev,
-          tables: [...prev.tables, { id: nextId, label: cleanLabel, token }],
+          tables: [...prev.tables, { id: nextId, label: createdLabel, token }],
         };
       });
-      say(`Added ${cleanLabel} with QR code ✅`);
+      say(`Added ${createdLabel} with QR code ✅`);
     },
-    [say, updateState]
+    [S.tables, say, updateState]
   );
+
+  const updateTable = useCallback(
+    (oldId: number, newLabel: string, newId?: number) => {
+      const cleanLabel = newLabel.trim().replace(/[<>&"']/g, '');
+      const targetId =
+        typeof newId === 'number' && newId > 0 ? newId : oldId;
+      if (targetId !== oldId && S.tables.some((t) => t.id === targetId)) {
+        say(`Table #${targetId} already exists`);
+        return;
+      }
+      updateState((prev) => {
+        const nextTables = prev.tables.map((t) =>
+          t.id === oldId
+            ? {
+                ...t,
+                id: targetId,
+                label: cleanLabel || `Table ${targetId}`,
+                token:
+                  targetId !== oldId
+                    ? `qr-tadka-t${targetId}-${Math.random().toString(36).slice(2, 6)}`
+                    : t.token,
+              }
+            : t
+        );
+        return {
+          ...prev,
+          tables: nextTables,
+          activeTable: prev.activeTable === oldId ? targetId : prev.activeTable,
+        };
+      });
+      say(`Updated Table #${targetId} ✅`);
+    },
+    [S.tables, say, updateState]
+  );
+
+  const resetTables = useCallback(() => {
+    updateState((prev) => ({
+      ...prev,
+      tables: INITIAL_STATE.tables,
+      activeTable: 1,
+    }));
+    say('Tables reset to default (Table 1–6) ✅');
+  }, [say, updateState]);
 
   const removeTable = useCallback(
     (tableId: number) => {
@@ -2038,7 +2092,9 @@ export function TadkaProvider({
         checkLogin,
         saveMenuDish,
         addTable,
+        updateTable,
         removeTable,
+        resetTables,
         regenerateTableQr,
         setActiveTable,
         resetDemoState,
