@@ -125,6 +125,15 @@ export function buildSheetRowsForState(
   ];
 
   // Combine active session orders + persistent dailyOrderHistory so completed visits stay in the Orders sheet
+  const hasCombinedGroup = Boolean(
+    (state.sess?.invitedMobs && state.sess.invitedMobs.length > 0) ||
+      new Set(
+        state.orders
+          .map((o) => o.orderedByMob || state.sess?.mob || '')
+          .filter(Boolean)
+      ).size > 1
+  );
+
   const activeOrderRows: (string | number | boolean)[][] = state.orders.map(
     (o) => {
       const { dateFormatted, timeFormatted } = formatIndianDateTime(o.createdAt);
@@ -133,6 +142,20 @@ export function buildSheetRowsForState(
         o.it,
         o.prices
       );
+      const principalMob = state.sess?.mob || state.me.mob || 'Guest';
+      const ordererMob = o.orderedByMob || principalMob;
+      const isInviteeOrder =
+        Boolean(o.orderedByMob && state.sess?.mob && o.orderedByMob !== state.sess.mob);
+      const baseSource = o.src === 'waiter' ? 'Waiter' : 'Customer App';
+      const sourceLabel = isInviteeOrder
+        ? `${baseSource} (Combined · Invitee)`
+        : hasCombinedGroup
+          ? `${baseSource} (Combined · Principal)`
+          : baseSource;
+      const customerMobLabel = isInviteeOrder
+        ? `${principalMob} (via ${ordererMob})`
+        : ordererMob;
+
       return [
         state.sess?.businessDate || businessDateToday,
         dateFormatted,
@@ -140,8 +163,8 @@ export function buildSheetRowsForState(
         state.sess?.no || 'Pending',
         state.activeTable,
         o.k,
-        o.src === 'waiter' ? 'Waiter' : 'Customer App',
-        state.sess?.mob || state.me.mob || 'Guest',
+        sourceLabel,
+        customerMobLabel,
         summary,
         totalQty,
         ordSub,
