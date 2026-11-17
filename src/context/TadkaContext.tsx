@@ -1701,6 +1701,7 @@ export function TadkaProvider({
         newStar: false,
         media: null,
         shared: false,
+        scratchReward: null,
         billSrc: '',
         M: {},
         cashReq: false,

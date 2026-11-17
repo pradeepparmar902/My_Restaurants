@@ -23,6 +23,7 @@ export function MenuTabView() {
     dsub,
     updateState,
     staffOf,
+    sheetOrdersToday,
   } = useTadka();
   const [optMob, setOptMob] = useState('');
   const [showOptMob, setShowOptMob] = useState(false);
@@ -47,6 +48,37 @@ export function MenuTabView() {
   const activeTableLabel =
     S.tables.find((t) => t.id === S.activeTable)?.label ||
     `Table ${S.activeTable}`;
+
+  const { dishCountsToday, topDishId } = (() => {
+    const counts: Record<number, number> = {};
+    const seenIds = new Set<string>();
+    sheetOrdersToday
+      .filter((po) => po.st !== 5)
+      .forEach((po) => {
+        seenIds.add(po.id);
+        Object.entries(po.it).forEach(([idStr, q]) => {
+          const id = Number(idStr);
+          if (q > 0) counts[id] = (counts[id] || 0) + q;
+        });
+      });
+    S.orders
+      .filter((o) => o.st !== 5 && !seenIds.has(o.id))
+      .forEach((o) => {
+        Object.entries(o.it).forEach(([idStr, q]) => {
+          const id = Number(idStr);
+          if (q > 0) counts[id] = (counts[id] || 0) + q;
+        });
+      });
+    let bestId = -1;
+    let bestCount = 1; // require at least 2 orders to show #1 Trending
+    Object.entries(counts).forEach(([idStr, c]) => {
+      if (c > bestCount) {
+        bestCount = c;
+        bestId = Number(idStr);
+      }
+    });
+    return { dishCountsToday: counts, topDishId: bestId };
+  })();
 
   return (
     <>
@@ -90,6 +122,7 @@ export function MenuTabView() {
 
       {filteredMenu.map((m) => {
         const draftQty = S.draft[m.id] || 0;
+        const todayOrderedCount = dishCountsToday[m.id] || 0;
         return (
           <div key={m.id} className="card dish">
             <div className="em">{m.e}</div>
@@ -98,6 +131,15 @@ export function MenuTabView() {
                 <span className={`veg ${m.v ? '' : 'nv'}`} />
                 {m.n[S.lang]}
               </b>
+              {todayOrderedCount > 0 && (
+                <div style={{ marginTop: '3px' }}>
+                  <span className="tag hot" style={{ fontSize: '10px' }}>
+                    {m.id === topDishId
+                      ? `⭐ #1 Trending · ${todayOrderedCount} today`
+                      : `🔥 ${todayOrderedCount} ordered today`}
+                  </span>
+                </div>
+              )}
               <span className="mu">
                 ₹{m.p}
                 {m.jain ? ' · Jain' : ''}
@@ -794,6 +836,196 @@ export function BillTabView() {
           </p>
         </div>
 
+        {/* #6 Post-Payment Scratch Card Reward */}
+        <div className="card">
+          <h3>🎁 Scratch &amp; Win Your Next-Visit Reward!</h3>
+          {S.scratchReward?.scratched ? (
+            <div
+              style={{
+                marginTop: '8px',
+                padding: '14px',
+                borderRadius: '14px',
+                background:
+                  'linear-gradient(135deg, rgba(92,242,192,0.18), rgba(58,168,255,0.18))',
+                border: '1px solid #5cf2c0',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '18px', fontWeight: 800 }}>
+                🎉 {S.scratchReward.label}
+              </div>
+              <div
+                style={{
+                  marginTop: '6px',
+                  fontSize: '13px',
+                  letterSpacing: '1px',
+                }}
+              >
+                Coupon Code: <b>{S.scratchReward.code}</b>
+              </div>
+              <p className="mu" style={{ fontSize: '11px', margin: '4px 0 8px' }}>
+                Valid for 7 days on your next visit at Tadka Truck
+              </p>
+              <button
+                className="chip on"
+                onClick={() => {
+                  const msg = `🎁 *Tadka Truck Reward*\nWon: *${S.scratchReward?.label}*\nCoupon Code: *${S.scratchReward?.code}*\nValid for 7 days on next visit!`;
+                  const digits = S.sess?.mob
+                    ? S.sess.mob.replace(/\D/g, '')
+                    : '';
+                  const url = digits
+                    ? `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`
+                    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                📲 Save Coupon on WhatsApp
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                const prizes = [
+                  { label: '🥤 Free Mango Masala Cooler', bonusPts: 0 },
+                  { label: '₹30 Off Next Visit', bonusPts: 0 },
+                  { label: '🍮 Free Gulab Jamun Sizzler', bonusPts: 0 },
+                  { label: '⭐ +25 Bonus Loyalty Points', bonusPts: 25 },
+                  { label: '10% Off Next Order', bonusPts: 0 },
+                ];
+                const pick = prizes[Math.floor(Math.random() * prizes.length)];
+                const code = `TADKA-${S.sess?.no || 'C1'}-${Math.random()
+                  .toString(36)
+                  .slice(2, 6)
+                  .toUpperCase()}`;
+                updateState((prev) => ({
+                  ...prev,
+                  pts: prev.pts + (pick.bonusPts || 0),
+                  scratchReward: {
+                    label: pick.label,
+                    code,
+                    scratched: true,
+                    bonusPts: pick.bonusPts,
+                  },
+                }));
+                say(`You won: ${pick.label}! 🎉`);
+              }}
+              style={{
+                width: '100%',
+                marginTop: '8px',
+                padding: '22px 14px',
+                borderRadius: '14px',
+                border: '2px dashed #ffb547',
+                background:
+                  'linear-gradient(135deg, rgba(255,181,71,0.28), rgba(255,92,138,0.28))',
+                color: '#fff',
+                font: 'inherit',
+                fontWeight: 800,
+                fontSize: '15px',
+                cursor: 'pointer',
+              }}
+            >
+              ✨ Tap Here to Scratch &amp; Reveal Your Prize ✨
+            </button>
+          )}
+        </div>
+
+        {/* #2 Real Digital GST Receipt */}
+        <div className="card">
+          <div className="row sp">
+            <h3 style={{ margin: 0 }}>🧾 Digital GST Receipt</h3>
+            <span className="tag ok">PAID · {S.pm}</span>
+          </div>
+          <p className="mu" style={{ margin: '4px 0 8px', fontSize: '12px' }}>
+            Counter {S.sess?.no || '—'} · Table {S.activeTable} ·{' '}
+            {S.sess?.mob || 'Guest'}
+          </p>
+          {S.menu
+            .filter((m) => S.cart[m.id])
+            .map((m) => (
+              <div key={m.id} className="line" style={{ fontSize: '13px' }}>
+                <span>
+                  {m.n.en} × {S.cart[m.id]}
+                </span>
+                <span>₹{m.p * S.cart[m.id]}</span>
+              </div>
+            ))}
+          <div className="line mu" style={{ fontSize: '12px', marginTop: '4px' }}>
+            <span>Subtotal</span>
+            <span>₹{s}</span>
+          </div>
+          {disc() > 0 && (
+            <div className="line mu" style={{ fontSize: '12px' }}>
+              <span>Discounts</span>
+              <span>−₹{disc()}</span>
+            </div>
+          )}
+          <div className="line mu" style={{ fontSize: '12px' }}>
+            <span>GST 5%</span>
+            <span>₹{g}</span>
+          </div>
+          <div className="line tot">
+            <span>Total Paid</span>
+            <span>₹{t}</span>
+          </div>
+          {(() => {
+            const buildReceiptText = () => {
+              const lines = S.menu
+                .filter((m) => S.cart[m.id])
+                .map((m) => `• ${m.n.en} × ${S.cart[m.id]} — ₹${m.p * S.cart[m.id]}`)
+                .join('\n');
+              const couponLine = S.scratchReward?.scratched
+                ? `\n🎁 Comeback Coupon: *${S.scratchReward.code}* (${S.scratchReward.label})`
+                : '';
+              return (
+                `🧾 *Tadka Truck — Paid Receipt*\n` +
+                `Counter: ${S.sess?.no || '—'} · Table ${S.activeTable}\n` +
+                `Payment: ${S.pm}\n\n` +
+                `${lines}\n\n` +
+                `Subtotal: ₹${s}\n` +
+                (disc() > 0 ? `Discounts: -₹${disc()}\n` : '') +
+                `GST (5%): ₹${g}\n` +
+                `*Total Paid: ₹${t}*` +
+                `${couponLine}\n\nThank you for dining with us! 🙏`
+              );
+            };
+            return (
+              <div className="row" style={{ gap: '8px', marginTop: '10px' }}>
+                <button
+                  className="btn alt"
+                  style={{ flex: 1, marginTop: 0 }}
+                  onClick={() => {
+                    const msg = buildReceiptText();
+                    const digits = S.sess?.mob
+                      ? S.sess.mob.replace(/\D/g, '')
+                      : '';
+                    const url = digits
+                      ? `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`
+                      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                    say('Opening WhatsApp with your receipt ✅');
+                  }}
+                >
+                  📲 Send Receipt on WhatsApp
+                </button>
+                <button
+                  className="chip"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard?.writeText(buildReceiptText());
+                      say('Receipt copied ✅');
+                    } catch {
+                      say('Use Send Receipt on WhatsApp');
+                    }
+                  }}
+                >
+                  📋 Copy
+                </button>
+              </div>
+            );
+          })()}
+        </div>
+
         {S.wab && !(S.sess && S.sess.mob) && (
           <div className="card">
             <b>Get the final bill on WhatsApp</b>
@@ -1320,6 +1552,65 @@ export function BillTabView() {
             Request waiter to collect ₹{t}
           </button>
         )
+      ) : S.pm === 'UPI' && (S.googleConfig.upiId || '').trim() ? (
+        (() => {
+          const upiId = (S.googleConfig.upiId || '').trim();
+          const upiName =
+            (S.googleConfig.upiName || '').trim() || 'Tadka Truck';
+          const upiNote = `Tadka ${S.sess?.no || 'Order'} T${S.activeTable}`;
+          const upiUri = `upi://pay?pa=${encodeURIComponent(
+            upiId
+          )}&pn=${encodeURIComponent(upiName)}&am=${per}&cu=INR&tn=${encodeURIComponent(
+            upiNote
+          )}`;
+          const upiQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=190x190&data=${encodeURIComponent(
+            upiUri
+          )}`;
+          return (
+            <div className="card" style={{ textAlign: 'center' }}>
+              <h3>💳 Pay ₹{per} via UPI (0% Fee)</h3>
+              <p className="mu" style={{ fontSize: '12px', margin: '4px 0 8px' }}>
+                Scan QR or tap below to pay directly to <b>{upiName}</b> (
+                {upiId})
+              </p>
+              <div
+                style={{
+                  background: '#fff',
+                  display: 'inline-block',
+                  padding: '10px',
+                  borderRadius: '12px',
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={upiQrUrl}
+                  alt="UPI Payment QR"
+                  width={180}
+                  height={180}
+                  style={{ display: 'block' }}
+                />
+              </div>
+              <a
+                href={upiUri}
+                className="btn alt"
+                style={{
+                  display: 'block',
+                  textDecoration: 'none',
+                  marginTop: '10px',
+                }}
+              >
+                📱 Open GPay / PhonePe / Paytm (₹{per})
+              </a>
+              <button
+                className="btn"
+                style={{ marginTop: '8px' }}
+                onClick={() => doPay('UPI', 'app')}
+              >
+                ✅ I have paid ₹{per} via UPI
+              </button>
+            </div>
+          );
+        })()
       ) : (
         <button className="btn" onClick={() => doPay(S.pm, 'app')}>
           Pay ₹{per} with {S.pm}

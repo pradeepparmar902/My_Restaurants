@@ -45,6 +45,8 @@ export function buildSheetRowsForState(
     ['instagramHandle', state.googleConfig?.instagramHandle || '', new Date().toISOString()],
     ['facebookUrl', state.googleConfig?.facebookUrl || '', new Date().toISOString()],
     ['socialTag', state.googleConfig?.socialTag || '', new Date().toISOString()],
+    ['upiId', state.googleConfig?.upiId || '', new Date().toISOString()],
+    ['upiName', state.googleConfig?.upiName || '', new Date().toISOString()],
     ['counter_mode', state.cmode, new Date().toISOString()],
     ['whatsapp_final_bill', state.wab, new Date().toISOString()],
     ['counter_business_date', businessDateToday, new Date().toISOString()],
@@ -652,6 +654,8 @@ export function parseConfigFromSheetRows(
     if (key === 'instagramHandle' && val) cfg.instagramHandle = val;
     if (key === 'facebookUrl' && val) cfg.facebookUrl = val;
     if (key === 'socialTag' && val) cfg.socialTag = val;
+    if (key === 'upiId' && val) cfg.upiId = val;
+    if (key === 'upiName' && val) cfg.upiName = val;
   }
   return Object.keys(cfg).length > 0 ? cfg : null;
 }

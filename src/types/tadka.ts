@@ -144,6 +144,8 @@ export interface GoogleCloudStorageConfig {
   instagramHandle?: string;
   facebookUrl?: string;
   socialTag?: string;
+  upiId?: string;
+  upiName?: string;
   lastSyncedAt?: string;
   lastSyncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
   lastSyncError?: string;
@@ -232,6 +234,12 @@ export interface AppState {
   media: 'snap' | 'reel' | null;
   shared: boolean;
   soc: Record<string, boolean>;
+  scratchReward?: {
+    label: string;
+    code: string;
+    scratched: boolean;
+    bonusPts?: number;
+  } | null;
 
   // Billing & Payments
   billSrc: '' | 'waiter';

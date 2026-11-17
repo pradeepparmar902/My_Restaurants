@@ -1344,7 +1344,10 @@ function CollapsibleSection({
 }
 
 export function OwnerPortalView() {
-  const { S, updateState, say } = useTadka();
+  const { S, sheetOrdersToday, updateState, say } = useTadka();
+  const [offerMsg, setOfferMsg] = useState(
+    '🔥 We miss you at Tadka Truck! Show this WhatsApp message today for 15% OFF your order + a free Gulab Jamun! 🍮'
+  );
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     bills: true,
     counter: false,
@@ -1506,13 +1509,96 @@ export function OwnerPortalView() {
         isOpen={!!openSections.offer}
         onToggle={() => toggleSection('offer')}
       >
-        <p className="mu">Customers who haven’t visited in 30 days</p>
-        <button
-          className="btn"
-          onClick={() => say('Offer sent to 42 customers')}
-        >
-          Send “We miss you” offer
-        </button>
+        {(() => {
+          const customerMobs = Array.from(
+            new Set([
+              ...S.hist.map((h) => h.customerMob).filter(Boolean),
+              ...sheetOrdersToday
+                .map((po) => po.principalMob || po.orderedByMob)
+                .filter(Boolean),
+            ])
+          ).filter(
+            (m): m is string =>
+              typeof m === 'string' && m !== 'Guest' && /^\+?\d{10,15}$/.test(m)
+          );
+
+          return (
+            <>
+              <div className="row" style={{ flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                <button
+                  className="chip"
+                  style={{ fontSize: '11px' }}
+                  onClick={() =>
+                    setOfferMsg(
+                      '🔥 We miss you at Tadka Truck! Show this WhatsApp message today for 15% OFF your order + a free Gulab Jamun! 🍮'
+                    )
+                  }
+                >
+                  🍮 Miss You 15% Off
+                </button>
+                <button
+                  className="chip"
+                  style={{ fontSize: '11px' }}
+                  onClick={() =>
+                    setOfferMsg(
+                      '🎉 Weekend Special at Tadka Truck! Order ₹299+ & get a FREE Mango Masala Cooler 🥤'
+                    )
+                  }
+                >
+                  🥤 Free Cooler Combo
+                </button>
+              </div>
+              <textarea
+                value={offerMsg}
+                onChange={(e) => setOfferMsg(e.target.value)}
+                rows={3}
+                className="inp"
+                style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+              />
+              {customerMobs.length > 0 ? (
+                <div style={{ marginTop: '8px' }}>
+                  <div className="mu" style={{ fontSize: '12px', marginBottom: '6px' }}>
+                    Recent customers ({customerMobs.length}):
+                  </div>
+                  {customerMobs.slice(0, 10).map((m) => (
+                    <div
+                      key={m}
+                      className="row sp"
+                      style={{
+                        padding: '6px 8px',
+                        borderRadius: '8px',
+                        background: 'var(--bg)',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      <span style={{ fontSize: '13px' }}>📱 {m}</span>
+                      <button
+                        className="chip on"
+                        style={{ fontSize: '11px' }}
+                        onClick={() => {
+                          const digits = m.replace(/\D/g, '');
+                          window.open(
+                            `https://wa.me/${digits}?text=${encodeURIComponent(offerMsg)}`,
+                            '_blank',
+                            'noopener,noreferrer'
+                          );
+                          say(`Opening WhatsApp offer for ${m} ✅`);
+                        }}
+                      >
+                        📲 Send WA
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mu" style={{ marginTop: '8px', fontSize: '12px' }}>
+                  Customer mobile numbers from paid bills &amp; orders will appear
+                  here for 1-tap WhatsApp offers.
+                </p>
+              )}
+            </>
+          );
+        })()}
       </CollapsibleSection>
 
       <CollapsibleSection
@@ -1560,6 +1646,10 @@ export function AdminPortalView() {
   const [fbUrlInput, setFbUrlInput] = useState(S.googleConfig.facebookUrl || '');
   const [socTagInput, setSocTagInput] = useState(
     S.googleConfig.socialTag || '#TadkaTruck @tadkatruck'
+  );
+  const [upiIdInput, setUpiIdInput] = useState(S.googleConfig.upiId || '');
+  const [upiNameInput, setUpiNameInput] = useState(
+    S.googleConfig.upiName || 'Tadka Truck'
   );
 
   const [openAdminSections, setOpenAdminSections] = useState<
@@ -2222,6 +2312,30 @@ export function AdminPortalView() {
               style={{ width: '100%' }}
             />
           </div>
+          <div>
+            <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+              💳 Direct UPI ID for 0%-Fee Customer QR Payments
+            </div>
+            <input
+              value={upiIdInput}
+              onChange={(e) => setUpiIdInput(e.target.value)}
+              placeholder="e.g. tadkatruck@okicici"
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+              🏪 UPI Payee Display Name
+            </div>
+            <input
+              value={upiNameInput}
+              onChange={(e) => setUpiNameInput(e.target.value)}
+              placeholder="Tadka Truck"
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
           <button
             className="btn alt"
             onClick={async () => {
@@ -2230,13 +2344,15 @@ export function AdminPortalView() {
                 instagramHandle: igHandleInput.trim(),
                 facebookUrl: fbUrlInput.trim(),
                 socialTag: socTagInput.trim(),
+                upiId: upiIdInput.trim(),
+                upiName: upiNameInput.trim() || 'Tadka Truck',
               };
               saveGoogleConfig(nextSocial);
               await syncToGoogleSheets(nextSocial);
-              say('Social & Google Review links saved & synced ✅');
+              say('Social, Review & UPI settings saved & synced ✅');
             }}
           >
-            Save &amp; Sync Social Links
+            Save &amp; Sync Social &amp; UPI Settings
           </button>
         </div>
       </CollapsibleSection>
