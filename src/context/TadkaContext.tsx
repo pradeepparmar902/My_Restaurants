@@ -154,6 +154,8 @@ export function TadkaProvider({
     return INITIAL_STATE;
   });
   const [sheetOrdersToday, setSheetOrdersToday] = useState<PulledSheetOrder[]>([]);
+  const sheetOrdersTodayRef = useRef<PulledSheetOrder[]>([]);
+  sheetOrdersTodayRef.current = sheetOrdersToday;
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -980,18 +982,14 @@ export function TadkaProvider({
 
   const updateSheetOrderStatus = useCallback(
     (orderId: string, nextStatus: 1 | 2 | 3 | 4 | 5) => {
-      let matchedSheetOrder: PulledSheetOrder | null = null;
-      setSheetOrdersToday((prev) =>
-        prev.map((po) => {
-          if (po.id === orderId) {
-            matchedSheetOrder = { ...po, st: nextStatus };
-            return matchedSheetOrder;
-          }
-          return po;
-        })
-      );
-      if (matchedSheetOrder) {
-        pushUpdatedSheetOrder(matchedSheetOrder);
+      const target = sheetOrdersTodayRef.current.find((po) => po.id === orderId);
+      const updatedTarget = target ? { ...target, st: nextStatus } : null;
+      if (updatedTarget) {
+        sheetOrdersTodayRef.current = sheetOrdersTodayRef.current.map((po) =>
+          po.id === orderId ? updatedTarget : po
+        );
+        setSheetOrdersToday(sheetOrdersTodayRef.current);
+        pushUpdatedSheetOrder(updatedTarget);
       }
       updateState((prev) => {
         const idx = prev.orders.findIndex((o) => o.id === orderId);
@@ -1020,18 +1018,14 @@ export function TadkaProvider({
 
   const toggleSheetOrderRush = useCallback(
     (orderId: string) => {
-      let matchedSheetOrder: PulledSheetOrder | null = null;
-      setSheetOrdersToday((prev) =>
-        prev.map((po) => {
-          if (po.id === orderId) {
-            matchedSheetOrder = { ...po, rush: !po.rush };
-            return matchedSheetOrder;
-          }
-          return po;
-        })
-      );
-      if (matchedSheetOrder) {
-        pushUpdatedSheetOrder(matchedSheetOrder);
+      const target = sheetOrdersTodayRef.current.find((po) => po.id === orderId);
+      const updatedTarget = target ? { ...target, rush: !target.rush } : null;
+      if (updatedTarget) {
+        sheetOrdersTodayRef.current = sheetOrdersTodayRef.current.map((po) =>
+          po.id === orderId ? updatedTarget : po
+        );
+        setSheetOrdersToday(sheetOrdersTodayRef.current);
+        pushUpdatedSheetOrder(updatedTarget);
       }
       updateState((prev) => {
         const idx = prev.orders.findIndex((o) => o.id === orderId);
