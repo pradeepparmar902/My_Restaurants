@@ -348,6 +348,10 @@ export function ShareMomentCard() {
       canShare?: (data: ShareData) => boolean;
     };
 
+    const sharePageUrl =
+      (S.googleConfig.facebookUrl || '').trim() ||
+      (typeof window !== 'undefined' ? window.location.origin + window.location.pathname : 'https://pradeepparmar902.github.io/My_Restaurants/');
+
     if (selectedFile && typeof nav.share === 'function') {
       try {
         if (!nav.canShare || nav.canShare({ files: [selectedFile] })) {
@@ -376,10 +380,9 @@ export function ShareMomentCard() {
         : platform === 'WhatsApp Status'
           ? `https://wa.me/?text=${encodeURIComponent(shareText)}`
           : platform === 'Facebook'
-            ? (S.googleConfig.facebookUrl || '').trim() ||
-              `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(
-                shareText
-              )}`
+            ? `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                sharePageUrl
+              )}&quote=${encodeURIComponent(shareText)}`
             : 'https://www.snapchat.com/';
 
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
@@ -531,16 +534,20 @@ export function ReviewAndShareCard() {
     } catch {
       // ignore
     }
+    const sharePageUrl =
+      (S.googleConfig.facebookUrl || '').trim() ||
+      (typeof window !== 'undefined'
+        ? window.location.origin + window.location.pathname
+        : 'https://pradeepparmar902.github.io/My_Restaurants/');
     const targetUrl =
       p === 'Instagram'
         ? buildInstagramUrl(S.googleConfig.instagramHandle)
         : p === 'WhatsApp Status'
           ? `https://wa.me/?text=${encodeURIComponent(shareText)}`
           : p === 'Facebook'
-            ? (S.googleConfig.facebookUrl || '').trim() ||
-              `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(
-                shareText
-              )}`
+            ? `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                sharePageUrl
+              )}&quote=${encodeURIComponent(shareText)}`
             : 'https://www.snapchat.com/';
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
     updateState((prev) => ({
