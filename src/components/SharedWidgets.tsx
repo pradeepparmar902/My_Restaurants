@@ -292,14 +292,47 @@ export function ConnectedAccountsCard() {
 
 export function ShareMomentCard() {
   const { S, updateState, say, uploadMediaToDrive } = useTadka();
-  const platforms = ['Instagram', 'WhatsApp Status', 'Snapchat', 'Facebook'];
+  const platforms = ['WhatsApp Status', 'Facebook', 'Instagram', 'Snapchat'];
   const snapInputRef = useRef<HTMLInputElement | null>(null);
   const reelInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
-  const [caption, setCaption] = useState('');
-
   const defaultTag = S.googleConfig.socialTag || '#TadkaTruck @tadkatruck';
+
+  const postTemplates: { id: string; label: string; text: string }[] = [
+    {
+      id: 'foodie',
+      label: '🔥 Foodie Vibe',
+      text: `Fresh off the grill at Tadka Truck! 🌯🍔 Crazy good flavors & fast QR ordering 😋🔥`,
+    },
+    {
+      id: 'fiveStar',
+      label: '⭐ 5-Star Spot',
+      text: `Found my new favorite street-food spot — Tadka Truck! 🚚✨ Must try if you're nearby 💯`,
+    },
+    {
+      id: 'squad',
+      label: '👥 Squad Hangout',
+      text: `Good food + great company at Tadka Truck! 🥳🍽️ Come hungry!`,
+    },
+    {
+      id: 'custom',
+      label: '✏️ Write Custom',
+      text: '',
+    },
+  ];
+
+  const [selectedTemplateId, setSelectedTemplateId] = useState('foodie');
+  const [caption, setCaption] = useState(postTemplates[0].text);
+
+  const buildFullPostText = () => {
+    const body = caption.trim() || postTemplates[0].text;
+    const url =
+      typeof window !== 'undefined'
+        ? window.location.origin + window.location.pathname
+        : 'https://pradeepparmar902.github.io/My_Restaurants/';
+    return `${body}\n${defaultTag}\n👉 ${url}`;
+  };
 
   const handleFilePicked = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -335,9 +368,7 @@ export function ShareMomentCard() {
   };
 
   const handleShareToPlatform = async (platform: string) => {
-    const shareText = `${
-      caption.trim() || 'Great food at Tadka Truck!'
-    } ${defaultTag}`;
+    const shareText = buildFullPostText();
     try {
       await navigator.clipboard?.writeText(shareText);
     } catch {
@@ -350,7 +381,9 @@ export function ShareMomentCard() {
 
     const sharePageUrl =
       (S.googleConfig.facebookUrl || '').trim() ||
-      (typeof window !== 'undefined' ? window.location.origin + window.location.pathname : 'https://pradeepparmar902.github.io/My_Restaurants/');
+      (typeof window !== 'undefined'
+        ? window.location.origin + window.location.pathname
+        : 'https://pradeepparmar902.github.io/My_Restaurants/');
 
     if (selectedFile && typeof nav.share === 'function') {
       try {
@@ -392,15 +425,26 @@ export function ShareMomentCard() {
       pts: !prev.shared ? prev.pts + 10 : prev.pts,
       shared: true,
     }));
-    say(`Tag copied! Opening ${platform} (+10 pts) 🎉`);
+    say(`Post copied! Opening ${platform} (+10 pts) 🎉`);
+  };
+
+  const handleCopyPost = async () => {
+    const text = buildFullPostText();
+    try {
+      await navigator.clipboard?.writeText(text);
+      say('Post text copied! Paste on FB / WhatsApp Status ✅');
+    } catch {
+      say('Select & copy the text above');
+    }
   };
 
   return (
     <div className="card">
-      <h3>📸 Share your moment</h3>
+      <h3>📸 Create Post &amp; Share</h3>
       <p className="mu">
-        Take a photo or record a reel from your phone, tag{' '}
-        <b>{defaultTag}</b>, and earn <b>10 bonus points</b>.
+        Pick a ready-made post or write your own, optionally attach a
+        photo/reel, and share to <b>Facebook / WhatsApp Status</b> for{' '}
+        <b>+10 bonus points</b>.
       </p>
 
       <input
@@ -420,8 +464,52 @@ export function ShareMomentCard() {
         onChange={(e) => handleFilePicked(e, 'reel')}
       />
 
+      {/* Post Templates */}
+      <div
+        className="row"
+        style={{ flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}
+      >
+        {postTemplates.map((tpl) => (
+          <button
+            key={tpl.id}
+            type="button"
+            className={`chip ${selectedTemplateId === tpl.id ? 'on' : ''}`}
+            style={{ fontSize: '12px' }}
+            onClick={() => {
+              setSelectedTemplateId(tpl.id);
+              if (tpl.id !== 'custom') setCaption(tpl.text);
+              else setCaption('');
+            }}
+          >
+            {tpl.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Editable Post Textarea */}
+      <textarea
+        value={caption}
+        onChange={(e) => {
+          setCaption(e.target.value);
+          setSelectedTemplateId('custom');
+        }}
+        rows={3}
+        placeholder={`Write your Facebook / WhatsApp Status post here…`}
+        className="inp"
+        style={{
+          width: '100%',
+          marginTop: '8px',
+          resize: 'vertical',
+          fontFamily: 'inherit',
+        }}
+      />
+      <div className="mu" style={{ fontSize: '11px', marginTop: '4px' }}>
+        Auto-includes: <b>{defaultTag}</b>
+      </div>
+
+      {/* Optional Photo / Video Attachment */}
       {S.media ? (
-        <>
+        <div style={{ marginTop: '8px' }}>
           {previewUrl &&
             (S.media === 'reel' ? (
               <video
@@ -431,7 +519,6 @@ export function ShareMomentCard() {
                   width: '100%',
                   maxHeight: '220px',
                   borderRadius: '10px',
-                  marginTop: '8px',
                 }}
               />
             ) : (
@@ -444,71 +531,72 @@ export function ShareMomentCard() {
                   maxHeight: '220px',
                   objectFit: 'cover',
                   borderRadius: '10px',
-                  marginTop: '8px',
                 }}
               />
             ))}
-          <p style={{ margin: '8px 0 4px', fontSize: '13px' }}>
-            ✅ {S.media === 'reel' ? 'Reel' : 'Snap'} saved to Google Drive. Tap
-            a platform to share:
-          </p>
-          <input
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder={`Add caption (${defaultTag})`}
-            className="inp"
-            style={{ width: '100%', marginBottom: '8px' }}
-          />
-          <div className="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
-            {selectedFile && (
-              <button
-                className="btn alt"
-                style={{ width: '100%', marginTop: 0, marginBottom: '4px' }}
-                onClick={() => handleShareToPlatform('Social App')}
-              >
-                📲 Share Photo/Reel to Any App (FB / IG / WA)
-              </button>
-            )}
-            {platforms.map((p) => (
-              <button
-                key={p}
-                className={`chip ${S.soc[p] ? 'on' : ''}`}
-                onClick={() => handleShareToPlatform(p)}
-              >
-                📲 Share to {p}
-              </button>
-            ))}
+          <div className="row sp" style={{ marginTop: '6px' }}>
+            <span style={{ fontSize: '12px' }}>
+              ✅ {S.media === 'reel' ? 'Reel' : 'Snap'} saved to Google Drive
+            </span>
+            <button
+              className="chip"
+              style={{ fontSize: '11px' }}
+              onClick={() => {
+                setSelectedFile(null);
+                setPreviewUrl('');
+                updateState((prev) => ({ ...prev, media: null }));
+              }}
+            >
+              🔄 Change Media
+            </button>
           </div>
-          <button
-            className="btn ghost"
-            style={{ marginTop: '8px' }}
-            onClick={() => {
-              setSelectedFile(null);
-              setPreviewUrl('');
-              updateState((prev) => ({ ...prev, media: null }));
-            }}
-          >
-            🔄 Upload another snap / reel
-          </button>
-        </>
+        </div>
       ) : (
         <div className="row" style={{ gap: '8px', marginTop: '8px' }}>
           <button
-            className="btn alt"
+            className="btn ghost"
             style={{ flex: 1, marginTop: 0 }}
             onClick={() => snapInputRef.current?.click()}
           >
-            📸 Take / Upload Snap
+            📸 Attach Snap
           </button>
           <button
-            className="btn alt"
+            className="btn ghost"
             style={{ flex: 1, marginTop: 0 }}
             onClick={() => reelInputRef.current?.click()}
           >
-            🎬 Record / Upload Reel
+            🎬 Attach Reel
           </button>
         </div>
       )}
+
+      {/* Share & Copy Actions */}
+      <div
+        className="row"
+        style={{ flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}
+      >
+        {selectedFile && (
+          <button
+            className="btn alt"
+            style={{ width: '100%', marginTop: 0, marginBottom: '2px' }}
+            onClick={() => handleShareToPlatform('Social App')}
+          >
+            📲 Share Photo/Reel to Any App (FB / IG / WA)
+          </button>
+        )}
+        {platforms.map((p) => (
+          <button
+            key={p}
+            className={`chip ${S.soc[p] ? 'on' : ''}`}
+            onClick={() => handleShareToPlatform(p)}
+          >
+            📲 {p}
+          </button>
+        ))}
+        <button className="chip" onClick={handleCopyPost}>
+          📋 Copy Post
+        </button>
+      </div>
     </div>
   );
 }
