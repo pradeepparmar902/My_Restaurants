@@ -207,6 +207,7 @@ export function WaiterPortalView() {
     updateSheetOrderStatus,
     pullFromGoogleSheets,
     setWTab,
+    setActiveTable,
     assignNo,
     setNo,
     changeWaiterDraftQty,
@@ -215,6 +216,7 @@ export function WaiterPortalView() {
   } = useTadka();
   const [wnoInput, setWnoInput] = useState('');
   const [wmobInput, setWmobInput] = useState('');
+  const [forceNewCounter, setForceNewCounter] = useState(false);
   const pullRef = useRef(pullFromGoogleSheets);
   pullRef.current = pullFromGoogleSheets;
 
@@ -370,9 +372,46 @@ export function WaiterPortalView() {
         <div className="card">
           <h3>📝 Book order for Table {S.activeTable}</h3>
           <p className="mu">
-            Take the order for the customer. It goes to the kitchen and joins
-            their session.
+            Select a table &amp; take the order. Booking a different table or
+            tapping &ldquo;New Counter&rdquo; automatically creates a new
+            counter.
           </p>
+          <div
+            className="row"
+            style={{ flexWrap: 'wrap', gap: '6px', margin: '8px 0 10px' }}
+          >
+            {S.tables.map((t) => (
+              <button
+                key={t.id}
+                className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
+                style={{ fontSize: '12px' }}
+                onClick={() => {
+                  setActiveTable(t.id);
+                  setForceNewCounter(false);
+                }}
+              >
+                🪑 {t.label || `Table ${t.id}`}
+              </button>
+            ))}
+          </div>
+          {S.sess && !S.paid && S.sess.table === S.activeTable && (
+            <div className="row" style={{ gap: '6px', marginBottom: '8px' }}>
+              <button
+                className={`chip ${!forceNewCounter ? 'on' : ''}`}
+                style={{ flex: 1, fontSize: '12px' }}
+                onClick={() => setForceNewCounter(false)}
+              >
+                ➕ Add to {S.sess.no}
+              </button>
+              <button
+                className={`chip ${forceNewCounter ? 'on' : ''}`}
+                style={{ flex: 1, fontSize: '12px' }}
+                onClick={() => setForceNewCounter(true)}
+              >
+                🆕 New Counter / Group
+              </button>
+            </div>
+          )}
 
           {S.menu
             .filter((m) => m.available)
@@ -477,9 +516,10 @@ export function WaiterPortalView() {
             className="btn"
             disabled={waiterItemCount === 0}
             onClick={() => {
-              bookWaiter(wmobInput, wnoInput);
+              bookWaiter(wmobInput, wnoInput, forceNewCounter);
               setWmobInput('');
               setWnoInput('');
+              setForceNewCounter(false);
             }}
           >
             Book order · ₹{waiterDraftTotal}

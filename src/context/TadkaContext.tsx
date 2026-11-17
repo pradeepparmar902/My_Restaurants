@@ -87,7 +87,11 @@ interface TadkaContextValue {
 
   // Waiter booking
   changeWaiterDraftQty: (dishId: number, delta: number) => void;
-  bookWaiter: (rawMob: string, rawCounterNo: string) => void;
+  bookWaiter: (
+    rawMob: string,
+    rawCounterNo: string,
+    forceNewCounter?: boolean
+  ) => void;
 
   // Billing & Payments
   pushWaiter: (rawMob?: string) => void;
@@ -1126,7 +1130,7 @@ export function TadkaProvider({
   );
 
   const bookWaiter = useCallback(
-    (rawMob: string, rawCounterNo: string) => {
+    (rawMob: string, rawCounterNo: string, forceNewCounter?: boolean) => {
       const mv = normalizeMobile(rawMob, S.cc);
       if (mv === null) {
         say('Enter a valid 10-digit mobile number');
@@ -1144,7 +1148,7 @@ export function TadkaProvider({
           ? []
           : [...(prev.usedCountersToday || [])];
 
-        // Also scan all known open sessions & today's history so no counter number can EVER collide
+        // Also scan all known open sessions, today's history & live sheet orders so no counter number can EVER collide
         Object.values(prev.sessionsByUser || {}).forEach((snap) => {
           if (snap.sess?.no && snap.sess.no !== 'Pending') {
             if (!usedToday.includes(snap.sess.no)) usedToday.push(snap.sess.no);
@@ -1159,15 +1163,36 @@ export function TadkaProvider({
             if (m && Number(m[1]) >= nextCtr) nextCtr = Number(m[1]) + 1;
           }
         });
+        sheetOrdersTodayRef.current.forEach((po) => {
+          if (po.counterNo && po.counterNo !== 'Pending') {
+            if (!usedToday.includes(po.counterNo)) usedToday.push(po.counterNo);
+            const m = po.counterNo.match(/^C(\d+)$/i);
+            if (m && Number(m[1]) >= nextCtr) nextCtr = Number(m[1]) + 1;
+          }
+        });
 
         let nextSess = prev.sess;
         const isDifferentCustomer = Boolean(
           mv && nextSess?.mob && mv !== nextSess.mob
         );
+        const isDifferentTable = Boolean(
+          nextSess && nextSess.table !== prev.activeTable
+        );
+        const updatedSessionsByUser = { ...(prev.sessionsByUser || {}) };
+
         if (
           nextSess &&
-          (prev.paid || nextSess.status === 'paid' || isDifferentCustomer)
+          (prev.paid ||
+            nextSess.status === 'paid' ||
+            isDifferentCustomer ||
+            isDifferentTable ||
+            forceNewCounter)
         ) {
+          // Preserve the previous open session under its mobile or session id before opening a new table/group counter
+          if (!prev.paid && nextSess.status !== 'paid') {
+            const saveKey = nextSess.mob || nextSess.id;
+            updatedSessionsByUser[saveKey] = extractUserSessionSnapshot(prev);
+          }
           nextSess = null;
         }
         const isStartingNewSess = !nextSess;
@@ -1282,6 +1307,7 @@ export function TadkaProvider({
           counterBusinessDate: todayBizDate,
           usedCountersToday: usedToday,
           dailyOrderHistory: nextHistory,
+          sessionsByUser: updatedSessionsByUser,
           sess: nextSess,
           cart: nextCart,
           orders: [...baseOrders, newOrder],
