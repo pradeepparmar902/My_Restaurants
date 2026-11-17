@@ -257,15 +257,28 @@ export function OrderTabView() {
   const [inviteMob, setInviteMob] = useState('');
   const stepIcons = ['📥', '🍳', '🛎️', '✅'];
   const hasInvitedMobs = (S.sess?.invitedMobs || []).length > 0;
+  const hasPendingKitchenOrder = S.orders.some((o) => o.st < 4);
 
   useEffect(() => {
-    if (!S.sess || S.paid || S.sess.status === 'paid' || !hasInvitedMobs) return;
+    if (
+      !S.sess ||
+      S.paid ||
+      S.sess.status === 'paid' ||
+      (!hasInvitedMobs && !hasPendingKitchenOrder)
+    )
+      return;
     pullFromGoogleSheets(undefined, true);
     const id = setInterval(() => {
       pullFromGoogleSheets(undefined, true);
     }, 10000);
     return () => clearInterval(id);
-  }, [S.sess, S.paid, hasInvitedMobs, pullFromGoogleSheets]);
+  }, [
+    S.sess,
+    S.paid,
+    hasInvitedMobs,
+    hasPendingKitchenOrder,
+    pullFromGoogleSheets,
+  ]);
 
   if (!S.sess) {
     return (

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import { StaffRoleName } from '@/types/tadka';
 import { ROLE_DESCRIPTIONS } from '@/lib/constants';
@@ -18,13 +18,76 @@ import {
 import { GoogleStorageAdminCard } from '@/components/GoogleStoragePanel';
 
 export function ChefPortalView() {
-  const { S, advanceOrderStatus, toggleOrderRush, toggleDishStock, staffOf, say } =
-    useTadka();
+  const {
+    S,
+    sheetOrdersToday,
+    updateSheetOrderStatus,
+    toggleSheetOrderRush,
+    pullFromGoogleSheets,
+    toggleDishStock,
+    staffOf,
+    say,
+  } = useTadka();
 
-  const q = S.orders
-    .map((o, i) => ({ o, i }))
-    .filter((x) => x.o.st < 3)
-    .sort((a, b) => (b.o.rush ? 1 : 0) - (a.o.rush ? 1 : 0));
+  useEffect(() => {
+    pullFromGoogleSheets(undefined, true);
+    const id = setInterval(() => {
+      pullFromGoogleSheets(undefined, true);
+    }, 8000);
+    return () => clearInterval(id);
+  }, [pullFromGoogleSheets]);
+
+  // Combine live Google Sheet orders for today + any local S.orders not yet synced
+  const combinedQueue = (() => {
+    const map = new Map<
+      string,
+      {
+        id: string;
+        counterNo: string;
+        table: number;
+        round: number;
+        mob: string;
+        it: Record<number, number>;
+        st: 1 | 2 | 3 | 4 | 5;
+        vip: boolean;
+        rush: boolean;
+      }
+    >();
+
+    sheetOrdersToday.forEach((po) => {
+      map.set(po.id, {
+        id: po.id,
+        counterNo: po.counterNo || 'Pending',
+        table: po.table || 1,
+        round: po.round || 1,
+        mob: po.orderedByMob || po.principalMob || 'Guest',
+        it: po.it,
+        st: po.st,
+        vip: po.vip,
+        rush: po.rush,
+      });
+    });
+
+    S.orders.forEach((o) => {
+      if (!map.has(o.id)) {
+        map.set(o.id, {
+          id: o.id,
+          counterNo: S.sess?.no || 'Pending',
+          table: S.activeTable,
+          round: o.k,
+          mob: o.orderedByMob || S.sess?.mob || 'Guest',
+          it: o.it,
+          st: o.st,
+          vip: Boolean(o.vip),
+          rush: Boolean(o.rush),
+        });
+      }
+    });
+
+    return Array.from(map.values())
+      .filter((x) => x.st < 3)
+      .sort((a, b) => (b.rush ? 1 : 0) - (a.rush ? 1 : 0));
+  })();
 
   const currentStaff = staffOf();
   const canCancel =
@@ -36,19 +99,28 @@ export function ChefPortalView() {
         className="hero"
         style={{ background: 'linear-gradient(135deg,#ffb547,#ff8a4c)' }}
       >
-        <h1>Kitchen queue</h1>
+        <div className="row sp">
+          <h1 style={{ margin: 0 }}>Kitchen queue</h1>
+          <button
+            className="chip"
+            style={{ background: 'rgba(0,0,0,0.22)', color: '#fff' }}
+            onClick={() => pullFromGoogleSheets()}
+          >
+            🔄 Refresh
+          </button>
+        </div>
         <p>
-          {q.length
-            ? `${q.length} order(s) to cook`
-            : 'All clear. Place an order on the Customer tab.'}
+          {combinedQueue.length
+            ? `${combinedQueue.length} order(s) to cook across all tables`
+            : 'All clear. New customer orders appear here automatically.'}
         </p>
       </div>
 
-      {q.map(({ o, i }) => (
-        <div key={o.id || i} className="card">
+      {combinedQueue.map((o) => (
+        <div key={o.id} className="card">
           <div className="row sp">
             <h3>
-              {S.sess?.no || 'Pending'} · Table {S.activeTable}
+              {o.counterNo} · Table {o.table}
             </h3>
             <span className="row">
               {o.vip && <span className="tag vip">VIP</span>}
@@ -56,8 +128,11 @@ export function ChefPortalView() {
               <span className="tag">{o.st === 1 ? 'NEW' : 'COOKING'}</span>
             </span>
           </div>
+          <p className="mu" style={{ margin: '4px 0', fontSize: '12px' }}>
+            📱 {o.mob} · Round {o.round}
+          </p>
           <p className="mu" style={{ margin: '6px 0' }}>
-            Order {o.k}:{' '}
+            Order {o.round}:{' '}
             {S.menu
               .filter((m) => o.it[m.id])
               .map((m) => `${o.it[m.id]}× ${m.n.en}`)
@@ -66,21 +141,27 @@ export function ChefPortalView() {
           {o.st === 1 ? (
             <button
               className="btn"
-              onClick={() => advanceOrderStatus(i, 2)}
+              onClick={() => {
+                updateSheetOrderStatus(o.id, 2);
+                say(`${o.counterNo} Order ${o.round} -> Cooking 🍳`);
+              }}
             >
               Start cooking
             </button>
           ) : (
             <button
               className="btn alt"
-              onClick={() => advanceOrderStatus(i, 3)}
+              onClick={() => {
+                updateSheetOrderStatus(o.id, 3);
+                say(`${o.counterNo} Order ${o.round} -> Ready for waiter 🛎️`);
+              }}
             >
               Mark ready for waiter
             </button>
           )}
           <button
             className="btn ghost"
-            onClick={() => toggleOrderRush(i)}
+            onClick={() => toggleSheetOrderRush(o.id)}
           >
             {o.rush ? 'Remove priority' : '⚡ Rush this order'}
           </button>
@@ -89,8 +170,8 @@ export function ChefPortalView() {
               className="btn ghost"
               style={{ marginTop: '6px', color: '#f87171' }}
               onClick={() => {
-                advanceOrderStatus(i, 5);
-                say(`Order ${o.k} cancelled`);
+                updateSheetOrderStatus(o.id, 5);
+                say(`Order ${o.round} cancelled`);
               }}
             >
               ✕ Cancel order
@@ -120,20 +201,64 @@ export function ChefPortalView() {
 export function WaiterPortalView() {
   const {
     S,
+    sheetOrdersToday,
+    updateSheetOrderStatus,
+    pullFromGoogleSheets,
     setWTab,
     assignNo,
     setNo,
-    advanceOrderStatus,
     changeWaiterDraftQty,
     bookWaiter,
+    say,
   } = useTadka();
   const [wnoInput, setWnoInput] = useState('');
   const [wmobInput, setWmobInput] = useState('');
 
-  const readyCount = S.orders.filter((o) => o.st === 3).length;
-  const readyList = S.orders
-    .map((o, i) => ({ o, i }))
-    .filter((x) => x.o.st === 3);
+  useEffect(() => {
+    pullFromGoogleSheets(undefined, true);
+    const id = setInterval(() => {
+      pullFromGoogleSheets(undefined, true);
+    }, 8000);
+    return () => clearInterval(id);
+  }, [pullFromGoogleSheets]);
+
+  const readyList = (() => {
+    const map = new Map<
+      string,
+      {
+        id: string;
+        counterNo: string;
+        table: number;
+        round: number;
+        it: Record<number, number>;
+        st: 1 | 2 | 3 | 4 | 5;
+      }
+    >();
+    sheetOrdersToday.forEach((po) => {
+      map.set(po.id, {
+        id: po.id,
+        counterNo: po.counterNo || 'Pending',
+        table: po.table || 1,
+        round: po.round || 1,
+        it: po.it,
+        st: po.st,
+      });
+    });
+    S.orders.forEach((o) => {
+      if (!map.has(o.id)) {
+        map.set(o.id, {
+          id: o.id,
+          counterNo: S.sess?.no || 'Pending',
+          table: S.activeTable,
+          round: o.k,
+          it: o.it,
+          st: o.st,
+        });
+      }
+    });
+    return Array.from(map.values()).filter((x) => x.st === 3);
+  })();
+  const readyCount = readyList.length;
 
   const waiterItemCount = Object.values(S.WD).reduce((a, b) => a + b, 0);
   const waiterDraftTotal = S.menu.reduce(
@@ -187,34 +312,40 @@ export function WaiterPortalView() {
             </div>
           )}
 
-          {readyList.map(({ o, i }) => (
-            <div key={o.id || i} className="card">
-              <div className="row sp">
-                <h2>{S.sess?.no}</h2>
-                <span className="tag">Table {S.activeTable}</span>
+          {readyList.map((o) => {
+            const isPend = o.counterNo === 'Pending';
+            return (
+              <div key={o.id} className="card">
+                <div className="row sp">
+                  <h2>{o.counterNo}</h2>
+                  <span className="tag">Table {o.table}</span>
+                </div>
+                <p className="mu" style={{ margin: '6px 0' }}>
+                  Order {o.round}:{' '}
+                  {S.menu
+                    .filter((m) => o.it[m.id])
+                    .map((m) => `${o.it[m.id]}× ${m.n.en}`)
+                    .join(', ')}
+                </p>
+                <p className="mu">
+                  Match this counter number with the customer’s phone before
+                  serving.
+                </p>
+                <button
+                  className="btn alt"
+                  disabled={isPend}
+                  onClick={() => {
+                    updateSheetOrderStatus(o.id, 4);
+                    say(`${o.counterNo} Order ${o.round} delivered ✅`);
+                  }}
+                >
+                  {isPend
+                    ? 'Set counter number first'
+                    : `Mark delivered to ${o.counterNo}`}
+                </button>
               </div>
-              <p className="mu" style={{ margin: '6px 0' }}>
-                Order {o.k}:{' '}
-                {S.menu
-                  .filter((m) => o.it[m.id])
-                  .map((m) => `${o.it[m.id]}× ${m.n.en}`)
-                  .join(', ')}
-              </p>
-              <p className="mu">
-                Match this counter number with the customer’s phone before
-                serving.
-              </p>
-              <button
-                className="btn alt"
-                disabled={!!S.sess?.pend}
-                onClick={() => advanceOrderStatus(i, 4)}
-              >
-                {S.sess?.pend
-                  ? 'Set counter number first'
-                  : `Mark delivered to ${S.sess?.no}`}
-              </button>
-            </div>
-          ))}
+            );
+          })}
 
           <h3 style={{ marginTop: '14px' }}>Open counters</h3>
           {S.sess ? (

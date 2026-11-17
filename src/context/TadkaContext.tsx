@@ -32,6 +32,7 @@ import {
 } from '@/lib/helpers';
 import {
   buildSheetRowsForState,
+  buildSingleOrderSheetRows,
   extractSpreadsheetIdFromUrl,
   parseConfigFromSheetRows,
   parseCsvToRows,
@@ -40,6 +41,7 @@ import {
   parseMenuFromSheetRows,
   parseOrdersFromSheetRows,
   parseStaffFromSheetRows,
+  PulledSheetOrder,
 } from '@/lib/googleSheetsShared';
 
 interface TadkaContextValue {
@@ -115,6 +117,9 @@ interface TadkaContextValue {
   resetDemoState: () => void;
 
   // Google Sheets & Google Drive Storage
+  sheetOrdersToday: PulledSheetOrder[];
+  updateSheetOrderStatus: (orderId: string, nextStatus: 1 | 2 | 3 | 4 | 5) => void;
+  toggleSheetOrderRush: (orderId: string) => void;
   syncToGoogleSheets: (overrideConfig?: Partial<AppState['googleConfig']>) => Promise<void>;
   pullFromGoogleSheets: (
     overrideConfig?: Partial<AppState['googleConfig']>,
@@ -148,6 +153,7 @@ export function TadkaProvider({
     }
     return INITIAL_STATE;
   });
+  const [sheetOrdersToday, setSheetOrdersToday] = useState<PulledSheetOrder[]>([]);
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -946,6 +952,99 @@ export function TadkaProvider({
       });
     },
     [updateState]
+  );
+
+  const pushUpdatedSheetOrder = useCallback(
+    (updatedOrder: PulledSheetOrder) => {
+      const webhookUrl = (S.googleConfig.appsScriptWebAppUrl || '').trim();
+      if (!webhookUrl.startsWith('https://script.google.com/')) return;
+      fetch(webhookUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'SYNC_ALL_SHEETS',
+          spreadsheetId: S.googleConfig.spreadsheetId,
+          driveFolderId: S.googleConfig.driveFolderId,
+          sheets: { Orders: buildSingleOrderSheetRows(updatedOrder) },
+          timestamp: new Date().toISOString(),
+        }),
+      }).catch(() => {});
+    },
+    [
+      S.googleConfig.appsScriptWebAppUrl,
+      S.googleConfig.driveFolderId,
+      S.googleConfig.spreadsheetId,
+    ]
+  );
+
+  const updateSheetOrderStatus = useCallback(
+    (orderId: string, nextStatus: 1 | 2 | 3 | 4 | 5) => {
+      let matchedSheetOrder: PulledSheetOrder | null = null;
+      setSheetOrdersToday((prev) =>
+        prev.map((po) => {
+          if (po.id === orderId) {
+            matchedSheetOrder = { ...po, st: nextStatus };
+            return matchedSheetOrder;
+          }
+          return po;
+        })
+      );
+      if (matchedSheetOrder) {
+        pushUpdatedSheetOrder(matchedSheetOrder);
+      }
+      updateState((prev) => {
+        const idx = prev.orders.findIndex((o) => o.id === orderId);
+        const nextOrders =
+          idx >= 0
+            ? prev.orders.map((o, i) => (i === idx ? { ...o, st: nextStatus } : o))
+            : prev.orders;
+        const nextHistory = (prev.dailyOrderHistory || []).map((h) =>
+          h.id === orderId
+            ? {
+                ...h,
+                orderStatus: ORDER_STATUS_LABELS[nextStatus] || String(nextStatus),
+              }
+            : h
+        );
+        return {
+          ...prev,
+          orders: nextOrders,
+          dailyOrderHistory: nextHistory,
+          status: idx >= 0 ? nextStatus : prev.status,
+        };
+      });
+    },
+    [pushUpdatedSheetOrder, updateState]
+  );
+
+  const toggleSheetOrderRush = useCallback(
+    (orderId: string) => {
+      let matchedSheetOrder: PulledSheetOrder | null = null;
+      setSheetOrdersToday((prev) =>
+        prev.map((po) => {
+          if (po.id === orderId) {
+            matchedSheetOrder = { ...po, rush: !po.rush };
+            return matchedSheetOrder;
+          }
+          return po;
+        })
+      );
+      if (matchedSheetOrder) {
+        pushUpdatedSheetOrder(matchedSheetOrder);
+      }
+      updateState((prev) => {
+        const idx = prev.orders.findIndex((o) => o.id === orderId);
+        if (idx < 0) return prev;
+        return {
+          ...prev,
+          orders: prev.orders.map((o, i) =>
+            i === idx ? { ...o, rush: !o.rush } : o
+          ),
+        };
+      });
+    },
+    [pushUpdatedSheetOrder, updateState]
   );
 
   const toggleDishStock = useCallback(
@@ -2038,6 +2137,15 @@ export function TadkaProvider({
         pulledCounters ||
         (pulledOrderRows && pulledOrderRows.length > 1)
       ) {
+        const todayBizDateOuter = getCurrentBusinessDate();
+        if (pulledOrderRows && pulledOrderRows.length > 1) {
+          const menuForParse =
+            pulledMenu && pulledMenu.length > 0 ? pulledMenu : S.menu;
+          const allParsed = parseOrdersFromSheetRows(pulledOrderRows, menuForParse);
+          setSheetOrdersToday(
+            allParsed.filter((po) => po.businessDate === todayBizDateOuter)
+          );
+        }
         setS((prev) => {
           const todayBizDate = getCurrentBusinessDate();
           const effectiveMenu =
@@ -2319,6 +2427,9 @@ export function TadkaProvider({
         regenerateTableQr,
         setActiveTable,
         resetDemoState,
+        sheetOrdersToday,
+        updateSheetOrderStatus,
+        toggleSheetOrderRush,
         syncToGoogleSheets,
         pullFromGoogleSheets,
         uploadMediaToDrive,

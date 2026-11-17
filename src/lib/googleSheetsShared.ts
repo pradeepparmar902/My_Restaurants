@@ -733,18 +733,71 @@ export function parseDailyCountersAndStateFromSheets(
 export interface PulledSheetOrder {
   id: string;
   businessDate: string;
+  dateFormatted: string;
+  timeFormatted: string;
   counterNo: string;
   table: number;
   round: number;
   src: 'app' | 'waiter';
+  orderSourceRaw: string;
+  customerMobRaw: string;
   principalMob: string;
   orderedByMob: string;
+  itemsRaw: string;
+  totalQty: number;
+  amountInr: number;
   it: Record<number, number>;
   prices: Record<number, number>;
   st: 1 | 2 | 3 | 4 | 5;
   billStatus: string;
+  paymentMethod: string;
   vip: boolean;
   rush: boolean;
+}
+
+export function buildSingleOrderSheetRows(
+  o: PulledSheetOrder
+): (string | number | boolean)[][] {
+  return [
+    [
+      'Business_Date',
+      'Date',
+      'Time',
+      'Counter_No',
+      'Table_No',
+      'Order_Round',
+      'Order_Source',
+      'Customer_Mobile',
+      'Menu_Items_Ordered',
+      'Total_Qty',
+      'Order_Amount_INR',
+      'Kitchen_Status',
+      'Bill_Status',
+      'Payment_Method',
+      'VIP',
+      'Rush',
+      'Order_ID',
+    ],
+    [
+      o.businessDate,
+      o.dateFormatted,
+      o.timeFormatted,
+      o.counterNo,
+      o.table,
+      o.round,
+      o.orderSourceRaw,
+      o.customerMobRaw,
+      o.itemsRaw,
+      o.totalQty,
+      o.amountInr,
+      ORDER_STATUS_LABELS[o.st] || String(o.st),
+      o.billStatus,
+      o.paymentMethod,
+      o.vip,
+      o.rush,
+      o.id,
+    ],
+  ];
 }
 
 export function parseOrdersFromSheetRows(
@@ -807,6 +860,7 @@ export function parseOrdersFromSheetRows(
     else if (ks === 'cancelled') st = 5;
 
     const billStatus = String(r[12] || 'OPEN').trim().toUpperCase();
+    const paymentMethod = String(r[13] || 'Pending').trim();
     const vip = r[14] === true || String(r[14] || '').toUpperCase() === 'TRUE';
     const rush = r[15] === true || String(r[15] || '').toUpperCase() === 'TRUE';
     const orderId =
@@ -817,16 +871,24 @@ export function parseOrdersFromSheetRows(
       out.push({
         id: orderId,
         businessDate,
+        dateFormatted: String(r[1] || '').trim(),
+        timeFormatted: String(r[2] || '').trim(),
         counterNo,
         table,
         round,
         src,
+        orderSourceRaw: String(r[6] || 'Customer App').trim(),
+        customerMobRaw: rawMob || 'Guest',
         principalMob,
         orderedByMob,
+        itemsRaw: itemsStr,
+        totalQty: Number(r[9]) || Object.values(it).reduce((a, b) => a + b, 0),
+        amountInr: Number(r[10]) || 0,
         it,
         prices,
         st,
         billStatus,
+        paymentMethod,
         vip,
         rush,
       });
