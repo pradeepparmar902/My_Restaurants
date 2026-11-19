@@ -93,12 +93,16 @@ export function MenuTabView() {
             ? S.sess.pend
               ? 'Counter number pending. Get it from the waiter or reception and enter it in the Order tab.'
               : `Counter ${S.sess.no}. Add more anytime until you pay.`
-            : 'Scan done. Pick your food, we cook it fresh.'}
+            : (S.googleConfig.restaurantTagline || '').trim() ||
+              'Scan done. Pick your food, we cook it fresh.'}
         </p>
       </div>
 
       <div className="row" style={{ flexWrap: 'wrap' }}>
-        {(['en', 'hi', 'gu'] as Language[]).map((l) => (
+        {(S.googleConfig.enabledLanguages?.length
+          ? S.googleConfig.enabledLanguages
+          : (['en', 'hi', 'gu'] as Language[])
+        ).map((l) => (
           <button
             key={l}
             className={`chip ${S.lang === l ? 'on' : ''}`}
@@ -107,15 +111,19 @@ export function MenuTabView() {
             {langLabels[l]}
           </button>
         ))}
-        <button className={`chip ${S.veg ? 'on' : ''}`} onClick={toggleVeg}>
-          🌱 Veg only
-        </button>
-        <button
-          className={`chip ${S.jainOnly ? 'on' : ''}`}
-          onClick={() => updateState((p) => ({ ...p, jainOnly: !p.jainOnly }))}
-        >
-          🙏 Jain
-        </button>
+        {S.googleConfig.showVegFilter !== false && (
+          <button className={`chip ${S.veg ? 'on' : ''}`} onClick={toggleVeg}>
+            🌱 Veg only
+          </button>
+        )}
+        {S.googleConfig.showJainFilter !== false && (
+          <button
+            className={`chip ${S.jainOnly ? 'on' : ''}`}
+            onClick={() => updateState((p) => ({ ...p, jainOnly: !p.jainOnly }))}
+          >
+            🙏 Jain
+          </button>
+        )}
       </div>
 
       <h2 style={{ marginTop: '14px' }}>{L[S.lang]}</h2>

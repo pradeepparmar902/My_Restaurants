@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
-import { RewardRulesConfig, StaffRoleName } from '@/types/tadka';
+import { Language, RewardRulesConfig, StaffRoleName } from '@/types/tadka';
 import {
   DEFAULT_REWARD_RULES,
   ORDER_STATUS_LABELS,
@@ -2203,6 +2203,20 @@ export function AdminPortalView() {
   const [restaurantNameInput, setRestaurantNameInput] = useState(
     S.googleConfig.restaurantName || 'Tadka Truck'
   );
+  const [restaurantTaglineInput, setRestaurantTaglineInput] = useState(
+    S.googleConfig.restaurantTagline || ''
+  );
+  const [enabledLangsInput, setEnabledLangsInput] = useState<Language[]>(
+    S.googleConfig.enabledLanguages?.length
+      ? S.googleConfig.enabledLanguages
+      : ['en', 'hi', 'gu']
+  );
+  const [showVegFilterInput, setShowVegFilterInput] = useState(
+    S.googleConfig.showVegFilter !== false
+  );
+  const [showJainFilterInput, setShowJainFilterInput] = useState(
+    S.googleConfig.showJainFilter !== false
+  );
   const [revUrlInput, setRevUrlInput] = useState(
     S.googleConfig.googleReviewUrl || ''
   );
@@ -2456,9 +2470,8 @@ export function AdminPortalView() {
         onToggle={() => toggleAdminSection('brandProfile')}
       >
         <p className="mu" style={{ margin: '0 0 8px', fontSize: '12px' }}>
-          Set your restaurant&apos;s display name shown on the Customer Menu,
-          Table QR posters, and digital bills. Synced via Google Sheets
-          (`Restaurant_Config`).
+          Set your restaurant&apos;s display name, tagline, menu languages, and
+          dietary filter chips. Synced via Google Sheets (`Restaurant_Config`).
         </p>
         <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
           🏪 Restaurant / Brand Name
@@ -2470,18 +2483,88 @@ export function AdminPortalView() {
           className="inp"
           style={{ width: '100%', marginBottom: '8px' }}
         />
+        <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+          💬 Hero Tagline / Subtitle (leave blank for default: &ldquo;Scan done. Pick your food, we cook it fresh.&rdquo;)
+        </div>
+        <input
+          value={restaurantTaglineInput}
+          onChange={(e) => setRestaurantTaglineInput(e.target.value)}
+          placeholder="Scan done. Pick your food, we cook it fresh."
+          className="inp"
+          style={{ width: '100%', marginBottom: '10px' }}
+        />
+
+        <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
+          🌐 Enabled Customer Menu Languages
+        </div>
+        <div className="row" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+          {(
+            [
+              ['en', 'English'],
+              ['hi', 'हिन्दी'],
+              ['gu', 'ગુજરાતી'],
+            ] as [Language, string][]
+          ).map(([code, label]) => {
+            const active = enabledLangsInput.includes(code);
+            return (
+              <button
+                key={code}
+                type="button"
+                className={`chip ${active ? 'on' : ''}`}
+                onClick={() => {
+                  if (active && enabledLangsInput.length <= 1) {
+                    say('Keep at least 1 language enabled');
+                    return;
+                  }
+                  setEnabledLangsInput((prev) =>
+                    active ? prev.filter((l) => l !== code) : [...prev, code]
+                  );
+                }}
+              >
+                {active ? '✅ ' : ''}{label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
+          🥗 Customer Dietary Filter Chips (Veg / Jain / Non-Veg per dish is set in Menu Admin)
+        </div>
+        <div className="row" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+          <button
+            type="button"
+            className={`chip ${showVegFilterInput ? 'on' : ''}`}
+            onClick={() => setShowVegFilterInput((v) => !v)}
+          >
+            {showVegFilterInput ? '✅ ' : ''}🌱 Show Veg-only Filter
+          </button>
+          <button
+            type="button"
+            className={`chip ${showJainFilterInput ? 'on' : ''}`}
+            onClick={() => setShowJainFilterInput((v) => !v)}
+          >
+            {showJainFilterInput ? '✅ ' : ''}🙏 Show Jain Filter
+          </button>
+        </div>
+
         <button
           className="btn alt"
           onClick={async () => {
             const nextBrand = {
               restaurantName: restaurantNameInput.trim() || 'Tadka Truck',
+              restaurantTagline: restaurantTaglineInput.trim(),
+              enabledLanguages: enabledLangsInput.length
+                ? enabledLangsInput
+                : (['en', 'hi', 'gu'] as Language[]),
+              showVegFilter: showVegFilterInput,
+              showJainFilter: showJainFilterInput,
             };
             saveGoogleConfig(nextBrand);
             await syncToGoogleSheets(nextBrand);
-            say('Restaurant name saved & synced ✅');
+            say('Brand profile, tagline & filters saved & synced ✅');
           }}
         >
-          Save &amp; Sync Restaurant Name
+          Save &amp; Sync Brand Profile
         </button>
       </CollapsibleSection>
 

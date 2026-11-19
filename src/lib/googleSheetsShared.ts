@@ -1,4 +1,4 @@
-import { AppState, Dish, SocialProofSubmission, StaffMember, StaffRoleName } from '@/types/tadka';
+import { AppState, Dish, Language, SocialProofSubmission, StaffMember, StaffRoleName } from '@/types/tadka';
 import {
   getSubtotal,
   getDiscount,
@@ -46,6 +46,10 @@ export function buildSheetRowsForState(
     ['Config_Key', 'Config_Value', 'Updated_At'],
     ['restaurant_slug', 'tadka-truck', new Date().toISOString()],
     ['restaurant_name', (state.googleConfig?.restaurantName || '').trim() || 'Tadka Truck', new Date().toISOString()],
+    ['restaurant_tagline', (state.googleConfig?.restaurantTagline || '').trim(), new Date().toISOString()],
+    ['enabled_languages', (state.googleConfig?.enabledLanguages?.length ? state.googleConfig.enabledLanguages : ['en', 'hi', 'gu']).join(','), new Date().toISOString()],
+    ['show_veg_filter', state.googleConfig?.showVegFilter !== false, new Date().toISOString()],
+    ['show_jain_filter', state.googleConfig?.showJainFilter !== false, new Date().toISOString()],
     ['appsScriptWebAppUrl', state.googleConfig?.appsScriptWebAppUrl || '', new Date().toISOString()],
     ['spreadsheetId', state.googleConfig?.spreadsheetId || '', new Date().toISOString()],
     ['driveFolderId', state.googleConfig?.driveFolderId || '', new Date().toISOString()],
@@ -664,6 +668,20 @@ export function parseConfigFromSheetRows(
     const key = String(r[0]).trim();
     const val = String(r[1] ?? '').trim();
     if (key === 'restaurant_name' && val) cfg.restaurantName = val;
+    if (key === 'restaurant_tagline') cfg.restaurantTagline = val;
+    if (key === 'enabled_languages' && val) {
+      const langs = val
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s === 'en' || s === 'hi' || s === 'gu') as Language[];
+      if (langs.length > 0) cfg.enabledLanguages = langs;
+    }
+    if (key === 'show_veg_filter' && val !== '') {
+      cfg.showVegFilter = val.toUpperCase() !== 'FALSE' && val !== '0';
+    }
+    if (key === 'show_jain_filter' && val !== '') {
+      cfg.showJainFilter = val.toUpperCase() !== 'FALSE' && val !== '0';
+    }
     if (key === 'appsScriptWebAppUrl' && val) cfg.appsScriptWebAppUrl = val;
     if (key === 'spreadsheetId' && val) cfg.spreadsheetId = val;
     if (key === 'driveFolderId' && val) cfg.driveFolderId = val;
