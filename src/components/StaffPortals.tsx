@@ -3111,6 +3111,47 @@ export function AdminPortalView() {
           >
             Save &amp; Sync Social &amp; UPI Settings
           </button>
+
+          <details
+            style={{
+              marginTop: '8px',
+              padding: '10px',
+              borderRadius: '10px',
+              background: 'rgba(59,130,246,0.08)',
+              border: '1px solid rgba(59,130,246,0.25)',
+              fontSize: '12px',
+            }}
+          >
+            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+              📘 Setup Guide: Monitor @Tag Notifications via Meta Business Suite (100% Free)
+            </summary>
+            <ol style={{ margin: '8px 0 6px', paddingLeft: '18px', lineHeight: 1.55 }}>
+              <li>
+                <b>Instagram Business Account:</b> Instagram → Settings → Account type and tools → Switch to <b>Professional (Business)</b> → enable Notifications for <b>Photos of you / Mentions</b>.
+              </li>
+              <li>
+                <b>Link Facebook Page:</b> Create/open your restaurant Facebook Page → Settings → Linked Accounts → <b>Connect Instagram</b> and allow Instagram messages in Inbox.
+              </li>
+              <li>
+                <b>Meta Business Suite (Free Inbox):</b> Sign in at{' '}
+                <a
+                  href="https://business.facebook.com/latest/inbox/all"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: '#93c5fd' }}
+                >
+                  business.facebook.com
+                </a>{' '}
+                (or install the Meta Business Suite app on your counter phone) and enable push notifications for <b>Mentions, Tags &amp; Comments</b>.
+              </li>
+              <li>
+                <b>Save Handles Above:</b> Enter your Instagram handle, Facebook Page URL, Caption Tag, and Google Review URL above, then tap <b>Save &amp; Sync</b>.
+              </li>
+              <li>
+                <b>Daily Counter Workflow:</b> Customers tag your <code>@handle</code> and submit their <code>@handle</code>, 1-tap screenshot, or <b>⚡ Verify at Counter</b>. Check <b>🎬 Reward Approvals</b> → tap <b>🔔 Meta Business Suite ↗</b> → approve Coupon, +1 Star, or Discount.
+              </li>
+            </ol>
+          </details>
         </div>
       </CollapsibleSection>
 
