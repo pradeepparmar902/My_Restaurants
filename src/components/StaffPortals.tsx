@@ -2174,15 +2174,6 @@ export function OwnerPortalView() {
           );
         })()}
       </CollapsibleSection>
-
-      <CollapsibleSection
-        title="☁️ Google Drive & Sheets Storage"
-        isOpen={!!openSections.storage}
-        onToggle={() => toggleSection('storage')}
-        wrapInCard={false}
-      >
-        <GoogleStorageAdminCard />
-      </CollapsibleSection>
     </>
   );
 }
@@ -2203,7 +2194,6 @@ function extractGoogleIdFromUrl(raw: string, kind: 'sheet' | 'folder'): string {
 export function SuperAdminPortalView() {
   const {
     S,
-    activeWorkspaceSlug,
     isSuperAdmin,
     unlockSuperAdmin,
     createAndProvisionWorkspace,
@@ -2211,6 +2201,8 @@ export function SuperAdminPortalView() {
     removeWorkspaceRecord,
     syncToGoogleSheets,
     pullFromGoogleSheets,
+    checkLogin,
+    resetDemoState,
     say,
   } = useTadka();
 
@@ -2232,6 +2224,27 @@ export function SuperAdminPortalView() {
   );
   const [provisioning, setProvisioning] = useState(false);
   const [lastHandoverUrl, setLastHandoverUrl] = useState('');
+  const [checkMob, setCheckMob] = useState('');
+
+  const [openSaSections, setOpenSaSections] = useState<Record<string, boolean>>({
+    clients: true,
+    addClient: false,
+    storage: false,
+    loginTest: false,
+    resetDemo: false,
+  });
+
+  const toggleSaSection = (key: string) =>
+    setOpenSaSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const setAllSa = (val: boolean) =>
+    setOpenSaSections({
+      clients: val,
+      addClient: val,
+      storage: val,
+      loginTest: val,
+      resetDemo: val,
+    });
 
   const registry = S.googleConfig.workspacesRegistry || [];
   const activeCount = registry.filter((w) => (w.status || 'ACTIVE') === 'ACTIVE').length;
@@ -2268,11 +2281,11 @@ export function SuperAdminPortalView() {
   if (!isSuperAdmin) {
     return (
       <div className="card">
-        <h3>🏢 Super Admin SaaS Dashboard</h3>
+        <h3>🏢 Super Admin Dashboard</h3>
         <p className="mu" style={{ margin: '6px 0 10px' }}>
-          Enter Super Admin Master PIN (<code>SUPER123</code>) or log in with
-          Super Admin mobile (<code>+919800000001</code>) to access the SaaS
-          Workspace Control Center.
+          Enter your Super Admin PIN (<code>SUPER123</code>) or log in with your
+          Super Admin mobile number (<code>+919800000001</code>) to manage all
+          restaurant clients.
         </p>
         <div className="row" style={{ gap: '6px' }}>
           <input
@@ -2297,7 +2310,7 @@ export function SuperAdminPortalView() {
 
   return (
     <>
-      {/* SaaS Executive KPI Hero Banner */}
+      {/* Super Admin Summary Banner */}
       <div
         className="hero"
         style={{
@@ -2318,13 +2331,13 @@ export function SuperAdminPortalView() {
                 marginBottom: '6px',
               }}
             >
-              🏢 SaaS Platform Control Center · Master ({activeWorkspaceSlug})
+              🏢 Super Admin · Master Business Dashboard
             </span>
             <h1 style={{ color: '#ffffff' }}>
               {registry.length} {registry.length === 1 ? 'Restaurant' : 'Restaurants'}
             </h1>
             <p style={{ color: 'rgba(255,255,255,0.88)' }}>
-              🟢 {activeCount} Active · 🟡 {trialCount} Trial · 🔴 {suspendedCount} Suspended · MRR ₹{totalMrr.toLocaleString('en-IN')}/mo
+              🟢 {activeCount} Active · 🟡 {trialCount} Trial · 🔴 {suspendedCount} Paused · Monthly Income ₹{totalMrr.toLocaleString('en-IN')}/mo
             </p>
           </div>
           <button
@@ -2346,99 +2359,65 @@ export function SuperAdminPortalView() {
       {/* KPI Metric Cards */}
       <div className="pts" style={{ marginBottom: '10px' }}>
         <div>
-          <div className="mu">Total Clients</div>
+          <div className="mu">Total Restaurants</div>
           <div className="big">{registry.length}</div>
           <div className="mu" style={{ fontSize: '11px' }}>
-            {activeCount} active workspaces
+            {activeCount} currently active
           </div>
         </div>
         <div>
-          <div className="mu">Monthly MRR</div>
+          <div className="mu">Monthly Income</div>
           <div className="big">₹{totalMrr.toLocaleString('en-IN')}</div>
           <div className="mu" style={{ fontSize: '11px' }}>
-            Recurring subscription
+            From active plans
           </div>
         </div>
       </div>
 
-      {/* Where Super Admin Data is Stored Card */}
-      <div className="card">
-        <div className="row sp" style={{ marginBottom: '6px' }}>
-          <h3 style={{ margin: 0 }}>🗄️ Super Admin Master Database Storage</h3>
-          <span className="tag ok">Google Sheets Synced</span>
-        </div>
-        <p className="mu" style={{ fontSize: '12px', margin: '0 0 8px' }}>
-          All created client workspaces, owner names/mobile numbers, default styles,
-          subscription plans, and Google Sheet IDs are stored in your{' '}
-          <b>Master Google Sheet</b> in two places:
-        </p>
-        <div
-          style={{
-            fontSize: '12px',
-            padding: '8px 10px',
-            borderRadius: '10px',
-            background: 'var(--sf2)',
-            marginBottom: '8px',
-            lineHeight: 1.5,
-          }}
-        >
-          <div>
-            1️⃣ <b><code>SuperAdmin_Workspaces</code> Sheet Tab:</b> Clean row-by-row
-            CRM table of every restaurant client (<code>Workspace_Slug</code>,{' '}
-            <code>Restaurant_Name</code>, <code>Owner_Name</code>,{' '}
-            <code>Owner_Mobile</code>, <code>Default_Style</code>,{' '}
-            <code>Status</code>, <code>Plan_Name</code>,{' '}
-            <code>Monthly_Fee_INR</code>, <code>Client_Spreadsheet_ID</code>,{' '}
-            <code>Created_At</code>).
-          </div>
-          <div style={{ marginTop: '4px' }}>
-            2️⃣ <b><code>Restaurant_Config</code> Tab (<code>workspaces_registry_json</code>):</b>{' '}
-            Used by any browser opening <code>?w=&lt;client-slug&gt;</code> to
-            automatically resolve that client&apos;s isolated Google Sheet.
-          </div>
-        </div>
-        <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
-          {masterSheetUrl && (
-            <a
-              href={masterSheetUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="chip on"
-              style={{ textDecoration: 'none', fontSize: '12px' }}
-            >
-              📊 Open Master Google Sheet ↗
-            </a>
-          )}
+      {/* Expand / Collapse All Row */}
+      <div className="row sp" style={{ marginBottom: '10px' }}>
+        <span className="mu" style={{ fontSize: '12px' }}>
+          Tap any section below to expand or collapse
+        </span>
+        <div className="row" style={{ gap: '6px' }}>
           <button
             type="button"
             className="chip"
-            style={{ fontSize: '12px' }}
-            onClick={() => syncToGoogleSheets()}
+            style={{ fontSize: '11px' }}
+            onClick={() => setAllSa(true)}
           >
-            ☁️ Sync Master Registry Now
+            Expand All
+          </button>
+          <button
+            type="button"
+            className="chip"
+            style={{ fontSize: '11px' }}
+            onClick={() => setAllSa(false)}
+          >
+            Collapse All
           </button>
         </div>
       </div>
 
-      {/* Client Workspaces Directory */}
-      <div className="card">
-        <div className="row sp" style={{ marginBottom: '8px' }}>
-          <h3 style={{ margin: 0 }}>
-            📋 Client Workspaces Directory ({filteredRegistry.length})
-          </h3>
-        </div>
+      {/* Section 1: All Restaurant Clients */}
+      <CollapsibleSection
+        title="🏪 All Restaurant Clients"
+        badge={`${registry.length}`}
+        isOpen={!!openSaSections.clients}
+        onToggle={() => toggleSaSection('clients')}
+      >
         <input
           value={searchClient}
           onChange={(e) => setSearchClient(e.target.value)}
-          placeholder="🔍 Search by restaurant name, slug, owner name or mobile..."
+          placeholder="🔍 Search by restaurant name, owner name or mobile..."
           className="inp"
           style={{ width: '100%', marginBottom: '10px' }}
         />
 
         {filteredRegistry.length === 0 ? (
           <p className="mu">
-            No client workspaces found. Use the form below to onboard and
-            provision your first restaurant client.
+            No restaurants added yet. Open <b>➕ Add New Restaurant Client</b>{' '}
+            below to create your first client restaurant.
           </p>
         ) : (
           <div style={{ display: 'grid', gap: '10px' }}>
@@ -2456,7 +2435,7 @@ export function SuperAdminPortalView() {
                 : '';
               const waText =
                 `🏪 *Welcome to ${w.restaurantName} Digital QR Ordering & Growth Platform!*\n\n` +
-                `🔗 *Your Dedicated Workspace Link:*\n${link}\n\n` +
+                `🔗 *Your Restaurant Link:*\n${link}\n\n` +
                 `👤 *Owner Login Mobile:* ${w.ownerMobile || 'Your registered mobile'}\n` +
                 `🔑 *Demo OTP:* 1234\n\n` +
                 `Log in with your mobile number to open your *Owner Panel* & *Admin Settings* (Menu, GST, Brand Profile, Table QR Codes & Rewards).`;
@@ -2483,17 +2462,14 @@ export function SuperAdminPortalView() {
                     <div>
                       <strong style={{ fontSize: '15px' }}>
                         🏪 {w.restaurantName}
-                      </strong>{' '}
-                      <code style={{ fontSize: '11px', opacity: 0.85 }}>
-                        ?w={w.slug}
-                      </code>
-                      <div className="mu" style={{ fontSize: '12px', marginTop: '2px' }}>
+                      </strong>
+                      <div className="mu" style={{ fontSize: '12px', marginTop: '3px' }}>
                         👤 Owner: <b>{w.ownerName || '—'}</b> · 📱{' '}
-                        {w.ownerMobile || '—'} · 💳 {w.planName || 'Growth'} (₹
-                        {w.monthlyFeeInr ?? 999}/mo)
+                        {w.ownerMobile || '—'}
                       </div>
-                      <div className="mu" style={{ fontSize: '11px', marginTop: '2px' }}>
-                        📊 Sheet ID: <code>{w.spreadsheetId || '—'}</code>
+                      <div className="mu" style={{ fontSize: '11.5px', marginTop: '2px' }}>
+                        📦 Plan: <b>{w.planName || 'Growth'}</b> · ₹
+                        {w.monthlyFeeInr ?? 999}/month
                       </div>
                     </div>
 
@@ -2507,10 +2483,10 @@ export function SuperAdminPortalView() {
                       }`}
                     >
                       {statusVal === 'ACTIVE'
-                        ? '🟢 ACTIVE'
+                        ? '🟢 Active'
                         : statusVal === 'TRIAL'
-                          ? '🟡 TRIAL'
-                          : '🔴 SUSPENDED'}
+                          ? '🟡 Trial'
+                          : '🔴 Paused'}
                     </span>
                   </div>
 
@@ -2534,12 +2510,12 @@ export function SuperAdminPortalView() {
                       className="sel-cc"
                       style={{ fontSize: '11px', padding: '5px 8px' }}
                     >
-                      <option value="style1">🌙 Style 1 (Dark)</option>
-                      <option value="style2">☀️ Style 2 (Emerald)</option>
-                      <option value="style3">🥛 Style 3 (Milky White)</option>
-                      <option value="style4">⚡ Style 4 (DotPe Blue)</option>
-                      <option value="style5">🎁 Style 5 (Reelo Teal)</option>
-                      <option value="style6">👑 Style 6 (Royal Gold)</option>
+                      <option value="style1">🌙 Style 1 · Classic Dark</option>
+                      <option value="style2">☀️ Style 2 · Fresh Emerald</option>
+                      <option value="style3">🥛 Style 3 · Milky White</option>
+                      <option value="style4">⚡ Style 4 · DotPe Blue</option>
+                      <option value="style5">🎁 Style 5 · Reelo Teal</option>
+                      <option value="style6">👑 Style 6 · Royal Gold</option>
                     </select>
 
                     <select
@@ -2555,7 +2531,7 @@ export function SuperAdminPortalView() {
                     >
                       <option value="ACTIVE">🟢 Active</option>
                       <option value="TRIAL">🟡 Trial</option>
-                      <option value="SUSPENDED">🔴 Suspended</option>
+                      <option value="SUSPENDED">🔴 Paused</option>
                     </select>
                   </div>
 
@@ -2570,7 +2546,7 @@ export function SuperAdminPortalView() {
                       style={{ fontSize: '11px' }}
                       onClick={() => {
                         navigator.clipboard?.writeText(link);
-                        say(`Copied handover link for ${w.restaurantName} ✅`);
+                        say(`Copied Owner link for ${w.restaurantName} ✅`);
                       }}
                     >
                       📋 Copy Owner Link
@@ -2582,7 +2558,7 @@ export function SuperAdminPortalView() {
                       className="chip"
                       style={{ fontSize: '11px', textDecoration: 'none' }}
                     >
-                      📲 WhatsApp Handover
+                      📲 Send on WhatsApp
                     </a>
                     <a
                       href={link}
@@ -2591,7 +2567,7 @@ export function SuperAdminPortalView() {
                       className="chip"
                       style={{ fontSize: '11px', textDecoration: 'none' }}
                     >
-                      ↗️ Open Workspace
+                      ↗️ Open Restaurant
                     </a>
                     {clientSheetUrl && (
                       <a
@@ -2601,7 +2577,7 @@ export function SuperAdminPortalView() {
                         className="chip"
                         style={{ fontSize: '11px', textDecoration: 'none' }}
                       >
-                        📊 Client Sheet ↗
+                        📊 Open Google Sheet ↗
                       </a>
                     )}
                     {clientDriveUrl && (
@@ -2612,7 +2588,7 @@ export function SuperAdminPortalView() {
                         className="chip"
                         style={{ fontSize: '11px', textDecoration: 'none' }}
                       >
-                        📁 Client Drive ↗
+                        📁 Open Drive Folder ↗
                       </a>
                     )}
                     <button
@@ -2621,7 +2597,7 @@ export function SuperAdminPortalView() {
                       style={{ fontSize: '11px', color: '#ef4444' }}
                       onClick={() => removeWorkspaceRecord(w.slug)}
                     >
-                      🗑️ Remove
+                      🗑️ Delete
                     </button>
                   </div>
                 </div>
@@ -2629,14 +2605,21 @@ export function SuperAdminPortalView() {
             })}
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
-      {/* Onboard & Provision New Restaurant Client Card */}
-      <div className="card">
-        <h3 style={{ margin: '0 0 8px' }}>➕ Onboard &amp; Provision New Restaurant Client</h3>
+      {/* Section 2: Add New Restaurant Client */}
+      <CollapsibleSection
+        title="➕ Add New Restaurant Client"
+        isOpen={!!openSaSections.addClient}
+        onToggle={() => toggleSaSection('addClient')}
+      >
+        <p className="mu" style={{ margin: '0 0 8px', fontSize: '12px' }}>
+          Create a separate workspace for a new restaurant owner with their own
+          menu, bills, GST, and Google Sheet.
+        </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div className="mu" style={{ fontSize: '11px' }}>
-            🏪 Client Restaurant / Brand Name
+            🏪 Restaurant Name
           </div>
           <input
             value={wsName}
@@ -2656,7 +2639,7 @@ export function SuperAdminPortalView() {
           />
 
           <div className="mu" style={{ fontSize: '11px' }}>
-            🔗 Workspace Slug (URL identifier: <code>?w={wsSlug || 'royal-dhaba'}</code>)
+            🔗 Short Web Link Name (auto-filled)
           </div>
           <input
             value={wsSlug}
@@ -2674,7 +2657,7 @@ export function SuperAdminPortalView() {
           <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
             <div style={{ flex: 2, minWidth: '160px' }}>
               <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
-                🎨 Default App Style
+                🎨 Default Theme Style
               </div>
               <select
                 aria-label="Workspace Default App Style"
@@ -2693,12 +2676,12 @@ export function SuperAdminPortalView() {
                 className="sel-cc"
                 style={{ width: '100%' }}
               >
-                <option value="style1">🌙 Style 1 · Classic Neon Dark</option>
-                <option value="style2">☀️ Style 2 · Fresh Food-App (Emerald)</option>
-                <option value="style3">🥛 Style 3 · Milky White &amp; Crimson</option>
-                <option value="style4">⚡ Style 4 · DotPe Electric Blue</option>
-                <option value="style5">🎁 Style 5 · Reelo Loyalty Teal</option>
-                <option value="style6">👑 Style 6 · Royal Gold &amp; Amber</option>
+                <option value="style1">🌙 Style 1 · Classic Dark</option>
+                <option value="style2">☀️ Style 2 · Fresh Emerald</option>
+                <option value="style3">🥛 Style 3 · Milky White</option>
+                <option value="style4">⚡ Style 4 · DotPe Blue</option>
+                <option value="style5">🎁 Style 5 · Reelo Teal</option>
+                <option value="style6">👑 Style 6 · Royal Gold</option>
               </select>
             </div>
             <div style={{ flex: 1, minWidth: '100px' }}>
@@ -2721,7 +2704,7 @@ export function SuperAdminPortalView() {
             </div>
             <div style={{ flex: 1, minWidth: '90px' }}>
               <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
-                💳 Fee (₹/mo)
+                💳 Monthly Price (₹)
               </div>
               <input
                 value={wsMonthlyFee}
@@ -2749,7 +2732,7 @@ export function SuperAdminPortalView() {
             </div>
             <div style={{ flex: 1, minWidth: '180px' }}>
               <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
-                📱 Owner Login Mobile (lands on Owner Panel)
+                📱 Owner Mobile Number
               </div>
               <CountryCodeMobileInput
                 id="sa-ws-owner-mob"
@@ -2760,46 +2743,22 @@ export function SuperAdminPortalView() {
           </div>
 
           <div className="mu" style={{ fontSize: '11px' }}>
-            📊 Client&apos;s Blank Google Sheet URL or ID (Share → Anyone with link → Editor)
+            📊 Restaurant&apos;s Google Sheet Link (Share → Anyone with link → Editor)
           </div>
           <input
             value={wsSheetRaw}
             onChange={(e) => setWsSheetRaw(e.target.value)}
-            placeholder="Paste new Google Sheet link or ID"
+            placeholder="Paste their blank Google Sheet link"
             className="inp"
           />
 
           <div className="mu" style={{ fontSize: '11px' }}>
-            📁 Client&apos;s Google Drive Folder URL or ID (optional)
+            📁 Restaurant&apos;s Google Drive Folder Link (optional, for photos &amp; reels)
           </div>
           <input
             value={wsDriveRaw}
             onChange={(e) => setWsDriveRaw(e.target.value)}
-            placeholder="Paste Google Drive folder link or ID"
-            className="inp"
-          />
-
-          <div className="row sp">
-            <span className="mu" style={{ fontSize: '11px' }}>
-              ⚙️ Apps Script Web App URL
-            </span>
-            {S.googleConfig.appsScriptWebAppUrl && (
-              <button
-                type="button"
-                className="chip"
-                style={{ fontSize: '10px', padding: '2px 7px' }}
-                onClick={() =>
-                  setWsScriptUrl(S.googleConfig.appsScriptWebAppUrl)
-                }
-              >
-                ⚡ Use Master Script URL
-              </button>
-            )}
-          </div>
-          <input
-            value={wsScriptUrl}
-            onChange={(e) => setWsScriptUrl(e.target.value)}
-            placeholder="https://script.google.com/macros/s/.../exec"
+            placeholder="Paste their Google Drive folder link (optional)"
             className="inp"
           />
 
@@ -2816,11 +2775,11 @@ export function SuperAdminPortalView() {
               const cleanSheetId = extractGoogleIdFromUrl(wsSheetRaw, 'sheet');
               const cleanDriveId = extractGoogleIdFromUrl(wsDriveRaw, 'folder');
               if (!cleanName || !cleanSlug) {
-                say('Enter Restaurant Name and Workspace Slug');
+                say('Enter Restaurant Name first');
                 return;
               }
               if (!cleanSheetId) {
-                say('Paste a dedicated Google Sheet URL or ID for this workspace');
+                say('Paste a Google Sheet link for this restaurant');
                 return;
               }
               const normOwnerMob = wsOwnerMob.trim()
@@ -2857,8 +2816,8 @@ export function SuperAdminPortalView() {
             }}
           >
             {provisioning
-              ? '⏳ Provisioning Client Sheet & Creating Workspace...'
-              : '🚀 Create, Provision Sheet & Generate Owner Handover Link'}
+              ? '⏳ Setting Up Restaurant Sheet...'
+              : '✅ Create Restaurant & Get Owner Link'}
           </button>
 
           {lastHandoverUrl && (
@@ -2871,7 +2830,7 @@ export function SuperAdminPortalView() {
                 fontSize: '12px',
               }}
             >
-              <b>✅ Workspace Provisioned! Handover Link:</b>
+              <b>✅ Restaurant Ready! Share This Link with the Owner:</b>
               <div
                 style={{
                   wordBreak: 'break-all',
@@ -2887,10 +2846,10 @@ export function SuperAdminPortalView() {
                   className="chip on"
                   onClick={() => {
                     navigator.clipboard?.writeText(lastHandoverUrl);
-                    say('Owner Handover Link copied ✅');
+                    say('Owner link copied ✅');
                   }}
                 >
-                  📋 Copy Handover Link
+                  📋 Copy Owner Link
                 </button>
                 <a
                   href={lastHandoverUrl}
@@ -2899,13 +2858,84 @@ export function SuperAdminPortalView() {
                   className="chip"
                   style={{ textDecoration: 'none' }}
                 >
-                  ↗️ Open Client Workspace
+                  ↗️ Open Restaurant
                 </a>
               </div>
             </div>
           )}
         </div>
-      </div>
+      </CollapsibleSection>
+
+      {/* Section 3: Master Google Sheet & Drive Storage Setup */}
+      <CollapsibleSection
+        title="☁️ Google Sheet &amp; Drive Storage Setup"
+        badge="Master Storage"
+        isOpen={!!openSaSections.storage}
+        onToggle={() => toggleSaSection('storage')}
+      >
+        <p className="mu" style={{ fontSize: '12px', margin: '0 0 8px' }}>
+          All your restaurant clients, owner mobile numbers, and plans are saved
+          automatically in your Master Google Sheet under the{' '}
+          <b>SuperAdmin_Workspaces</b> tab.
+        </p>
+        <div className="row" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+          {masterSheetUrl && (
+            <a
+              href={masterSheetUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="chip on"
+              style={{ textDecoration: 'none', fontSize: '12px' }}
+            >
+              📊 Open Master Google Sheet ↗
+            </a>
+          )}
+          <button
+            type="button"
+            className="chip"
+            style={{ fontSize: '12px' }}
+            onClick={() => syncToGoogleSheets()}
+          >
+            ☁️ Save All to Google Sheet Now
+          </button>
+        </div>
+        <GoogleStorageAdminCard />
+      </CollapsibleSection>
+
+      {/* Section 4: Test Mobile Login Access */}
+      <CollapsibleSection
+        title="🔐 Check Mobile Login Access"
+        isOpen={!!openSaSections.loginTest}
+        onToggle={() => toggleSaSection('loginTest')}
+      >
+        <p className="mu" style={{ margin: '0 0 8px' }}>
+          Enter any phone number to see which role and panel will open when they
+          log in.
+        </p>
+        <CountryCodeMobileInput
+          id="sa-alg"
+          value={checkMob}
+          onChange={setCheckMob}
+        />
+        <button className="btn ghost" onClick={() => checkLogin(checkMob)}>
+          Check Access
+        </button>
+        {S.alr && <p style={{ marginTop: '8px' }}>{S.alr}</p>}
+      </CollapsibleSection>
+
+      {/* Section 5: Reset Demo Data */}
+      <CollapsibleSection
+        title="🔄 Reset Demo Data"
+        isOpen={!!openSaSections.resetDemo}
+        onToggle={() => toggleSaSection('resetDemo')}
+      >
+        <div className="row sp">
+          <span className="mu">Reset current browser demo data</span>
+          <button className="chip" onClick={resetDemoState}>
+            Reset All
+          </button>
+        </div>
+      </CollapsibleSection>
     </>
   );
 }
@@ -3573,11 +3603,6 @@ export function AdminPortalView() {
           </button>
         </div>
       </div>
-
-      <SuperAdminWorkspaceManagerSection
-        isOpen={!!openAdminSections.superAdmin}
-        onToggle={() => toggleAdminSection('superAdmin')}
-      />
 
       <CollapsibleSection
         title="👥 Team"
@@ -4329,25 +4354,6 @@ export function AdminPortalView() {
         <RewardRulesMasterContent />
       </CollapsibleSection>
 
-      <CollapsibleSection
-        title="🔐 What Happens at Login?"
-        isOpen={!!openAdminSections.loginTest}
-        onToggle={() => toggleAdminSection('loginTest')}
-      >
-        <p className="mu" style={{ margin: '0 0 8px' }}>
-          Try a number to see which portal opens.
-        </p>
-        <CountryCodeMobileInput
-          id="alg"
-          value={checkMob}
-          onChange={setCheckMob}
-        />
-        <button className="btn ghost" onClick={() => checkLogin(checkMob)}>
-          Check
-        </button>
-        {S.alr && <p style={{ marginTop: '8px' }}>{S.alr}</p>}
-      </CollapsibleSection>
-
       <div className="card">
         <div className="row sp">
           <h3>🍽️ Menu Admin</h3>
@@ -4987,28 +4993,6 @@ export function AdminPortalView() {
               </li>
             </ol>
           </details>
-        </div>
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="☁️ Google Drive & Sheets Storage"
-        isOpen={!!openAdminSections.storage}
-        onToggle={() => toggleAdminSection('storage')}
-        wrapInCard={false}
-      >
-        <GoogleStorageAdminCard />
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="🔄 Reset Prototype / Demo State"
-        isOpen={!!openAdminSections.resetDemo}
-        onToggle={() => toggleAdminSection('resetDemo')}
-      >
-        <div className="row sp">
-          <span className="mu">Reset prototype / demo state</span>
-          <button className="chip" onClick={resetDemoState}>
-            Reset All
-          </button>
         </div>
       </CollapsibleSection>
     </>
