@@ -217,6 +217,7 @@ function saveEphemeralBrowserState(state: AppState) {
       sess: state.sess,
       googleConfig: {
         enabled: state.googleConfig?.enabled ?? true,
+        appStyle: state.googleConfig?.appStyle || 'style1',
         workspaceSlug:
           state.googleConfig?.workspaceSlug || getActiveWorkspaceSlug(),
         appsScriptWebAppUrl: state.googleConfig?.appsScriptWebAppUrl || '',
@@ -412,6 +413,9 @@ export function TadkaProvider({
           activeTable: resolvedTableId,
           googleConfig: {
             ...prev.googleConfig,
+            ...(parsed.googleConfig?.appStyle
+              ? { appStyle: parsed.googleConfig.appStyle }
+              : {}),
             enabled:
               typeof parsed.googleConfig?.enabled === 'boolean'
                 ? parsed.googleConfig.enabled
@@ -3180,6 +3184,7 @@ export function TadkaProvider({
           googleConfig: {
             ...INITIAL_STATE.googleConfig,
             enabled: true,
+            appStyle: record.appStyle || 'style2',
             workspaceSlug: cleanSlug,
             restaurantName: record.restaurantName || cleanSlug,
             ownerName: record.ownerName,
@@ -3328,6 +3333,7 @@ export function TadkaProvider({
               if (foundWs) {
                 tenantCfg = {
                   workspaceSlug: slug,
+                  ...(foundWs.appStyle ? { appStyle: foundWs.appStyle } : {}),
                   restaurantName: foundWs.restaurantName,
                   ownerName: foundWs.ownerName,
                   ownerMobile: foundWs.ownerMobile,
@@ -3353,6 +3359,7 @@ export function TadkaProvider({
         const mergedCfg = {
           ...prev.googleConfig,
           workspaceSlug: slug,
+          ...(tenantCfg.appStyle ? { appStyle: tenantCfg.appStyle } : {}),
           ...(tenantCfg.restaurantName
             ? { restaurantName: tenantCfg.restaurantName }
             : {}),

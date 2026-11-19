@@ -395,49 +395,51 @@ export function MenuTabView() {
               {taglineText}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() =>
-              saveGoogleConfig({
-                appStyle:
-                  currentStyle === 'style1'
-                    ? 'style2'
-                    : currentStyle === 'style2'
-                      ? 'style3'
-                      : currentStyle === 'style3'
-                        ? 'style4'
-                        : currentStyle === 'style4'
-                          ? 'style5'
-                          : currentStyle === 'style5'
-                            ? 'style6'
-                            : 'style1',
-              })
-            }
-            title="Cycle App Styles 1 to 6"
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              border: '1px solid rgba(255,255,255,0.35)',
-              color: '#fff',
-              borderRadius: '999px',
-              padding: '5px 10px',
-              fontSize: '11px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {currentStyle === 'style1'
-              ? '☀️ Style 2'
-              : currentStyle === 'style2'
-                ? '🥛 Style 3'
-                : currentStyle === 'style3'
-                  ? '⚡ Style 4'
-                  : currentStyle === 'style4'
-                    ? '🎁 Style 5'
-                    : currentStyle === 'style5'
-                      ? '👑 Style 6'
-                      : '🌙 Style 1'}
-          </button>
+          {currentStaff && (
+            <button
+              type="button"
+              onClick={() =>
+                saveGoogleConfig({
+                  appStyle:
+                    currentStyle === 'style1'
+                      ? 'style2'
+                      : currentStyle === 'style2'
+                        ? 'style3'
+                        : currentStyle === 'style3'
+                          ? 'style4'
+                          : currentStyle === 'style4'
+                            ? 'style5'
+                            : currentStyle === 'style5'
+                              ? 'style6'
+                              : 'style1',
+                })
+              }
+              title="Staff Preview: Cycle App Styles 1 to 6"
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                color: '#fff',
+                borderRadius: '999px',
+                padding: '5px 10px',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {currentStyle === 'style1'
+                ? '☀️ Style 2'
+                : currentStyle === 'style2'
+                  ? '🥛 Style 3'
+                  : currentStyle === 'style3'
+                    ? '⚡ Style 4'
+                    : currentStyle === 'style4'
+                      ? '🎁 Style 5'
+                      : currentStyle === 'style5'
+                        ? '👑 Style 6'
+                        : '🌙 Style 1'}
+            </button>
+          )}
         </div>
 
         {/* Language Switcher Row inside Header */}

@@ -176,6 +176,7 @@ export interface DietaryFilterOption {
 export interface WorkspaceTenantRecord {
   slug: string;
   restaurantName: string;
+  appStyle?: 'style1' | 'style2' | 'style3' | 'style4' | 'style5' | 'style6';
   ownerName: string;
   ownerMobile: string;
   spreadsheetId: string;

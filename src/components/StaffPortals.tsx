@@ -2218,6 +2218,9 @@ function SuperAdminWorkspaceManagerSection({
   const [pinInput, setPinInput] = useState('');
   const [wsName, setWsName] = useState('');
   const [wsSlug, setWsSlug] = useState('');
+  const [wsDefaultStyle, setWsDefaultStyle] = useState<
+    'style1' | 'style2' | 'style3' | 'style4' | 'style5' | 'style6'
+  >('style2');
   const [wsOwnerName, setWsOwnerName] = useState('');
   const [wsOwnerMob, setWsOwnerMob] = useState('');
   const [wsSheetRaw, setWsSheetRaw] = useState('');
@@ -2332,6 +2335,33 @@ function SuperAdminWorkspaceManagerSection({
             className="inp"
           />
 
+          <div className="mu" style={{ fontSize: '11px' }}>
+            🎨 Default App Style for this Workspace
+          </div>
+          <select
+            aria-label="Workspace Default App Style"
+            value={wsDefaultStyle}
+            onChange={(e) =>
+              setWsDefaultStyle(
+                e.target.value as
+                  | 'style1'
+                  | 'style2'
+                  | 'style3'
+                  | 'style4'
+                  | 'style5'
+                  | 'style6'
+              )
+            }
+            className="sel-cc"
+          >
+            <option value="style1">🌙 Style 1 · Classic Neon Dark</option>
+            <option value="style2">☀️ Style 2 · Fresh Food-App (Emerald &amp; Saffron)</option>
+            <option value="style3">🥛 Style 3 · Milky White &amp; Gourmet Crimson</option>
+            <option value="style4">⚡ Style 4 · DotPe Commerce (Electric Blue &amp; Navy)</option>
+            <option value="style5">🎁 Style 5 · Reelo Loyalty (Teal-Cyan &amp; Gold)</option>
+            <option value="style6">👑 Style 6 · Royal Gold &amp; Maharaja Amber</option>
+          </select>
+
           <div className="row" style={{ gap: '6px' }}>
             <div style={{ flex: 1 }}>
               <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
@@ -2429,6 +2459,7 @@ function SuperAdminWorkspaceManagerSection({
                 const url = await createAndProvisionWorkspace({
                   slug: cleanSlug,
                   restaurantName: cleanName,
+                  appStyle: wsDefaultStyle,
                   ownerName: wsOwnerName.trim() || 'Owner',
                   ownerMobile: normOwnerMob,
                   spreadsheetId: cleanSheetId,
