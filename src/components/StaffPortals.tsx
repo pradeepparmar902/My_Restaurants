@@ -2341,11 +2341,11 @@ export function AdminPortalView() {
   // Menu editor collapsible state
   const [showMenuAdmin, setShowMenuAdmin] = useState(false);
   const [newDishEn, setNewDishEn] = useState('');
-  const [newDishHi, setNewDishHi] = useState('');
-  const [newDishGu, setNewDishGu] = useState('');
+  const [newDishLangCode, setNewDishLangCode] = useState('hi');
+  const [newDishTranslations, setNewDishTranslations] = useState<Record<string, string>>({});
   const [newDishPrice, setNewDishPrice] = useState('100');
   const [newDishEmoji, setNewDishEmoji] = useState('🍲');
-  const [newDishVeg, setNewDishVeg] = useState(true);
+  const [newDishDietaryId, setNewDishDietaryId] = useState('veg');
   const [newDishGst, setNewDishGst] = useState('');
 
   const [showQrAdmin, setShowQrAdmin] = useState(false);
@@ -3162,24 +3162,55 @@ export function AdminPortalView() {
                 <input
                   value={newDishEn}
                   onChange={(e) => setNewDishEn(e.target.value)}
-                  placeholder="English name"
+                  placeholder="Dish name (Default / English)"
                   className="inp"
                 />
               </div>
-              <div className="row" style={{ marginTop: '6px' }}>
-                <input
-                  value={newDishHi}
-                  onChange={(e) => setNewDishHi(e.target.value)}
-                  placeholder="Hindi name (optional)"
-                  className="inp"
-                />
-                <input
-                  value={newDishGu}
-                  onChange={(e) => setNewDishGu(e.target.value)}
-                  placeholder="Gujarati name (optional)"
-                  className="inp"
-                />
-              </div>
+              {(() => {
+                const extraLangs = menuLanguagesInput.filter(
+                  (l) => l.code !== 'en'
+                );
+                const langOptions = extraLangs.length
+                  ? extraLangs
+                  : menuLanguagesInput;
+                const activeLangCode = langOptions.some(
+                  (l) => l.code === newDishLangCode
+                )
+                  ? newDishLangCode
+                  : langOptions[0]?.code || 'hi';
+                const activeLangObj = langOptions.find(
+                  (l) => l.code === activeLangCode
+                );
+                return (
+                  <div className="row" style={{ marginTop: '6px', gap: '6px' }}>
+                    <select
+                      aria-label="Translation language"
+                      value={activeLangCode}
+                      onChange={(e) => setNewDishLangCode(e.target.value)}
+                      className="sel-cc"
+                      style={{ minWidth: '120px' }}
+                    >
+                      {langOptions.map((l) => (
+                        <option key={l.code} value={l.code}>
+                          🌐 {l.label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      value={newDishTranslations[activeLangCode] || ''}
+                      onChange={(e) =>
+                        setNewDishTranslations((prev) => ({
+                          ...prev,
+                          [activeLangCode]: e.target.value,
+                        }))
+                      }
+                      placeholder={`${activeLangObj?.label || 'Translated'} name (optional)`}
+                      className="inp"
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                );
+              })()}
               <div className="row" style={{ marginTop: '6px', flexWrap: 'wrap', gap: '6px' }}>
                 <input
                   value={newDishPrice}
@@ -3201,32 +3232,84 @@ export function AdminPortalView() {
                   <option value="12">12% GST</option>
                   <option value="18">18% GST</option>
                 </select>
-                <button
-                  className={`chip ${newDishVeg ? 'on' : ''}`}
-                  onClick={() => setNewDishVeg((v) => !v)}
-                >
-                  {newDishVeg ? '🌱 Veg' : '🍗 Non-Veg'}
-                </button>
+                {(() => {
+                  const dietaryOpts = dietaryFiltersInput.length
+                    ? dietaryFiltersInput
+                    : DEFAULT_DIETARY_FILTERS;
+                  const activeDietId = dietaryOpts.some(
+                    (d) => d.id === newDishDietaryId
+                  )
+                    ? newDishDietaryId
+                    : dietaryOpts[0]?.id || 'veg';
+                  return (
+                    <select
+                      aria-label="New dish dietary"
+                      value={activeDietId}
+                      onChange={(e) => setNewDishDietaryId(e.target.value)}
+                      className="sel-cc"
+                    >
+                      {dietaryOpts.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.emoji ? `${d.emoji} ` : ''}
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  );
+                })()}
               </div>
               <button
                 className="btn alt"
                 disabled={!newDishEn.trim()}
                 onClick={() => {
+                  const baseName = newDishEn.trim();
+                  const dietaryOpts = dietaryFiltersInput.length
+                    ? dietaryFiltersInput
+                    : DEFAULT_DIETARY_FILTERS;
+                  const activeDietId = dietaryOpts.some(
+                    (d) => d.id === newDishDietaryId
+                  )
+                    ? newDishDietaryId
+                    : dietaryOpts[0]?.id || 'veg';
+                  const activeDietObj = dietaryOpts.find(
+                    (d) => d.id === activeDietId
+                  );
+                  const dietLabel = (
+                    activeDietObj?.label || activeDietId
+                  ).toLowerCase();
+                  const isNonVeg =
+                    activeDietId === 'nonveg' ||
+                    dietLabel.includes('non-veg') ||
+                    dietLabel.includes('non veg');
+                  const isJain =
+                    activeDietId === 'jain' || dietLabel.includes('jain');
+
+                  const translatedMap: {
+                    en: string;
+                    hi: string;
+                    gu: string;
+                    [lang: string]: string;
+                  } = {
+                    en: baseName,
+                    hi: (newDishTranslations.hi || '').trim() || baseName,
+                    gu: (newDishTranslations.gu || '').trim() || baseName,
+                  };
+                  Object.entries(newDishTranslations).forEach(([code, val]) => {
+                    if (val.trim()) translatedMap[code] = val.trim();
+                  });
+
                   saveMenuDish({
                     e: newDishEmoji || '🍲',
                     p: Number(newDishPrice) || 100,
-                    v: newDishVeg ? 1 : 0,
+                    v: isNonVeg ? 0 : 1,
+                    ...(isJain ? { jain: true } : {}),
+                    dietaryTags: [activeDietId],
                     available: true,
                     ...(newDishGst !== '' ? { gstRate: Number(newDishGst) } : {}),
-                    n: {
-                      en: newDishEn.trim(),
-                      hi: newDishHi.trim() || newDishEn.trim(),
-                      gu: newDishGu.trim() || newDishEn.trim(),
-                    },
+                    n: translatedMap,
                   });
                   setNewDishEn('');
-                  setNewDishHi('');
-                  setNewDishGu('');
+                  setNewDishTranslations({});
                   setNewDishGst('');
                 }}
               >
