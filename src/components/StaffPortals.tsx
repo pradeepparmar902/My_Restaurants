@@ -2222,6 +2222,8 @@ export function AdminPortalView() {
       : DEFAULT_MENU_LANGUAGES
   );
   const [newLangLabel, setNewLangLabel] = useState('');
+  const [editingLangCode, setEditingLangCode] = useState<string | null>(null);
+  const [editingLangLabel, setEditingLangLabel] = useState('');
   const [dietaryFiltersInput, setDietaryFiltersInput] = useState<DietaryFilterOption[]>(
     S.googleConfig.dietaryFilters
       ? S.googleConfig.dietaryFilters
@@ -2229,6 +2231,9 @@ export function AdminPortalView() {
   );
   const [newDietaryEmoji, setNewDietaryEmoji] = useState('🍗');
   const [newDietaryLabel, setNewDietaryLabel] = useState('');
+  const [editingDietaryId, setEditingDietaryId] = useState<string | null>(null);
+  const [editingDietaryEmoji, setEditingDietaryEmoji] = useState('');
+  const [editingDietaryLabel, setEditingDietaryLabel] = useState('');
   const [revUrlInput, setRevUrlInput] = useState(
     S.googleConfig.googleReviewUrl || ''
   );
@@ -2548,66 +2553,130 @@ export function AdminPortalView() {
         />
 
         <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
-          🌐 Customer Menu Languages (Toggle, Delete, or Add New)
+          🌐 Customer Menu Languages (Toggle, Edit Label, Delete, or Add New)
         </div>
         <div className="row" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
-          {menuLanguagesInput.map((lang) => (
-            <span
-              key={lang.code}
-              className="row"
-              style={{
-                gap: '4px',
-                padding: '2px 6px 2px 2px',
-                borderRadius: '999px',
-                background: 'rgba(255,255,255,0.06)',
-              }}
-            >
-              <button
-                type="button"
-                className={`chip ${lang.enabled ? 'on' : ''}`}
-                style={{ margin: 0 }}
-                onClick={() => {
-                  const enabledCount = menuLanguagesInput.filter((l) => l.enabled).length;
-                  if (lang.enabled && enabledCount <= 1) {
-                    say('Keep at least 1 language enabled');
-                    return;
-                  }
-                  setMenuLanguagesInput((prev) =>
-                    prev.map((l) =>
-                      l.code === lang.code ? { ...l, enabled: !l.enabled } : l
-                    )
-                  );
+          {menuLanguagesInput.map((lang) =>
+            editingLangCode === lang.code ? (
+              <span
+                key={lang.code}
+                className="row"
+                style={{
+                  gap: '4px',
+                  padding: '3px 6px',
+                  borderRadius: '10px',
+                  background: 'rgba(255,255,255,0.1)',
                 }}
               >
-                {lang.enabled ? '✅ ' : ''}{lang.label}
-              </button>
-              {menuLanguagesInput.length > 1 && (
+                <input
+                  value={editingLangLabel}
+                  onChange={(e) => setEditingLangLabel(e.target.value)}
+                  className="inp"
+                  style={{ width: '110px', padding: '4px 8px', fontSize: '12px' }}
+                  autoFocus
+                />
                 <button
                   type="button"
-                  title={`Delete ${lang.label}`}
+                  className="chip on"
+                  style={{ margin: 0, padding: '3px 8px', fontSize: '11px' }}
                   onClick={() => {
-                    const remaining = menuLanguagesInput.filter(
-                      (l) => l.code !== lang.code
+                    const nextLabel = editingLangLabel.trim();
+                    if (!nextLabel) return;
+                    setMenuLanguagesInput((prev) =>
+                      prev.map((l) =>
+                        l.code === lang.code ? { ...l, label: nextLabel } : l
+                      )
                     );
-                    if (!remaining.some((l) => l.enabled) && remaining[0]) {
-                      remaining[0] = { ...remaining[0], enabled: true };
+                    setEditingLangCode(null);
+                  }}
+                >
+                  ✓
+                </button>
+                <button
+                  type="button"
+                  className="chip"
+                  style={{ margin: 0, padding: '3px 7px', fontSize: '11px' }}
+                  onClick={() => setEditingLangCode(null)}
+                >
+                  ✕
+                </button>
+              </span>
+            ) : (
+              <span
+                key={lang.code}
+                className="row"
+                style={{
+                  gap: '2px',
+                  padding: '2px 6px 2px 2px',
+                  borderRadius: '999px',
+                  background: 'rgba(255,255,255,0.06)',
+                }}
+              >
+                <button
+                  type="button"
+                  className={`chip ${lang.enabled ? 'on' : ''}`}
+                  style={{ margin: 0 }}
+                  onClick={() => {
+                    const enabledCount = menuLanguagesInput.filter((l) => l.enabled).length;
+                    if (lang.enabled && enabledCount <= 1) {
+                      say('Keep at least 1 language enabled');
+                      return;
                     }
-                    setMenuLanguagesInput(remaining);
+                    setMenuLanguagesInput((prev) =>
+                      prev.map((l) =>
+                        l.code === lang.code ? { ...l, enabled: !l.enabled } : l
+                      )
+                    );
+                  }}
+                >
+                  {lang.enabled ? '✅ ' : ''}{lang.label}
+                </button>
+                <button
+                  type="button"
+                  title={`Rename ${lang.label}`}
+                  onClick={() => {
+                    setEditingLangCode(lang.code);
+                    setEditingLangLabel(lang.label);
                   }}
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: '#fca5a5',
+                    color: '#93c5fd',
                     cursor: 'pointer',
-                    fontSize: '12px',
+                    fontSize: '11px',
                     padding: '0 4px',
                   }}
                 >
-                  ✕
+                  ✏️
                 </button>
-              )}
-            </span>
-          ))}
+                {menuLanguagesInput.length > 1 && (
+                  <button
+                    type="button"
+                    title={`Delete ${lang.label}`}
+                    onClick={() => {
+                      const remaining = menuLanguagesInput.filter(
+                        (l) => l.code !== lang.code
+                      );
+                      if (!remaining.some((l) => l.enabled) && remaining[0]) {
+                        remaining[0] = { ...remaining[0], enabled: true };
+                      }
+                      setMenuLanguagesInput(remaining);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#fca5a5',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      padding: '0 4px',
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            )
+          )}
         </div>
         <div className="row" style={{ gap: '6px', marginBottom: '10px' }}>
           <input
@@ -2650,55 +2719,132 @@ export function AdminPortalView() {
         </div>
 
         <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
-          🥗 Customer Dietary Filter Chips (Toggle, Delete, or Add New)
+          🥗 Customer Dietary Filter Chips (Toggle, Edit Label, Delete, or Add New)
         </div>
         <div className="row" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
-          {dietaryFiltersInput.map((f) => (
-            <span
-              key={f.id}
-              className="row"
-              style={{
-                gap: '4px',
-                padding: '2px 6px 2px 2px',
-                borderRadius: '999px',
-                background: 'rgba(255,255,255,0.06)',
-              }}
-            >
-              <button
-                type="button"
-                className={`chip ${f.enabled ? 'on' : ''}`}
-                style={{ margin: 0 }}
-                onClick={() =>
-                  setDietaryFiltersInput((prev) =>
-                    prev.map((x) =>
-                      x.id === f.id ? { ...x, enabled: !x.enabled } : x
-                    )
-                  )
-                }
-              >
-                {f.enabled ? '✅ ' : ''}{f.emoji ? `${f.emoji} ` : ''}{f.label}
-              </button>
-              <button
-                type="button"
-                title={`Delete ${f.label}`}
-                onClick={() =>
-                  setDietaryFiltersInput((prev) =>
-                    prev.filter((x) => x.id !== f.id)
-                  )
-                }
+          {dietaryFiltersInput.map((f) =>
+            editingDietaryId === f.id ? (
+              <span
+                key={f.id}
+                className="row"
                 style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#fca5a5',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  padding: '0 4px',
+                  gap: '4px',
+                  padding: '3px 6px',
+                  borderRadius: '10px',
+                  background: 'rgba(255,255,255,0.1)',
                 }}
               >
-                ✕
-              </button>
-            </span>
-          ))}
+                <input
+                  value={editingDietaryEmoji}
+                  onChange={(e) => setEditingDietaryEmoji(e.target.value)}
+                  className="inp"
+                  style={{ width: '40px', padding: '4px', textAlign: 'center', fontSize: '12px' }}
+                />
+                <input
+                  value={editingDietaryLabel}
+                  onChange={(e) => setEditingDietaryLabel(e.target.value)}
+                  className="inp"
+                  style={{ width: '110px', padding: '4px 8px', fontSize: '12px' }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="chip on"
+                  style={{ margin: 0, padding: '3px 8px', fontSize: '11px' }}
+                  onClick={() => {
+                    const nextLabel = editingDietaryLabel.trim();
+                    if (!nextLabel) return;
+                    setDietaryFiltersInput((prev) =>
+                      prev.map((x) =>
+                        x.id === f.id
+                          ? {
+                              ...x,
+                              emoji: editingDietaryEmoji.trim(),
+                              label: nextLabel,
+                            }
+                          : x
+                      )
+                    );
+                    setEditingDietaryId(null);
+                  }}
+                >
+                  ✓
+                </button>
+                <button
+                  type="button"
+                  className="chip"
+                  style={{ margin: 0, padding: '3px 7px', fontSize: '11px' }}
+                  onClick={() => setEditingDietaryId(null)}
+                >
+                  ✕
+                </button>
+              </span>
+            ) : (
+              <span
+                key={f.id}
+                className="row"
+                style={{
+                  gap: '2px',
+                  padding: '2px 6px 2px 2px',
+                  borderRadius: '999px',
+                  background: 'rgba(255,255,255,0.06)',
+                }}
+              >
+                <button
+                  type="button"
+                  className={`chip ${f.enabled ? 'on' : ''}`}
+                  style={{ margin: 0 }}
+                  onClick={() =>
+                    setDietaryFiltersInput((prev) =>
+                      prev.map((x) =>
+                        x.id === f.id ? { ...x, enabled: !x.enabled } : x
+                      )
+                    )
+                  }
+                >
+                  {f.enabled ? '✅ ' : ''}{f.emoji ? `${f.emoji} ` : ''}{f.label}
+                </button>
+                <button
+                  type="button"
+                  title={`Rename ${f.label}`}
+                  onClick={() => {
+                    setEditingDietaryId(f.id);
+                    setEditingDietaryEmoji(f.emoji || '');
+                    setEditingDietaryLabel(f.label);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#93c5fd',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    padding: '0 4px',
+                  }}
+                >
+                  ✏️
+                </button>
+                <button
+                  type="button"
+                  title={`Delete ${f.label}`}
+                  onClick={() =>
+                    setDietaryFiltersInput((prev) =>
+                      prev.filter((x) => x.id !== f.id)
+                    )
+                  }
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#fca5a5',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    padding: '0 4px',
+                  }}
+                >
+                  ✕
+                </button>
+              </span>
+            )
+          )}
         </div>
         <div className="row" style={{ gap: '6px', marginBottom: '10px' }}>
           <input
