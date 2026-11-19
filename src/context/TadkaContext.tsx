@@ -159,6 +159,40 @@ interface TadkaContextValue {
 const STORAGE_KEY = 'tadka_production_state_v1';
 const CHANNEL_NAME = 'tadka_realtime_channel';
 
+/**
+ * Best-of-both-worlds browser persistence:
+ * Business data (menu, staff, tables, orders, GST/reward/brand config, proofs)
+ * lives in Google Sheets/Drive as the strict source of truth.
+ * Only the Sheet connection pointer + active browser session/cart/UI prefs are kept locally.
+ */
+function saveEphemeralBrowserState(state: AppState) {
+  if (typeof window === 'undefined') return;
+  try {
+    const minimal = {
+      me: state.me,
+      role: state.role,
+      tab: state.tab,
+      wtab: state.wtab,
+      lang: state.lang,
+      veg: state.veg,
+      jainOnly: state.jainOnly,
+      activeTable: state.activeTable,
+      draft: state.draft,
+      cart: state.cart,
+      sess: state.sess,
+      googleConfig: {
+        enabled: state.googleConfig?.enabled ?? true,
+        appsScriptWebAppUrl: state.googleConfig?.appsScriptWebAppUrl || '',
+        spreadsheetId: state.googleConfig?.spreadsheetId || '',
+        driveFolderId: state.googleConfig?.driveFolderId || '',
+      },
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
 const TadkaContext = createContext<TadkaContextValue | null>(null);
 
 export function TadkaProvider({
@@ -301,19 +335,38 @@ export function TadkaProvider({
 
         setS((prev) => ({
           ...prev,
-          ...parsed,
-          tables: qrDynamicTables || parsed.tables || prev.tables,
+          me: parsed.me || prev.me,
+          role: parsed.role || prev.role,
+          tab: parsed.tab || prev.tab,
+          wtab: parsed.wtab || prev.wtab,
+          lang: parsed.lang || prev.lang,
+          veg: typeof parsed.veg === 'boolean' ? parsed.veg : prev.veg,
+          jainOnly:
+            typeof parsed.jainOnly === 'boolean' ? parsed.jainOnly : prev.jainOnly,
+          draft: parsed.draft || {},
+          tables: qrDynamicTables || prev.tables,
           ctr: cleanCtr,
           counterBusinessDate: todayBizDate,
           usedCountersToday: cleanUsed,
-          sessionsByUser: cleanedSessionsByUser,
           sess: finalHydratedSess,
-          orders: finalHydratedSess ? parsed.orders || [] : [],
           cart: finalHydratedSess ? parsed.cart || {} : {},
-          status: finalHydratedSess ? parsed.status || 0 : 0,
-          paid: finalHydratedSess ? Boolean(parsed.paid) : false,
-          billSrc: finalHydratedSess ? parsed.billSrc || '' : '',
           activeTable: resolvedTableId,
+          googleConfig: {
+            ...prev.googleConfig,
+            enabled:
+              typeof parsed.googleConfig?.enabled === 'boolean'
+                ? parsed.googleConfig.enabled
+                : prev.googleConfig.enabled,
+            appsScriptWebAppUrl:
+              parsed.googleConfig?.appsScriptWebAppUrl ||
+              prev.googleConfig.appsScriptWebAppUrl,
+            spreadsheetId:
+              parsed.googleConfig?.spreadsheetId ||
+              prev.googleConfig.spreadsheetId,
+            driveFolderId:
+              parsed.googleConfig?.driveFolderId ||
+              prev.googleConfig.driveFolderId,
+          },
           toast: '',
         }));
       } else if (typeof window !== 'undefined' && !initialTableId) {
@@ -404,7 +457,7 @@ export function TadkaProvider({
 
       if (isHydratedRef.current && typeof window !== 'undefined') {
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(finalState));
+          saveEphemeralBrowserState(finalState);
           channelRef.current?.postMessage({ type: 'STATE_SYNC', payload: finalState });
           // Background auto-sync to Google Sheets & local CSV mirror ONLY when business data actually changes (not on UI tab/draft clicks)
           const hasDataMutation =
@@ -2910,7 +2963,7 @@ export function TadkaProvider({
             },
           };
           try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+            saveEphemeralBrowserState(nextState);
             channelRef.current?.postMessage({
               type: 'STATE_SYNC',
               payload: nextState,
@@ -2997,11 +3050,7 @@ export function TadkaProvider({
             prev.googleConfig.driveFolderId || tenantCfg.driveFolderId || '',
         };
         const next = { ...prev, googleConfig: mergedCfg };
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        } catch {
-          // ignore
-        }
+        saveEphemeralBrowserState(next);
         return next;
       });
 
