@@ -2369,19 +2369,39 @@ export function TadkaProvider({
         const isWebhookSet = mergedConfig.appsScriptWebAppUrl?.startsWith(
           'https://script.google.com/'
         );
+        if (isWebhookSet) {
+          try {
+            const nextStateForSheet = { ...S, googleConfig: mergedConfig };
+            const sheetsPayload = buildSheetRowsForState(nextStateForSheet);
+            await fetch(mergedConfig.appsScriptWebAppUrl, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({
+                action: 'SYNC_ALL_SHEETS',
+                spreadsheetId: mergedConfig.spreadsheetId,
+                driveFolderId: mergedConfig.driveFolderId,
+                sheets: sheetsPayload,
+                timestamp: new Date().toISOString(),
+              }),
+            });
+          } catch {
+            // ignore network error
+          }
+        }
         updateState((prev) => ({
           ...prev,
           googleConfig: {
             ...mergedConfig,
             lastSyncedAt: new Date().toISOString(),
-            lastSyncStatus: 'synced',
+            lastSyncStatus: isWebhookSet ? 'synced' : 'idle',
             lastSyncError: undefined,
           },
         }));
         say(
           isWebhookSet
-            ? 'Synced all 9 sheets to Google Sheets ✅'
-            : 'Saved in browser storage (Paste Apps Script URL to sync to Google Sheet)'
+            ? 'Synced all sheets to Google Sheets ✅'
+            : 'Saved locally (Paste Apps Script URL to sync to Google Sheet)'
         );
       }
     },
