@@ -32,12 +32,18 @@ export function MenuTabView() {
   const [optMob, setOptMob] = useState('');
   const [showOptMob, setShowOptMob] = useState(false);
   const [activeCustomDietary, setActiveCustomDietary] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [onlyBestsellers, setOnlyBestsellers] = useState(false);
+  const [sortPriceAsc, setSortPriceAsc] = useState(false);
+  const [gridView, setGridView] = useState<'grid' | 'list'>('grid');
+  const [lightTheme, setLightTheme] = useState(true);
   const currentStaff = staffOf();
 
   const L: Record<string, string> = {
-    en: 'Menu',
-    hi: 'मेन्यू',
-    gu: 'મેનુ',
+    en: 'RECOMMENDED FOR YOU',
+    hi: 'आपके लिए खास मेन्यू',
+    gu: 'તમારા માટે ખાસ મેનુ',
   };
 
   const configuredLanguages = S.googleConfig.menuLanguages?.length
@@ -58,25 +64,6 @@ export function MenuTabView() {
         if (f.id === 'jain') return S.googleConfig.showJainFilter !== false;
         return true;
       });
-
-  const filteredMenu = S.menu.filter((m) => {
-    if (!m.available) return false;
-    if (S.veg && m.v !== 1) return false;
-    if (S.jainOnly && !m.jain) return false;
-    for (const fid of activeCustomDietary) {
-      const fObj = visibleDietaryFilters.find((x) => x.id === fid);
-      const lbl = (fObj?.label || fid).toLowerCase();
-      if (fid === 'nonveg' || lbl.includes('non-veg') || lbl.includes('non veg')) {
-        if (m.v !== 0) return false;
-      } else if (
-        !(m.dietaryTags || []).includes(fid) &&
-        !m.n.en.toLowerCase().includes(lbl)
-      ) {
-        return false;
-      }
-    }
-    return true;
-  });
 
   const activeTableLabel =
     S.tables.find((t) => t.id === S.activeTable)?.label ||
@@ -113,34 +100,522 @@ export function MenuTabView() {
     return { dishCountsToday: counts, topDishId: bestId };
   })();
 
+  const getDishCategory = (m: (typeof S.menu)[number]): string => {
+    const en = (m.n.en || '').toLowerCase();
+    const em = m.e || '';
+    if (
+      em === '🌯' ||
+      em === '🌮' ||
+      em === '🥙' ||
+      en.includes('roll') ||
+      en.includes('wrap') ||
+      en.includes('frankie') ||
+      en.includes('shawarma')
+    ) {
+      return 'rolls';
+    }
+    if (
+      em === '🍔' ||
+      em === '🍟' ||
+      em === '🍕' ||
+      em === '🌭' ||
+      en.includes('burger') ||
+      en.includes('fries') ||
+      en.includes('sandwich') ||
+      en.includes('pizza') ||
+      en.includes('samosa')
+    ) {
+      return 'burgers';
+    }
+    if (
+      em === '🥤' ||
+      em === '🍮' ||
+      em === '🍰' ||
+      em === '🍨' ||
+      em === '☕' ||
+      en.includes('cooler') ||
+      en.includes('drink') ||
+      en.includes('coffee') ||
+      en.includes('tea') ||
+      en.includes('jamun') ||
+      en.includes('cake') ||
+      en.includes('dessert') ||
+      en.includes('shake')
+    ) {
+      return 'drinks';
+    }
+    return 'mains';
+  };
+
+  const categoryTabs = [
+    { id: 'all', label: 'All', emoji: '🍽️', bg: 'linear-gradient(135deg,#fef3c7,#fde68a)' },
+    { id: 'under100', label: 'Under ₹100', emoji: '🏷️', bg: 'linear-gradient(135deg,#dbeafe,#bfdbfe)' },
+    { id: 'rolls', label: 'Rolls & Wraps', emoji: '🌯', bg: 'linear-gradient(135deg,#ffedd5,#fed7aa)' },
+    { id: 'burgers', label: 'Burgers & Snacks', emoji: '🍔', bg: 'linear-gradient(135deg,#fee2e2,#fecaca)' },
+    { id: 'mains', label: 'Noodles & Bowls', emoji: '🍜', bg: 'linear-gradient(135deg,#dcfce7,#bbf7d0)' },
+    { id: 'drinks', label: 'Drinks & Sweets', emoji: '🥤', bg: 'linear-gradient(135deg,#f3e8ff,#e9d5ff)' },
+  ];
+
+  const filteredMenu = S.menu
+    .filter((m) => {
+      if (!m.available) return false;
+      if (S.veg && m.v !== 1) return false;
+      if (S.jainOnly && !m.jain) return false;
+      for (const fid of activeCustomDietary) {
+        const fObj = visibleDietaryFilters.find((x) => x.id === fid);
+        const lbl = (fObj?.label || fid).toLowerCase();
+        if (
+          fid === 'nonveg' ||
+          lbl.includes('non-veg') ||
+          lbl.includes('non veg')
+        ) {
+          if (m.v !== 0) return false;
+        } else if (
+          !(m.dietaryTags || []).includes(fid) &&
+          !m.n.en.toLowerCase().includes(lbl)
+        ) {
+          return false;
+        }
+      }
+      if (activeCategory === 'under100' && m.p > 100) return false;
+      if (
+        activeCategory !== 'all' &&
+        activeCategory !== 'under100' &&
+        getDishCategory(m) !== activeCategory
+      ) {
+        return false;
+      }
+      if (onlyBestsellers && (dishCountsToday[m.id] || 0) === 0 && m.id > 3) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const matchEn = (m.n.en || '').toLowerCase().includes(q);
+        const matchLang = (m.n[S.lang] || '').toLowerCase().includes(q);
+        if (!matchEn && !matchLang) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => (sortPriceAsc ? a.p - b.p : 0));
+
+  const rules = {
+    ...DEFAULT_REWARD_RULES,
+    ...(S.googleConfig.rewardRules || {}),
+  };
+  const brandName = (S.googleConfig.restaurantName || '').trim() || 'Tadka Truck';
+  const taglineText =
+    S.sess && S.orders.length > 0 && !S.paid
+      ? S.sess.pend
+        ? 'Counter number pending. Get it from the waiter or reception and enter it in the Order tab.'
+        : `Counter ${S.sess.no} · Add more anytime until you pay.`
+      : (S.googleConfig.restaurantTagline || '').trim() ||
+        'Scan done. Pick your food, we cook it fresh.';
+
+  const cardBgGradients = [
+    'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+    'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+    'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+    'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+    'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
+    'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+  ];
+
+  const surfaceBg = lightTheme ? '#f4f6f8' : 'rgba(255,255,255,0.03)';
+  const cardSurface = lightTheme ? '#ffffff' : '#23153c';
+  const textPrimary = lightTheme ? '#0f172a' : '#f8fafc';
+  const textMuted = lightTheme ? '#64748b' : '#b9a8e0';
+  const borderCol = lightTheme ? '#e2e8f0' : 'rgba(255,255,255,0.12)';
+
   return (
-    <>
-      <div className="hero">
-        <h1>
-          {(S.googleConfig.restaurantName || '').trim() || 'Tadka Truck'}
-          <br />
-          {activeTableLabel} 🔥
-        </h1>
-        <p>
-          {S.sess && S.orders.length > 0 && !S.paid
-            ? S.sess.pend
-              ? 'Counter number pending. Get it from the waiter or reception and enter it in the Order tab.'
-              : `Counter ${S.sess.no}. Add more anytime until you pay.`
-            : (S.googleConfig.restaurantTagline || '').trim() ||
-              'Scan done. Pick your food, we cook it fresh.'}
-        </p>
+    <div
+      style={{
+        background: surfaceBg,
+        color: textPrimary,
+        borderRadius: '20px',
+        padding: '12px',
+        marginTop: '6px',
+        boxShadow: lightTheme
+          ? '0 10px 30px rgba(15, 23, 42, 0.12)'
+          : 'none',
+        transition: 'background 0.2s ease',
+      }}
+    >
+      {/* Top Restaurant Header Bar + Language & Theme Controls */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #065f46 0%, #16a34a 55%, #ea580c 100%)',
+          borderRadius: '16px',
+          padding: '14px',
+          color: '#ffffff',
+          position: 'relative',
+          overflow: 'hidden',
+          boxShadow: '0 6px 18px rgba(22, 163, 74, 0.25)',
+        }}
+      >
+        <div className="row sp" style={{ alignItems: 'flex-start', gap: '8px' }}>
+          <div>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: 'rgba(0,0,0,0.28)',
+                padding: '3px 9px',
+                borderRadius: '999px',
+                fontSize: '11px',
+                fontWeight: 700,
+                marginBottom: '6px',
+              }}
+            >
+              <span>📍 {activeTableLabel}</span>
+              <span>·</span>
+              <span>⚡ Fresh Dine-In / Takeaway</span>
+            </div>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: '23px',
+                fontWeight: 800,
+                letterSpacing: '-0.3px',
+                lineHeight: 1.15,
+              }}
+            >
+              {brandName} 🔥
+            </h1>
+            <p
+              style={{
+                margin: '4px 0 0',
+                fontSize: '12px',
+                color: 'rgba(255,255,255,0.92)',
+              }}
+            >
+              {taglineText}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setLightTheme((v) => !v)}
+            title="Switch Light / Dark Menu Style"
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: '1px solid rgba(255,255,255,0.35)',
+              color: '#fff',
+              borderRadius: '999px',
+              padding: '5px 10px',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {lightTheme ? '🌙 Dark' : '☀️ Light'}
+          </button>
+        </div>
+
+        {/* Language Switcher Row inside Header */}
+        <div
+          className="row"
+          style={{
+            flexWrap: 'wrap',
+            gap: '5px',
+            marginTop: '10px',
+          }}
+        >
+          {visibleLanguages.map((l) => {
+            const active = S.lang === l.code;
+            return (
+              <button
+                key={l.code}
+                type="button"
+                onClick={() => setLang(l.code as Language)}
+                style={{
+                  background: active ? '#ffffff' : 'rgba(0,0,0,0.25)',
+                  color: active ? '#065f46' : '#ffffff',
+                  border: active
+                    ? '1px solid #ffffff'
+                    : '1px solid rgba(255,255,255,0.3)',
+                  borderRadius: '999px',
+                  padding: '4px 11px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                🌐 {l.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="row" style={{ flexWrap: 'wrap' }}>
-        {visibleLanguages.map((l) => (
-          <button
-            key={l.code}
-            className={`chip ${S.lang === l.code ? 'on' : ''}`}
-            onClick={() => setLang(l.code as Language)}
+      {/* Promotional Offer Strip (Swiggy / EatClub Style) */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: '8px',
+          marginTop: '10px',
+        }}
+      >
+        <div
+          style={{
+            background: lightTheme
+              ? 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)'
+              : 'rgba(244,63,94,0.15)',
+            border: lightTheme ? '1px solid #fecdd3' : '1px solid rgba(244,63,94,0.3)',
+            borderRadius: '12px',
+            padding: '8px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span style={{ fontSize: '20px' }}>🏷️</span>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: '11px',
+                fontWeight: 800,
+                color: lightTheme ? '#be123c' : '#fda4af',
+              }}
+            >
+              {rules.couponType === 'percent'
+                ? `${rules.couponValue}% OFF`
+                : `FLAT ₹${rules.couponValue} OFF`}
+              {rules.couponMinBill > 0 ? ` above ₹${rules.couponMinBill}` : ''}
+            </div>
+            <div style={{ fontSize: '10px', color: textMuted }}>
+              Use code <b>{rules.couponCode}</b>
+            </div>
+          </div>
+        </div>
+        <div
+          style={{
+            background: lightTheme
+              ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
+              : 'rgba(16,185,129,0.15)',
+            border: lightTheme ? '1px solid #a7f3d0' : '1px solid rgba(16,185,129,0.3)',
+            borderRadius: '12px',
+            padding: '8px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span style={{ fontSize: '20px' }}>⭐</span>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: '11px',
+                fontWeight: 800,
+                color: lightTheme ? '#047857' : '#6ee7b7',
+              }}
+            >
+              {rules.starFreeRewardLabel}
+            </div>
+            <div style={{ fontSize: '10px', color: textMuted }}>
+              Collect {rules.starsTarget} stars · Save ₹{rules.reviewDiscountInr} on review
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search Bar + Prominent VEG Sliding Toggle (Images 5, 6, 7, 13) */}
+      <div
+        className="row"
+        style={{
+          marginTop: '12px',
+          gap: '8px',
+          alignItems: 'center',
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            background: cardSurface,
+            border: `1.5px solid ${borderCol}`,
+            borderRadius: '14px',
+            padding: '8px 12px',
+            gap: '8px',
+            boxShadow: lightTheme ? '0 2px 6px rgba(15,23,42,0.04)' : 'none',
+          }}
+        >
+          <span style={{ fontSize: '15px', opacity: 0.7 }}>🔍</span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={`Search "${S.menu[0]?.n.en || 'paneer'}", rolls, drinks...`}
+            style={{
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              color: textPrimary,
+              fontSize: '13px',
+              width: '100%',
+              padding: 0,
+              margin: 0,
+            }}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: textMuted,
+                cursor: 'pointer',
+                fontSize: '13px',
+                padding: '0 2px',
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Dedicated VEG Toggle Switch */}
+        {visibleDietaryFilters.some((f) => f.id === 'veg') && (
+          <div
+            onClick={toggleVeg}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              background: cardSurface,
+              border: `1.5px solid ${S.veg ? '#16a34a' : borderCol}`,
+              borderRadius: '14px',
+              padding: '5px 10px',
+              userSelect: 'none',
+            }}
           >
-            {l.label}
-          </button>
-        ))}
+            <span
+              style={{
+                fontSize: '9px',
+                fontWeight: 800,
+                letterSpacing: '0.5px',
+                color: S.veg ? '#16a34a' : textMuted,
+                marginBottom: '2px',
+              }}
+            >
+              VEG
+            </span>
+            <div
+              style={{
+                width: '34px',
+                height: '18px',
+                borderRadius: '999px',
+                background: S.veg ? '#16a34a' : '#cbd5e1',
+                position: 'relative',
+                transition: 'background 0.2s',
+              }}
+            >
+              <div
+                style={{
+                  width: '14px',
+                  height: '14px',
+                  borderRadius: '50%',
+                  background: '#ffffff',
+                  position: 'absolute',
+                  top: '2px',
+                  left: S.veg ? '18px' : '2px',
+                  transition: 'left 0.2s',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Horizontal Visual Category Carousel with Green Active Underline (Images 1-6, 13) */}
+      <div
+        style={{
+          display: 'flex',
+          overflowX: 'auto',
+          gap: '10px',
+          marginTop: '12px',
+          paddingBottom: '2px',
+          borderBottom: `1px solid ${borderCol}`,
+          scrollbarWidth: 'none',
+        }}
+      >
+        {categoryTabs.map((cat) => {
+          const isActive = activeCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setActiveCategory(cat.id)}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '5px',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: isActive
+                  ? '3px solid #16a34a'
+                  : '3px solid transparent',
+                padding: '4px 8px 8px',
+                cursor: 'pointer',
+                minWidth: '68px',
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '14px',
+                  background: cat.bg,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px',
+                  boxShadow: isActive
+                    ? '0 4px 10px rgba(22,163,74,0.22)'
+                    : '0 2px 5px rgba(15,23,42,0.06)',
+                  border: isActive
+                    ? '2px solid #16a34a'
+                    : '1px solid rgba(0,0,0,0.05)',
+                  transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {cat.emoji}
+              </div>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: isActive ? 800 : 600,
+                  color: isActive ? '#16a34a' : textMuted,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {cat.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Horizontal Dietary & Quick Filter Pills + Grid/List Toggle (Images 1, 2, 5, 13) */}
+      <div
+        style={{
+          display: 'flex',
+          overflowX: 'auto',
+          gap: '6px',
+          marginTop: '10px',
+          paddingBottom: '4px',
+          alignItems: 'center',
+        }}
+      >
         {visibleDietaryFilters.map((f) => {
           const isVeg = f.id === 'veg';
           const isJain = f.id === 'jain';
@@ -152,7 +627,7 @@ export function MenuTabView() {
           return (
             <button
               key={f.id}
-              className={`chip ${isOn ? 'on' : ''}`}
+              type="button"
               onClick={() => {
                 if (isVeg) {
                   toggleVeg();
@@ -166,68 +641,598 @@ export function MenuTabView() {
                   );
                 }
               }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '6px 11px',
+                borderRadius: '10px',
+                fontSize: '12px',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                background: isOn
+                  ? '#dcfce7'
+                  : cardSurface,
+                color: isOn ? '#15803d' : textPrimary,
+                border: isOn
+                  ? '1.5px solid #16a34a'
+                  : `1px solid ${borderCol}`,
+                boxShadow: lightTheme ? '0 1px 3px rgba(15,23,42,0.04)' : 'none',
+              }}
             >
-              {f.emoji ? `${f.emoji} ` : ''}{f.label}
+              {f.emoji ? `${f.emoji} ` : ''}
+              {f.label}
+              {isOn ? ' ✓' : ''}
             </button>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => setOnlyBestsellers((v) => !v)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '6px 11px',
+            borderRadius: '10px',
+            fontSize: '12px',
+            fontWeight: 700,
+            whiteSpace: 'nowrap',
+            cursor: 'pointer',
+            background: onlyBestsellers ? '#ffedd5' : cardSurface,
+            color: onlyBestsellers ? '#c2410c' : textPrimary,
+            border: onlyBestsellers
+              ? '1.5px solid #ea580c'
+              : `1px solid ${borderCol}`,
+          }}
+        >
+          🔥 Bestsellers
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSortPriceAsc((v) => !v)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '6px 11px',
+            borderRadius: '10px',
+            fontSize: '12px',
+            fontWeight: 700,
+            whiteSpace: 'nowrap',
+            cursor: 'pointer',
+            background: sortPriceAsc ? '#dbeafe' : cardSurface,
+            color: sortPriceAsc ? '#1d4ed8' : textPrimary,
+            border: sortPriceAsc
+              ? '1.5px solid #2563eb'
+              : `1px solid ${borderCol}`,
+          }}
+        >
+          ⇅ Price: Low to High
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setGridView((v) => (v === 'grid' ? 'list' : 'grid'))}
+          style={{
+            marginLeft: 'auto',
+            padding: '6px 10px',
+            borderRadius: '10px',
+            fontSize: '11px',
+            fontWeight: 700,
+            whiteSpace: 'nowrap',
+            cursor: 'pointer',
+            background: cardSurface,
+            color: textMuted,
+            border: `1px solid ${borderCol}`,
+          }}
+        >
+          {gridView === 'grid' ? '☰ List' : '⊞ Grid'}
+        </button>
+      </div>
+
+      {/* Section Heading */}
+      <div
+        className="row sp"
+        style={{
+          marginTop: '14px',
+          marginBottom: '10px',
+          alignItems: 'center',
+        }}
+      >
+        <span
+          style={{
+            fontSize: '12px',
+            fontWeight: 800,
+            letterSpacing: '1.2px',
+            color: textMuted,
+            textTransform: 'uppercase',
+          }}
+        >
+          {L[S.lang] || 'RECOMMENDED FOR YOU'} ({filteredMenu.length})
+        </span>
+        {(S.veg ||
+          S.jainOnly ||
+          activeCustomDietary.length > 0 ||
+          activeCategory !== 'all' ||
+          onlyBestsellers ||
+          searchQuery) && (
+          <button
+            type="button"
+            onClick={() => {
+              if (S.veg) toggleVeg();
+              if (S.jainOnly) updateState((p) => ({ ...p, jainOnly: false }));
+              setActiveCustomDietary([]);
+              setActiveCategory('all');
+              setOnlyBestsellers(false);
+              setSearchQuery('');
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#ea580c',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Reset Filters ✕
+          </button>
+        )}
+      </div>
+
+      {/* Empty Filter State */}
+      {filteredMenu.length === 0 && (
+        <div
+          style={{
+            background: cardSurface,
+            border: `1px dashed ${borderCol}`,
+            borderRadius: '14px',
+            padding: '24px 16px',
+            textAlign: 'center',
+            color: textMuted,
+            fontSize: '13px',
+          }}
+        >
+          No dishes match the selected filters. Tap <b>Reset Filters</b> above to
+          view all items.
+        </div>
+      )}
+
+      {/* Dish Cards Grid / List (Images 1, 2, 3, 8, 10, 13) */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns:
+            gridView === 'grid'
+              ? 'repeat(auto-fill, minmax(152px, 1fr))'
+              : '1fr',
+          gap: '12px',
+        }}
+      >
+        {filteredMenu.map((m, idx) => {
+          const draftQty = S.draft[m.id] || 0;
+          const todayOrderedCount = dishCountsToday[m.id] || 0;
+          const isTop = m.id === topDishId;
+          const ratingVal = (4.3 + ((m.id * 7) % 6) * 0.1).toFixed(1);
+          const bgGrad = cardBgGradients[idx % cardBgGradients.length];
+
+          // Authentic Indian FSSAI Veg/Non-Veg Square Symbol
+          const fssaiBadge = (
+            <span
+              title={m.v ? 'Pure Veg' : 'Non-Veg'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '14px',
+                height: '14px',
+                border: `1.5px solid ${m.v ? '#16a34a' : '#dc2626'}`,
+                borderRadius: '3px',
+                flexShrink: 0,
+              }}
+            >
+              <span
+                style={{
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: m.v ? '50%' : '1px',
+                  background: m.v ? '#16a34a' : '#dc2626',
+                }}
+              />
+            </span>
+          );
+
+          const addControl =
+            draftQty === 0 ? (
+              <button
+                type="button"
+                aria-label="Add"
+                onClick={() => changeDraftQty(m.id, 1)}
+                style={{
+                  background: lightTheme ? '#ffffff' : '#16a34a',
+                  color: lightTheme ? '#15803d' : '#ffffff',
+                  border: '1.5px solid #16a34a',
+                  borderRadius: '10px',
+                  padding: '6px 16px',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(22,163,74,0.18)',
+                }}
+              >
+                ADD +
+              </button>
+            ) : (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  boxShadow: '0 2px 6px rgba(22,163,74,0.28)',
+                }}
+              >
+                <button
+                  type="button"
+                  aria-label="Remove"
+                  onClick={() => changeDraftQty(m.id, -1)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '5px 10px',
+                    fontSize: '14px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  −
+                </button>
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    minWidth: '18px',
+                    textAlign: 'center',
+                  }}
+                >
+                  {draftQty}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Add"
+                  onClick={() => changeDraftQty(m.id, 1)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#ffffff',
+                    padding: '5px 10px',
+                    fontSize: '14px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  +
+                </button>
+              </div>
+            );
+
+          if (gridView === 'list') {
+            return (
+              <div
+                key={m.id}
+                style={{
+                  background: cardSurface,
+                  border: `1px solid ${
+                    draftQty > 0 ? '#16a34a' : borderCol
+                  }`,
+                  borderRadius: '16px',
+                  padding: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  boxShadow: lightTheme
+                    ? '0 3px 10px rgba(15,23,42,0.05)'
+                    : 'none',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    className="row"
+                    style={{ gap: '6px', alignItems: 'center', marginBottom: '4px' }}
+                  >
+                    {fssaiBadge}
+                    {isTop ? (
+                      <span
+                        style={{
+                          background: '#ffedd5',
+                          color: '#c2410c',
+                          fontSize: '10px',
+                          fontWeight: 800,
+                          padding: '2px 7px',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        ⭐ #1 Bestseller
+                      </span>
+                    ) : todayOrderedCount > 0 ? (
+                      <span
+                        style={{
+                          background: '#fef3c7',
+                          color: '#b45309',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '2px 7px',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        🔥 {todayOrderedCount} ordered today
+                      </span>
+                    ) : null}
+                    {m.jain && (
+                      <span
+                        style={{
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: '6px',
+                        }}
+                      >
+                        🙏 Jain
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: 800,
+                      color: textPrimary,
+                      lineHeight: 1.25,
+                    }}
+                  >
+                    {m.n[S.lang] || m.n.en}
+                  </div>
+                  <div
+                    className="row"
+                    style={{
+                      gap: '8px',
+                      alignItems: 'center',
+                      marginTop: '6px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '15px',
+                        fontWeight: 800,
+                        color: textPrimary,
+                      }}
+                    >
+                      ₹{m.p}
+                    </span>
+                    <span
+                      style={{
+                        background: '#15803d',
+                        color: '#ffffff',
+                        fontSize: '10px',
+                        fontWeight: 800,
+                        padding: '2px 6px',
+                        borderRadius: '6px',
+                      }}
+                    >
+                      ★ {ratingVal}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '78px',
+                      height: '72px',
+                      borderRadius: '14px',
+                      background: bgGrad,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '36px',
+                      border: '1px solid rgba(0,0,0,0.05)',
+                    }}
+                  >
+                    {m.e}
+                  </div>
+                  {addControl}
+                </div>
+              </div>
+            );
+          }
+
+          // Default 2-Column Visual Grid Card (Images 1, 3, 8, 10, 13)
+          return (
+            <div
+              key={m.id}
+              style={{
+                background: cardSurface,
+                border: `1.5px solid ${
+                  draftQty > 0 ? '#16a34a' : borderCol
+                }`,
+                borderRadius: '16px',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxShadow: lightTheme
+                  ? '0 4px 12px rgba(15,23,42,0.06)'
+                  : 'none',
+              }}
+            >
+              {/* Visual Food Plate Header */}
+              <div
+                style={{
+                  background: bgGrad,
+                  height: '112px',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '50px',
+                }}
+              >
+                {/* Top-Left Offer / Trending Badge (like Images 1, 3, 13) */}
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '8px',
+                    background: isTop
+                      ? '#ea580c'
+                      : 'rgba(15, 23, 42, 0.78)',
+                    color: '#ffffff',
+                    fontSize: '9.5px',
+                    fontWeight: 800,
+                    padding: '3px 7px',
+                    borderRadius: '6px',
+                    backdropFilter: 'blur(4px)',
+                  }}
+                >
+                  {isTop
+                    ? `⭐ #1 Trending (${todayOrderedCount})`
+                    : todayOrderedCount > 0
+                      ? `🔥 ${todayOrderedCount} ordered`
+                      : m.p <= 100
+                        ? '🏷️ Pocket Friendly'
+                        : '✨ Chef Special'}
+                </span>
+
+                <span>{m.e}</span>
+
+                {/* Bottom-Left Green Star Pill (like Images 1, 3, 13) */}
+                <span
+                  style={{
+                    position: 'absolute',
+                    bottom: '8px',
+                    left: '8px',
+                    background: '#15803d',
+                    color: '#ffffff',
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    padding: '2px 7px',
+                    borderRadius: '999px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.18)',
+                  }}
+                >
+                  ★ {ratingVal}
+                </span>
+
+                {m.jain && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '8px',
+                      background: 'rgba(255,255,255,0.92)',
+                      color: '#15803d',
+                      fontSize: '9.5px',
+                      fontWeight: 800,
+                      padding: '2px 6px',
+                      borderRadius: '999px',
+                      border: '1px solid #86efac',
+                    }}
+                  >
+                    🙏 Jain
+                  </span>
+                )}
+              </div>
+
+              {/* Card Body */}
+              <div
+                style={{
+                  padding: '10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  flex: 1,
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '6px',
+                  }}
+                >
+                  <div style={{ marginTop: '2px' }}>{fssaiBadge}</div>
+                  <div
+                    style={{
+                      fontSize: '13.5px',
+                      fontWeight: 800,
+                      color: textPrimary,
+                      lineHeight: 1.25,
+                    }}
+                  >
+                    {m.n[S.lang] || m.n.en}
+                  </div>
+                </div>
+
+                <div
+                  className="row sp"
+                  style={{
+                    marginTop: '4px',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '15px',
+                        fontWeight: 800,
+                        color: textPrimary,
+                      }}
+                    >
+                      ₹{m.p}
+                    </div>
+                    <div style={{ fontSize: '9.5px', color: textMuted }}>
+                      ⏱️ Fresh · 8-12 mins
+                    </div>
+                  </div>
+                  {addControl}
+                </div>
+              </div>
+            </div>
           );
         })}
       </div>
 
-      <h2 style={{ marginTop: '14px' }}>{L[S.lang] || 'Menu'}</h2>
-
-      {filteredMenu.map((m) => {
-        const draftQty = S.draft[m.id] || 0;
-        const todayOrderedCount = dishCountsToday[m.id] || 0;
-        return (
-          <div key={m.id} className="card dish">
-            <div className="em">{m.e}</div>
-            <div>
-              <b>
-                <span className={`veg ${m.v ? '' : 'nv'}`} />
-                {m.n[S.lang] || m.n.en}
-              </b>
-              {todayOrderedCount > 0 && (
-                <div style={{ marginTop: '3px' }}>
-                  <span className="tag hot" style={{ fontSize: '10px' }}>
-                    {m.id === topDishId
-                      ? `⭐ #1 Trending · ${todayOrderedCount} today`
-                      : `🔥 ${todayOrderedCount} ordered today`}
-                  </span>
-                </div>
-              )}
-              <span className="mu">
-                ₹{m.p}
-                {m.jain ? ' · Jain' : ''}
-              </span>
-            </div>
-            <div className="qty">
-              {draftQty > 0 && (
-                <>
-                  <button
-                    aria-label="Remove"
-                    onClick={() => changeDraftQty(m.id, -1)}
-                  >
-                    −
-                  </button>
-                  <b>{draftQty}</b>
-                </>
-              )}
-              <button
-                aria-label="Add"
-                onClick={() => changeDraftQty(m.id, 1)}
-              >
-                +
-              </button>
-            </div>
-          </div>
-        );
-      })}
-
+      {/* Optional Guest WhatsApp Bill Number Input */}
       {cnt() > 0 && !S.sess?.mob && !S.me.mob && (
-        <div className="card">
+        <div
+          style={{
+            marginTop: '14px',
+            background: cardSurface,
+            border: `1px solid ${borderCol}`,
+            borderRadius: '14px',
+            padding: '12px',
+          }}
+        >
           <div className="row sp">
-            <span className="mu">
-              💬 Want your final bill & offers on WhatsApp? (Optional)
+            <span style={{ fontSize: '12px', color: textMuted }}>
+              💬 Want your final bill &amp; offers on WhatsApp? (Optional)
             </span>
             <button
               className="chip"
@@ -245,8 +1250,13 @@ export function MenuTabView() {
                 placeholder="WhatsApp mobile number"
               />
               <label
-                className="row mu"
-                style={{ marginTop: '8px', cursor: 'pointer' }}
+                className="row"
+                style={{
+                  marginTop: '8px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: textMuted,
+                }}
               >
                 <input
                   type="checkbox"
@@ -262,12 +1272,23 @@ export function MenuTabView() {
         </div>
       )}
 
+      {/* Staff Ordering on Behalf of Customer */}
       {currentStaff && cnt() > 0 && (
-        <div className="card">
+        <div
+          style={{
+            marginTop: '14px',
+            background: cardSurface,
+            border: `1px solid ${borderCol}`,
+            borderRadius: '14px',
+            padding: '12px',
+          }}
+        >
           <div className="row sp">
-            <b>👤 Ordering on behalf of Customer ({currentStaff.r})</b>
+            <b style={{ color: textPrimary }}>
+              👤 Ordering on behalf of Customer ({currentStaff.r})
+            </b>
           </div>
-          <p className="mu" style={{ margin: '4px 0 8px', fontSize: '12px' }}>
+          <p style={{ margin: '4px 0 8px', fontSize: '12px', color: textMuted }}>
             Enter the customer&apos;s mobile number to place this order under
             their name &amp; counter (leave blank to use {S.me.mob}).
           </p>
@@ -278,8 +1299,13 @@ export function MenuTabView() {
             placeholder="Customer mobile number"
           />
           <label
-            className="row mu"
-            style={{ marginTop: '8px', cursor: 'pointer' }}
+            className="row"
+            style={{
+              marginTop: '8px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              color: textMuted,
+            }}
           >
             <input
               type="checkbox"
@@ -293,22 +1319,87 @@ export function MenuTabView() {
         </div>
       )}
 
-      <button
-        className="btn"
-        disabled={cnt() === 0}
-        onClick={() => {
-          placeOrder(optMob, S.waOptIn);
-          if (currentStaff) setOptMob('');
-        }}
-      >
-        {!S.me.mob
-          ? 'Login & Place order'
-          : S.sess
-            ? 'Add to my order'
-            : 'Place order'}{' '}
-        · ₹{dsub()}
-      </button>
-    </>
+      {/* Floating Swiggy / Zomato Style Bottom View Cart & Place Order Bar (Images 1-6, 13) */}
+      {cnt() > 0 ? (
+        <div
+          style={{
+            position: 'sticky',
+            bottom: '10px',
+            marginTop: '14px',
+            background: '#ffffff',
+            color: '#0f172a',
+            borderRadius: '16px',
+            padding: '10px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            boxShadow: '0 10px 28px rgba(15, 23, 42, 0.25)',
+            border: '1.5px solid #16a34a',
+            zIndex: 20,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                background: '#dcfce7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '19px',
+              }}
+            >
+              🛒
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>
+                {brandName}
+              </div>
+              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#15803d' }}>
+                {cnt()} {cnt() === 1 ? 'item' : 'items'} · ₹{dsub()}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              placeOrder(optMob, S.waOptIn);
+              if (currentStaff) setOptMob('');
+            }}
+            style={{
+              background: '#16a34a',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '999px',
+              padding: '10px 18px',
+              fontSize: '13px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.35)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {!S.me.mob
+              ? 'Login & Order ▸'
+              : S.sess
+                ? 'Add to Order ▸'
+                : 'Place Order ▸'}
+          </button>
+        </div>
+      ) : (
+        <button
+          className="btn"
+          disabled
+          style={{ marginTop: '14px', opacity: 0.6 }}
+        >
+          Pick dishes above to place order · ₹0
+        </button>
+      )}
+    </div>
   );
 }
 
