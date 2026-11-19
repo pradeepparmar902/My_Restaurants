@@ -152,7 +152,7 @@ interface TadkaContextValue {
     mimeType?: string;
     base64Data?: string;
     caption?: string;
-  }) => Promise<void>;
+  }) => Promise<string | undefined>;
   saveGoogleConfig: (cfg: Partial<AppState['googleConfig']>) => void;
 }
 
@@ -2365,6 +2365,7 @@ export function TadkaProvider({
             },
           }));
           say(`Saved ${payload.kind} to Google Drive ✅`);
+          return data.asset.driveViewUrl as string | undefined;
         }
       } catch {
         // Fallback for static hosting (GitHub Pages): create Drive asset client-side & push directly if webhook is configured
@@ -2404,9 +2405,10 @@ export function TadkaProvider({
           driveAssets: [fallbackAsset, ...(prev.driveAssets || [])],
         }));
         say(`Saved ${payload.kind} to Google Drive ✅`);
+        return fallbackAsset.driveViewUrl;
       }
     },
-    [S.sess, S.me.mob, say, updateState]
+    [S.sess, S.me.mob, S.googleConfig?.appsScriptWebAppUrl, S.googleConfig?.driveFolderId, say, updateState]
   );
 
   const saveGoogleConfig = useCallback(

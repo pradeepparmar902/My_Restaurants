@@ -609,6 +609,7 @@ function ProofSubmissionBox({ kind }: { kind: 'social' | 'review' }) {
     proofSubmissions,
     submitSocialProof,
     pullFromGoogleSheets,
+    uploadMediaToDrive,
     say,
   } = useTadka();
   const socialPlatforms = ['Instagram', 'Facebook', 'WhatsApp Status', 'Snapchat'];
@@ -617,6 +618,10 @@ function ProofSubmissionBox({ kind }: { kind: 'social' | 'review' }) {
   );
   const [proofUrl, setProofUrl] = useState('');
   const [note, setNote] = useState('');
+  const [screenshotName, setScreenshotName] = useState('');
+  const [screenshotPreview, setScreenshotPreview] = useState('');
+  const [uploadingShot, setUploadingShot] = useState(false);
+  const shotInputRef = useRef<HTMLInputElement | null>(null);
 
   const myMob = S.sess?.mob || '';
   const myProofs = proofSubmissions
@@ -627,12 +632,48 @@ function ProofSubmissionBox({ kind }: { kind: 'social' | 'review' }) {
     )
     .slice(0, 5);
 
+  const handleScreenshotPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScreenshotName(file.name);
+    try {
+      setScreenshotPreview(URL.createObjectURL(file));
+    } catch {
+      // ignore preview error
+    }
+    setUploadingShot(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64 = typeof reader.result === 'string' ? reader.result : '';
+        const driveUrl = await uploadMediaToDrive({
+          fileName:
+            file.name ||
+            `proof_${kind}_table${S.activeTable}_${Date.now()}.jpg`,
+          kind: 'snap',
+          mimeType: file.type || 'image/jpeg',
+          base64Data: base64,
+          caption: `${kind === 'review' ? 'Google Review' : platform} Proof · Counter ${S.sess?.no || 'C27'}`,
+        });
+        if (driveUrl && !proofUrl.trim()) {
+          setProofUrl(driveUrl);
+        }
+        if (!note.trim()) {
+          setNote(`Screenshot: ${file.name}`);
+        }
+      } finally {
+        setUploadingShot(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = () => {
-    if (!proofUrl.trim() && !note.trim()) {
+    if (!proofUrl.trim() && !note.trim() && !screenshotName) {
       say(
         kind === 'review'
-          ? 'Enter your Google reviewer name or review link first'
-          : 'Paste your reel/post link or @handle note first'
+          ? 'Attach a screenshot, enter your Google reviewer name, or tap Verify at Counter'
+          : 'Attach a screenshot, paste a link/@handle, or tap Verify at Counter'
       );
       return;
     }
@@ -640,10 +681,27 @@ function ProofSubmissionBox({ kind }: { kind: 'social' | 'review' }) {
       kind,
       platform: kind === 'review' ? 'Google Review' : platform,
       proofUrl: proofUrl.trim() || undefined,
-      note: note.trim() || undefined,
+      note:
+        note.trim() ||
+        (screenshotName ? `Screenshot: ${screenshotName}` : undefined),
     });
     setProofUrl('');
     setNote('');
+    setScreenshotName('');
+    setScreenshotPreview('');
+  };
+
+  const handleVerifyAtCounter = () => {
+    submitSocialProof({
+      kind,
+      platform: kind === 'review' ? 'Google Review' : platform,
+      proofUrl: proofUrl.trim() || undefined,
+      note: note.trim() || '⚡ Verify at Counter (customer will show phone)',
+    });
+    setProofUrl('');
+    setNote('');
+    setScreenshotName('');
+    setScreenshotPreview('');
   };
 
   return (
@@ -671,8 +729,8 @@ function ProofSubmissionBox({ kind }: { kind: 'social' | 'review' }) {
       </div>
       <p className="mu" style={{ fontSize: '11px', margin: '0 0 8px' }}>
         {kind === 'review'
-          ? 'Posted your Google review? Enter your reviewer name or link. Admin will verify & release your Coupon, +1 Star, or Discount.'
-          : 'Posted your Reel / Snap / Post? Paste the link or @handle below. Admin will verify & release your Coupon, +1 Star, or Discount.'}
+          ? 'Posted your Google review? Upload a screenshot, enter your reviewer name, or tap Verify at Counter. Admin will release your Coupon, +1 Star, or Discount.'
+          : 'Posted your Reel / Story / WhatsApp Status? Upload a screenshot, paste your @handle/link, or tap Verify at Counter.'}
       </p>
 
       {kind === 'social' && (
@@ -692,13 +750,51 @@ function ProofSubmissionBox({ kind }: { kind: 'social' | 'review' }) {
       )}
 
       <input
+        ref={shotInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleScreenshotPicked}
+      />
+
+      <button
+        type="button"
+        className="btn ghost"
+        style={{ width: '100%', marginTop: 0, marginBottom: '8px' }}
+        onClick={() => shotInputRef.current?.click()}
+        disabled={uploadingShot}
+      >
+        {uploadingShot
+          ? '⏳ Uploading Screenshot to Drive...'
+          : screenshotName
+            ? `✅ Screenshot Attached (${screenshotName})`
+            : '📸 Upload Screenshot Proof (1-Tap)'}
+      </button>
+
+      {screenshotPreview && (
+        <div style={{ marginBottom: '8px' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={screenshotPreview}
+            alt="Proof screenshot preview"
+            style={{
+              width: '100%',
+              maxHeight: '140px',
+              objectFit: 'cover',
+              borderRadius: '8px',
+            }}
+          />
+        </div>
+      )}
+
+      <input
         type="url"
         value={proofUrl}
         onChange={(e) => setProofUrl(e.target.value)}
         placeholder={
           kind === 'review'
             ? 'Paste Google Review link (optional)'
-            : 'Paste Reel / Post / Snap link (optional)'
+            : 'Paste Reel / Post link (optional)'
         }
         style={{ marginBottom: '6px' }}
       />
@@ -709,18 +805,30 @@ function ProofSubmissionBox({ kind }: { kind: 'social' | 'review' }) {
         placeholder={
           kind === 'review'
             ? 'Your Google Reviewer Name (e.g. Rahul S.)'
-            : 'Your @handle, caption, or screenshot note'
+            : 'Your @handle or caption note'
         }
         style={{ marginBottom: '8px' }}
       />
-      <button
-        type="button"
-        className="btn alt"
-        style={{ width: '100%', marginTop: 0 }}
-        onClick={handleSubmit}
-      >
-        📤 Submit Proof for Admin Approval
-      </button>
+      <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className="btn alt"
+          style={{ flex: 1, marginTop: 0, minWidth: '150px' }}
+          onClick={handleSubmit}
+          disabled={uploadingShot}
+        >
+          📤 Submit Proof
+        </button>
+        <button
+          type="button"
+          className="btn ghost"
+          style={{ flex: 1, marginTop: 0, minWidth: '150px' }}
+          onClick={handleVerifyAtCounter}
+          disabled={uploadingShot}
+        >
+          ⚡ Verify at Counter
+        </button>
+      </div>
 
       {myProofs.length > 0 && (
         <div style={{ marginTop: '8px', display: 'grid', gap: '6px' }}>
