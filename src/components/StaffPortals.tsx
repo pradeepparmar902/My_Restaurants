@@ -1740,18 +1740,40 @@ function RewardApprovalsSection({
         onToggle();
       }}
     >
-      <div className="row sp" style={{ marginBottom: '10px' }}>
+      <div className="row sp" style={{ marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
         <span className="mu" style={{ fontSize: '12px' }}>
           Verify customer Reels, Posts &amp; Google Reviews before releasing rewards
         </span>
-        <button
-          type="button"
-          className="chip"
-          style={{ fontSize: '11px' }}
-          onClick={() => pullFromGoogleSheets()}
-        >
-          🔄 Refresh Queue
-        </button>
+        <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+          <a
+            href="https://business.facebook.com/latest/inbox/all"
+            target="_blank"
+            rel="noreferrer"
+            className="chip"
+            style={{ fontSize: '11px', textDecoration: 'none' }}
+          >
+            🔔 Meta Business Suite ↗
+          </a>
+          {S.googleConfig.googleReviewUrl && (
+            <a
+              href={S.googleConfig.googleReviewUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="chip"
+              style={{ fontSize: '11px', textDecoration: 'none' }}
+            >
+              ⭐ Google Reviews ↗
+            </a>
+          )}
+          <button
+            type="button"
+            className="chip"
+            style={{ fontSize: '11px' }}
+            onClick={() => pullFromGoogleSheets()}
+          >
+            🔄 Refresh Queue
+          </button>
+        </div>
       </div>
 
       {S.reel === 'wait' && (

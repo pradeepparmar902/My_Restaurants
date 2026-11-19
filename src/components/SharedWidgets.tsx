@@ -734,19 +734,43 @@ function ProofSubmissionBox({ kind }: { kind: 'social' | 'review' }) {
       </p>
 
       {kind === 'social' && (
-        <div className="row" style={{ flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
-          {socialPlatforms.map((p) => (
-            <button
-              key={p}
-              type="button"
-              className={`chip ${platform === p ? 'on' : ''}`}
-              style={{ fontSize: '11px', padding: '3px 8px' }}
-              onClick={() => setPlatform(p)}
+        <>
+          <div className="row" style={{ flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+            {socialPlatforms.map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={`chip ${platform === p ? 'on' : ''}`}
+                style={{ fontSize: '11px', padding: '3px 8px' }}
+                onClick={() => setPlatform(p)}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+          {(platform === 'Instagram' || platform === 'Facebook') && (
+            <div
+              className="mu"
+              style={{
+                fontSize: '11px',
+                marginBottom: '8px',
+                padding: '6px 8px',
+                borderRadius: '6px',
+                background: 'rgba(59,130,246,0.12)',
+                border: '1px solid rgba(59,130,246,0.28)',
+              }}
             >
-              {p}
-            </button>
-          ))}
-        </div>
+              🏷️ Tag{' '}
+              <b>
+                {S.googleConfig.instagramHandle
+                  ? `@${S.googleConfig.instagramHandle.replace(/^@/, '')}`
+                  : S.googleConfig.socialTag || '@tadkatruck'}
+              </b>{' '}
+              in your Reel/Story/Post so our team gets an instant notification, then enter your{' '}
+              <b>@handle</b> below!
+            </div>
+          )}
+        </>
       )}
 
       <input
@@ -805,7 +829,9 @@ function ProofSubmissionBox({ kind }: { kind: 'social' | 'review' }) {
         placeholder={
           kind === 'review'
             ? 'Your Google Reviewer Name (e.g. Rahul S.)'
-            : 'Your @handle or caption note'
+            : platform === 'Instagram' || platform === 'Facebook'
+              ? 'Your IG / FB @handle (e.g. @rahul_foodie)'
+              : 'Your @handle or caption note'
         }
         style={{ marginBottom: '8px' }}
       />
