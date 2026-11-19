@@ -824,6 +824,7 @@ export function BillTabView() {
   const g = gst();
   const gstEnabled = S.googleConfig?.gstEnabled !== false;
   const gstRate = gstEnabled ? (S.googleConfig?.gstRate ?? 5) : 0;
+  const gstMode = S.googleConfig?.gstMode === 'item' ? 'item' : 'bill';
   const gstin = (S.googleConfig?.gstin || '').trim();
 
   if (S.paid) {
@@ -946,14 +947,23 @@ export function BillTabView() {
           </p>
           {S.menu
             .filter((m) => S.cart[m.id])
-            .map((m) => (
-              <div key={m.id} className="line" style={{ fontSize: '13px' }}>
-                <span>
-                  {m.n.en} × {S.cart[m.id]}
-                </span>
-                <span>₹{m.p * S.cart[m.id]}</span>
-              </div>
-            ))}
+            .map((m) => {
+              const itemRate = m.gstRate ?? gstRate;
+              return (
+                <div key={m.id} className="line" style={{ fontSize: '13px' }}>
+                  <span>
+                    {m.n.en} × {S.cart[m.id]}
+                    {gstEnabled && gstMode === 'item' ? (
+                      <span className="mu" style={{ fontSize: '11px' }}>
+                        {' '}
+                        ({itemRate}% GST)
+                      </span>
+                    ) : null}
+                  </span>
+                  <span>₹{m.p * S.cart[m.id]}</span>
+                </div>
+              );
+            })}
           <div className="line mu" style={{ fontSize: '12px', marginTop: '4px' }}>
             <span>Subtotal</span>
             <span>₹{s}</span>
@@ -964,9 +974,11 @@ export function BillTabView() {
               <span>−₹{disc()}</span>
             </div>
           )}
-          {gstEnabled && gstRate > 0 && (
+          {gstEnabled && g > 0 && (
             <div className="line mu" style={{ fontSize: '12px' }}>
-              <span>GST {gstRate}%</span>
+              <span>
+                {gstMode === 'item' ? 'GST (Item-wise)' : `GST ${gstRate}%`}
+              </span>
               <span>₹{g}</span>
             </div>
           )}
@@ -1428,14 +1440,23 @@ export function BillTabView() {
       <div className="card">
         {S.menu
           .filter((m) => S.cart[m.id])
-          .map((m) => (
-            <div key={m.id} className="line">
-              <span>
-                {m.e} {m.n.en} × {S.cart[m.id]}
-              </span>
-              <span>₹{m.p * S.cart[m.id]}</span>
-            </div>
-          ))}
+          .map((m) => {
+            const itemRate = m.gstRate ?? gstRate;
+            return (
+              <div key={m.id} className="line">
+                <span>
+                  {m.e} {m.n.en} × {S.cart[m.id]}
+                  {gstEnabled && gstMode === 'item' ? (
+                    <span className="mu" style={{ fontSize: '11px' }}>
+                      {' '}
+                      ({itemRate}% GST)
+                    </span>
+                  ) : null}
+                </span>
+                <span>₹{m.p * S.cart[m.id]}</span>
+              </div>
+            );
+          })}
         {(() => {
           const memberTotals: Record<string, number> = {};
           S.orders
@@ -1492,9 +1513,12 @@ export function BillTabView() {
             <span>−₹50</span>
           </div>
         )}
-        {gstEnabled && gstRate > 0 && (
+        {gstEnabled && g > 0 && (
           <div className="line">
-            <span>GST {gstRate}%{gstin ? ` (${gstin})` : ''}</span>
+            <span>
+              {gstMode === 'item' ? 'GST (Item-wise)' : `GST ${gstRate}%`}
+              {gstin ? ` (${gstin})` : ''}
+            </span>
             <span>₹{g}</span>
           </div>
         )}

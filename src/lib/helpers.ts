@@ -44,9 +44,27 @@ export function getGST(
   subtotal: number,
   discount: number,
   gstEnabled = true,
-  gstRate = 5
+  gstRate = 5,
+  gstMode: 'bill' | 'item' = 'bill',
+  menu?: Dish[],
+  cart?: Record<number, number>
 ): number {
-  if (!gstEnabled || gstRate <= 0) return 0;
+  if (!gstEnabled) return 0;
+  if (gstMode === 'item' && menu && cart) {
+    if (subtotal <= 0) return 0;
+    const netRatio = Math.max(0, subtotal - discount) / subtotal;
+    let rawItemGst = 0;
+    for (const m of menu) {
+      const qty = cart[m.id] || 0;
+      if (qty <= 0) continue;
+      const rate = m.gstRate ?? gstRate;
+      if (rate > 0) {
+        rawItemGst += m.p * qty * netRatio * (rate / 100);
+      }
+    }
+    return Math.round(rawItemGst);
+  }
+  if (gstRate <= 0) return 0;
   return Math.round(Math.max(0, subtotal - discount) * (gstRate / 100));
 }
 
@@ -54,10 +72,16 @@ export function getTotal(
   subtotal: number,
   discount: number,
   gstEnabled = true,
-  gstRate = 5
+  gstRate = 5,
+  gstMode: 'bill' | 'item' = 'bill',
+  menu?: Dish[],
+  cart?: Record<number, number>
 ): number {
   const net = Math.max(0, subtotal - discount);
-  return Math.max(0, net + getGST(subtotal, discount, gstEnabled, gstRate));
+  return Math.max(
+    0,
+    net + getGST(subtotal, discount, gstEnabled, gstRate, gstMode, menu, cart)
+  );
 }
 
 export function getActiveStaffMember(staff: StaffMember[], mob: string): StaffMember | undefined {

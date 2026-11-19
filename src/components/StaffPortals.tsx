@@ -1657,6 +1657,9 @@ export function AdminPortalView() {
   const [gstRateInput, setGstRateInput] = useState(
     String(S.googleConfig.gstRate ?? 5)
   );
+  const [gstModeInput, setGstModeInput] = useState<'bill' | 'item'>(
+    S.googleConfig.gstMode === 'item' ? 'item' : 'bill'
+  );
   const [gstinInput, setGstinInput] = useState(S.googleConfig.gstin || '');
 
   const [openAdminSections, setOpenAdminSections] = useState<
@@ -1702,6 +1705,7 @@ export function AdminPortalView() {
   const [newDishPrice, setNewDishPrice] = useState('100');
   const [newDishEmoji, setNewDishEmoji] = useState('🍲');
   const [newDishVeg, setNewDishVeg] = useState(true);
+  const [newDishGst, setNewDishGst] = useState('');
 
   const [showQrAdmin, setShowQrAdmin] = useState(false);
   const [newTableNo, setNewTableNo] = useState('');
@@ -1909,33 +1913,59 @@ export function AdminPortalView() {
         </div>
 
         {gstEnabledInput && (
-          <div style={{ marginBottom: '10px' }}>
-            <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
-              GST Rate (%):
-            </div>
-            <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
-              {['5', '12', '18'].map((r) => (
+          <>
+            <div style={{ marginBottom: '10px' }}>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
+                Apply GST On:
+              </div>
+              <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
                 <button
-                  key={r}
-                  className={`chip ${gstRateInput === r ? 'on' : ''}`}
-                  onClick={() => setGstRateInput(r)}
+                  className={`chip ${gstModeInput === 'bill' ? 'on' : ''}`}
+                  onClick={() => setGstModeInput('bill')}
                 >
-                  {r}%
+                  🧾 Bottom of Bill (Single %)
                 </button>
-              ))}
-              <input
-                type="number"
-                min="0"
-                max="28"
-                step="0.5"
-                value={gstRateInput}
-                onChange={(e) => setGstRateInput(e.target.value)}
-                placeholder="%"
-                className="inp"
-                style={{ width: '80px', padding: '5px 8px', fontSize: '12px' }}
-              />
+                <button
+                  className={`chip ${gstModeInput === 'item' ? 'on' : ''}`}
+                  onClick={() => setGstModeInput('item')}
+                >
+                  🍽️ Each Menu Item (Item-wise %)
+                </button>
+              </div>
+              <p className="mu" style={{ fontSize: '11px', marginTop: '4px' }}>
+                {gstModeInput === 'item'
+                  ? 'Uses each dish’s GST % from Menu Admin (falls back to default % below if blank).'
+                  : 'Applies a single flat GST % at the bottom of the bill.'}
+              </p>
             </div>
-          </div>
+            <div style={{ marginBottom: '10px' }}>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
+                {gstModeInput === 'item' ? 'Default GST Rate (%):' : 'GST Rate (%):'}
+              </div>
+              <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                {['5', '12', '18'].map((r) => (
+                  <button
+                    key={r}
+                    className={`chip ${gstRateInput === r ? 'on' : ''}`}
+                    onClick={() => setGstRateInput(r)}
+                  >
+                    {r}%
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  min="0"
+                  max="28"
+                  step="0.5"
+                  value={gstRateInput}
+                  onChange={(e) => setGstRateInput(e.target.value)}
+                  placeholder="%"
+                  className="inp"
+                  style={{ width: '80px', padding: '5px 8px', fontSize: '12px' }}
+                />
+              </div>
+            </div>
+          </>
         )}
 
         <div style={{ marginBottom: '10px' }}>
@@ -1959,6 +1989,7 @@ export function AdminPortalView() {
             const nextGst = {
               gstEnabled: gstEnabledInput,
               gstRate: gstEnabledInput ? parsedRate : 0,
+              gstMode: gstModeInput,
               gstin: gstinInput.trim().toUpperCase(),
             };
             saveGoogleConfig(nextGst);
@@ -2002,11 +2033,40 @@ export function AdminPortalView() {
         {showMenuAdmin && (
           <div style={{ marginTop: '10px' }}>
             {S.menu.map((m) => (
-              <div key={m.id} className="line" style={{ alignItems: 'center' }}>
+              <div
+                key={m.id}
+                className="line"
+                style={{ alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}
+              >
                 <span>
                   {m.e} {m.n.en} (₹{m.p})
+                  <span className="mu" style={{ fontSize: '11px', marginLeft: '4px' }}>
+                    · GST{' '}
+                    {typeof m.gstRate === 'number'
+                      ? `${m.gstRate}%`
+                      : `Default (${S.googleConfig.gstRate ?? 5}%)`}
+                  </span>
                 </span>
-                <div className="row">
+                <div className="row" style={{ gap: '4px' }}>
+                  <select
+                    aria-label={`GST % for ${m.n.en}`}
+                    value={typeof m.gstRate === 'number' ? String(m.gstRate) : ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      saveMenuDish({
+                        id: m.id,
+                        gstRate: val === '' ? undefined : Number(val),
+                      });
+                    }}
+                    className="sel-cc"
+                    style={{ fontSize: '11px', padding: '4px 6px' }}
+                  >
+                    <option value="">Default GST</option>
+                    <option value="0">0% GST</option>
+                    <option value="5">5% GST</option>
+                    <option value="12">12% GST</option>
+                    <option value="18">18% GST</option>
+                  </select>
                   <button
                     className="chip"
                     onClick={() =>
@@ -2061,14 +2121,27 @@ export function AdminPortalView() {
                   className="inp"
                 />
               </div>
-              <div className="row" style={{ marginTop: '6px' }}>
+              <div className="row" style={{ marginTop: '6px', flexWrap: 'wrap', gap: '6px' }}>
                 <input
                   value={newDishPrice}
                   onChange={(e) => setNewDishPrice(e.target.value)}
                   placeholder="Price ₹"
                   inputMode="numeric"
                   className="inp"
+                  style={{ flex: 1, minWidth: '80px' }}
                 />
+                <select
+                  aria-label="New dish GST %"
+                  value={newDishGst}
+                  onChange={(e) => setNewDishGst(e.target.value)}
+                  className="sel-cc"
+                >
+                  <option value="">Default GST</option>
+                  <option value="0">0% GST</option>
+                  <option value="5">5% GST</option>
+                  <option value="12">12% GST</option>
+                  <option value="18">18% GST</option>
+                </select>
                 <button
                   className={`chip ${newDishVeg ? 'on' : ''}`}
                   onClick={() => setNewDishVeg((v) => !v)}
@@ -2085,6 +2158,7 @@ export function AdminPortalView() {
                     p: Number(newDishPrice) || 100,
                     v: newDishVeg ? 1 : 0,
                     available: true,
+                    ...(newDishGst !== '' ? { gstRate: Number(newDishGst) } : {}),
                     n: {
                       en: newDishEn.trim(),
                       hi: newDishHi.trim() || newDishEn.trim(),
@@ -2094,6 +2168,7 @@ export function AdminPortalView() {
                   setNewDishEn('');
                   setNewDishHi('');
                   setNewDishGu('');
+                  setNewDishGst('');
                 }}
               >
                 + Add Dish to Menu

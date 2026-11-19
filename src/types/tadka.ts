@@ -26,6 +26,7 @@ export interface Dish {
   v: number; // 1 = veg, 0 = non-veg
   jain?: boolean;
   available: boolean;
+  gstRate?: number; // per-item GST % (optional, falls back to default gstRate)
   n: {
     en: string;
     hi: string;
@@ -148,6 +149,7 @@ export interface GoogleCloudStorageConfig {
   upiName?: string;
   gstEnabled?: boolean;
   gstRate?: number;
+  gstMode?: 'bill' | 'item';
   gstin?: string;
   lastSyncedAt?: string;
   lastSyncStatus?: 'idle' | 'syncing' | 'synced' | 'error';

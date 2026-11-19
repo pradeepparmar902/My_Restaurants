@@ -460,9 +460,20 @@ export function TadkaProvider({
       s,
       d,
       S.googleConfig?.gstEnabled !== false,
-      S.googleConfig?.gstRate ?? 5
+      S.googleConfig?.gstRate ?? 5,
+      S.googleConfig?.gstMode === 'item' ? 'item' : 'bill',
+      S.menu,
+      S.cart
     );
-  }, [S.menu, S.cart, S.reel, S.review, S.googleConfig?.gstEnabled, S.googleConfig?.gstRate]);
+  }, [
+    S.menu,
+    S.cart,
+    S.reel,
+    S.review,
+    S.googleConfig?.gstEnabled,
+    S.googleConfig?.gstRate,
+    S.googleConfig?.gstMode,
+  ]);
   const total = useCallback(() => {
     const s = getSubtotal(S.menu, S.cart);
     const d = getDiscount(s, S.reel, S.review);
@@ -470,9 +481,20 @@ export function TadkaProvider({
       s,
       d,
       S.googleConfig?.gstEnabled !== false,
-      S.googleConfig?.gstRate ?? 5
+      S.googleConfig?.gstRate ?? 5,
+      S.googleConfig?.gstMode === 'item' ? 'item' : 'bill',
+      S.menu,
+      S.cart
     );
-  }, [S.menu, S.cart, S.reel, S.review, S.googleConfig?.gstEnabled, S.googleConfig?.gstRate]);
+  }, [
+    S.menu,
+    S.cart,
+    S.reel,
+    S.review,
+    S.googleConfig?.gstEnabled,
+    S.googleConfig?.gstRate,
+    S.googleConfig?.gstMode,
+  ]);
 
   const staffOf = useCallback(() => getActiveStaffMember(S.staff, S.me.mob), [S.staff, S.me.mob]);
   const portals = useCallback(() => getAllowedPortals(staffOf()), [staffOf]);
@@ -1597,8 +1619,9 @@ export function TadkaProvider({
         const d = getDiscount(s, prev.reel, prev.review);
         const gstEnabled = prev.googleConfig?.gstEnabled !== false;
         const gstRate = prev.googleConfig?.gstRate ?? 5;
-        const g = getGST(s, d, gstEnabled, gstRate);
-        const t = getTotal(s, d, gstEnabled, gstRate);
+        const gstMode = prev.googleConfig?.gstMode === 'item' ? 'item' : 'bill';
+        const g = getGST(s, d, gstEnabled, gstRate, gstMode, prev.menu, prev.cart);
+        const t = getTotal(s, d, gstEnabled, gstRate, gstMode, prev.menu, prev.cart);
         const { summary } = formatItemsSummary(prev.menu, prev.cart);
         const todayBizDate =
           prev.sess?.businessDate ||
@@ -1893,6 +1916,7 @@ export function TadkaProvider({
             v: dish.v ?? 1,
             jain: dish.jain ?? false,
             available: dish.available ?? true,
+            ...(typeof dish.gstRate === 'number' ? { gstRate: dish.gstRate } : {}),
             n: dish.n,
           });
         }

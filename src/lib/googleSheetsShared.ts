@@ -30,8 +30,9 @@ export function buildSheetRowsForState(
   const discount = getDiscount(subtotal, state.reel, state.review);
   const gstEnabled = state.googleConfig?.gstEnabled !== false;
   const gstRate = state.googleConfig?.gstRate ?? 5;
-  const gst = getGST(subtotal, discount, gstEnabled, gstRate);
-  const total = getTotal(subtotal, discount, gstEnabled, gstRate);
+  const gstMode = state.googleConfig?.gstMode === 'item' ? 'item' : 'bill';
+  const gst = getGST(subtotal, discount, gstEnabled, gstRate, gstMode, state.menu, state.cart);
+  const total = getTotal(subtotal, discount, gstEnabled, gstRate, gstMode, state.menu, state.cart);
 
   const businessDateToday =
     state.counterBusinessDate || getCurrentBusinessDate();
@@ -51,6 +52,7 @@ export function buildSheetRowsForState(
     ['upiName', state.googleConfig?.upiName || '', new Date().toISOString()],
     ['gst_enabled', gstEnabled, new Date().toISOString()],
     ['gst_rate', gstRate, new Date().toISOString()],
+    ['gst_mode', gstMode, new Date().toISOString()],
     ['gstin', state.googleConfig?.gstin || '', new Date().toISOString()],
     ['counter_mode', state.cmode, new Date().toISOString()],
     ['whatsapp_final_bill', state.wab, new Date().toISOString()],
@@ -71,6 +73,7 @@ export function buildSheetRowsForState(
       'Is_Veg',
       'Is_Jain',
       'Available',
+      'GST_Percent',
     ],
     ...state.menu.map((m) => [
       m.id,
@@ -83,6 +86,7 @@ export function buildSheetRowsForState(
       m.v === 1,
       !!m.jain,
       m.available,
+      typeof m.gstRate === 'number' ? m.gstRate : '',
     ]),
   ];
 
@@ -604,6 +608,11 @@ export function parseMenuFromSheetRows(rows: unknown[][]): Dish[] | null {
     const jain = jainRaw === 'true' || jainRaw === '1' || jainRaw === 'yes';
     const availRaw = String(r[9] ?? 'true').trim().toLowerCase();
     const available = availRaw !== 'false' && availRaw !== '0' && availRaw !== 'no';
+    const gstRaw = String(r[10] ?? '').trim();
+    const parsedGst =
+      gstRaw !== '' && !Number.isNaN(Number(gstRaw)) && Number(gstRaw) >= 0
+        ? Number(gstRaw)
+        : undefined;
     dishes.push({
       id,
       e,
@@ -611,6 +620,7 @@ export function parseMenuFromSheetRows(rows: unknown[][]): Dish[] | null {
       v,
       jain,
       available,
+      ...(typeof parsedGst === 'number' ? { gstRate: parsedGst } : {}),
       n: { en, hi, gu },
     });
   }
@@ -667,6 +677,9 @@ export function parseConfigFromSheetRows(
     if (key === 'gst_rate' && val !== '') {
       const parsed = Number(val);
       if (!Number.isNaN(parsed) && parsed >= 0) cfg.gstRate = parsed;
+    }
+    if (key === 'gst_mode' && (val === 'item' || val === 'bill')) {
+      cfg.gstMode = val;
     }
     if (key === 'gstin' && val) cfg.gstin = val;
   }
