@@ -4,6 +4,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import { Language, PaymentMethod } from '@/types/tadka';
 import { DEFAULT_REWARD_RULES, ORDER_STATUS_LABELS } from '@/lib/constants';
+import {
+  DEFAULT_DIETARY_FILTERS,
+  DEFAULT_MENU_LANGUAGES,
+} from '@/lib/googleSheetsShared';
 import { normalizeMobile } from '@/lib/helpers';
 import {
   ConnectedAccountsCard,
@@ -27,23 +31,52 @@ export function MenuTabView() {
   } = useTadka();
   const [optMob, setOptMob] = useState('');
   const [showOptMob, setShowOptMob] = useState(false);
+  const [activeCustomDietary, setActiveCustomDietary] = useState<string[]>([]);
   const currentStaff = staffOf();
 
-  const L: Record<Language, string> = {
+  const L: Record<string, string> = {
     en: 'Menu',
     hi: 'मेन्यू',
     gu: 'મેનુ',
   };
 
-  const langLabels: Record<Language, string> = {
-    en: 'English',
-    hi: 'हिन्दी',
-    gu: 'ગુજરાતી',
-  };
+  const configuredLanguages = S.googleConfig.menuLanguages?.length
+    ? S.googleConfig.menuLanguages.filter((l) => l.enabled)
+    : DEFAULT_MENU_LANGUAGES.filter(
+        (l) =>
+          !S.googleConfig.enabledLanguages?.length ||
+          S.googleConfig.enabledLanguages.includes(l.code)
+      );
+  const visibleLanguages = configuredLanguages.length
+    ? configuredLanguages
+    : [DEFAULT_MENU_LANGUAGES[0]];
 
-  const filteredMenu = S.menu.filter(
-    (m) => m.available && (!S.veg || m.v === 1) && (!S.jainOnly || m.jain)
-  );
+  const visibleDietaryFilters = S.googleConfig.dietaryFilters
+    ? S.googleConfig.dietaryFilters.filter((f) => f.enabled)
+    : DEFAULT_DIETARY_FILTERS.filter((f) => {
+        if (f.id === 'veg') return S.googleConfig.showVegFilter !== false;
+        if (f.id === 'jain') return S.googleConfig.showJainFilter !== false;
+        return true;
+      });
+
+  const filteredMenu = S.menu.filter((m) => {
+    if (!m.available) return false;
+    if (S.veg && m.v !== 1) return false;
+    if (S.jainOnly && !m.jain) return false;
+    for (const fid of activeCustomDietary) {
+      const fObj = visibleDietaryFilters.find((x) => x.id === fid);
+      const lbl = (fObj?.label || fid).toLowerCase();
+      if (fid === 'nonveg' || lbl.includes('non-veg') || lbl.includes('non veg')) {
+        if (m.v !== 0) return false;
+      } else if (
+        !(m.dietaryTags || []).includes(fid) &&
+        !m.n.en.toLowerCase().includes(lbl)
+      ) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const activeTableLabel =
     S.tables.find((t) => t.id === S.activeTable)?.label ||
@@ -99,34 +132,48 @@ export function MenuTabView() {
       </div>
 
       <div className="row" style={{ flexWrap: 'wrap' }}>
-        {(S.googleConfig.enabledLanguages?.length
-          ? S.googleConfig.enabledLanguages
-          : (['en', 'hi', 'gu'] as Language[])
-        ).map((l) => (
+        {visibleLanguages.map((l) => (
           <button
-            key={l}
-            className={`chip ${S.lang === l ? 'on' : ''}`}
-            onClick={() => setLang(l)}
+            key={l.code}
+            className={`chip ${S.lang === l.code ? 'on' : ''}`}
+            onClick={() => setLang(l.code as Language)}
           >
-            {langLabels[l]}
+            {l.label}
           </button>
         ))}
-        {S.googleConfig.showVegFilter !== false && (
-          <button className={`chip ${S.veg ? 'on' : ''}`} onClick={toggleVeg}>
-            🌱 Veg only
-          </button>
-        )}
-        {S.googleConfig.showJainFilter !== false && (
-          <button
-            className={`chip ${S.jainOnly ? 'on' : ''}`}
-            onClick={() => updateState((p) => ({ ...p, jainOnly: !p.jainOnly }))}
-          >
-            🙏 Jain
-          </button>
-        )}
+        {visibleDietaryFilters.map((f) => {
+          const isVeg = f.id === 'veg';
+          const isJain = f.id === 'jain';
+          const isOn = isVeg
+            ? S.veg
+            : isJain
+              ? S.jainOnly
+              : activeCustomDietary.includes(f.id);
+          return (
+            <button
+              key={f.id}
+              className={`chip ${isOn ? 'on' : ''}`}
+              onClick={() => {
+                if (isVeg) {
+                  toggleVeg();
+                } else if (isJain) {
+                  updateState((p) => ({ ...p, jainOnly: !p.jainOnly }));
+                } else {
+                  setActiveCustomDietary((prev) =>
+                    prev.includes(f.id)
+                      ? prev.filter((id) => id !== f.id)
+                      : [...prev, f.id]
+                  );
+                }
+              }}
+            >
+              {f.emoji ? `${f.emoji} ` : ''}{f.label}
+            </button>
+          );
+        })}
       </div>
 
-      <h2 style={{ marginTop: '14px' }}>{L[S.lang]}</h2>
+      <h2 style={{ marginTop: '14px' }}>{L[S.lang] || 'Menu'}</h2>
 
       {filteredMenu.map((m) => {
         const draftQty = S.draft[m.id] || 0;
@@ -137,7 +184,7 @@ export function MenuTabView() {
             <div>
               <b>
                 <span className={`veg ${m.v ? '' : 'nv'}`} />
-                {m.n[S.lang]}
+                {m.n[S.lang] || m.n.en}
               </b>
               {todayOrderedCount > 0 && (
                 <div style={{ marginTop: '3px' }}>

@@ -1,4 +1,4 @@
-export type Language = 'en' | 'hi' | 'gu';
+export type Language = 'en' | 'hi' | 'gu' | (string & {});
 export type PortalRole = 'c' | 'k' | 'w' | 'o' | 'a';
 export type StaffRoleName = 'Admin' | 'Manager' | 'Chef' | 'Waiter' | 'Reception';
 export type CustomerTab = 'menu' | 'order' | 'reward' | 'bill';
@@ -27,10 +27,12 @@ export interface Dish {
   jain?: boolean;
   available: boolean;
   gstRate?: number; // per-item GST % (optional, falls back to default gstRate)
+  dietaryTags?: string[]; // optional custom dietary filter IDs
   n: {
     en: string;
     hi: string;
     gu: string;
+    [lang: string]: string;
   };
 }
 
@@ -158,13 +160,28 @@ export interface RewardRulesConfig {
   socialShareBonusStars: number;
 }
 
+export interface MenuLanguageOption {
+  code: string;
+  label: string;
+  enabled: boolean;
+}
+
+export interface DietaryFilterOption {
+  id: string;
+  label: string;
+  emoji: string;
+  enabled: boolean;
+}
+
 export interface GoogleCloudStorageConfig {
   enabled: boolean;
   restaurantName?: string;
   restaurantTagline?: string;
   enabledLanguages?: Language[];
+  menuLanguages?: MenuLanguageOption[];
   showVegFilter?: boolean;
   showJainFilter?: boolean;
+  dietaryFilters?: DietaryFilterOption[];
   appsScriptWebAppUrl: string;
   spreadsheetId: string;
   driveFolderId: string;

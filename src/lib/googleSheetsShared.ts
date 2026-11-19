@@ -1,4 +1,24 @@
-import { AppState, Dish, Language, SocialProofSubmission, StaffMember, StaffRoleName } from '@/types/tadka';
+import {
+  AppState,
+  DietaryFilterOption,
+  Dish,
+  Language,
+  MenuLanguageOption,
+  SocialProofSubmission,
+  StaffMember,
+  StaffRoleName,
+} from '@/types/tadka';
+
+export const DEFAULT_MENU_LANGUAGES: MenuLanguageOption[] = [
+  { code: 'en', label: 'English', enabled: true },
+  { code: 'hi', label: 'हिन्दी', enabled: true },
+  { code: 'gu', label: 'ગુજરાતી', enabled: true },
+];
+
+export const DEFAULT_DIETARY_FILTERS: DietaryFilterOption[] = [
+  { id: 'veg', label: 'Veg only', emoji: '🌱', enabled: true },
+  { id: 'jain', label: 'Jain', emoji: '🙏', enabled: true },
+];
 import {
   getSubtotal,
   getDiscount,
@@ -48,8 +68,10 @@ export function buildSheetRowsForState(
     ['restaurant_name', (state.googleConfig?.restaurantName || '').trim() || 'Tadka Truck', new Date().toISOString()],
     ['restaurant_tagline', (state.googleConfig?.restaurantTagline || '').trim(), new Date().toISOString()],
     ['enabled_languages', (state.googleConfig?.enabledLanguages?.length ? state.googleConfig.enabledLanguages : ['en', 'hi', 'gu']).join(','), new Date().toISOString()],
+    ['menu_languages_json', JSON.stringify(state.googleConfig?.menuLanguages?.length ? state.googleConfig.menuLanguages : DEFAULT_MENU_LANGUAGES), new Date().toISOString()],
     ['show_veg_filter', state.googleConfig?.showVegFilter !== false, new Date().toISOString()],
     ['show_jain_filter', state.googleConfig?.showJainFilter !== false, new Date().toISOString()],
+    ['dietary_filters_json', JSON.stringify(state.googleConfig?.dietaryFilters?.length ? state.googleConfig.dietaryFilters : DEFAULT_DIETARY_FILTERS), new Date().toISOString()],
     ['appsScriptWebAppUrl', state.googleConfig?.appsScriptWebAppUrl || '', new Date().toISOString()],
     ['spreadsheetId', state.googleConfig?.spreadsheetId || '', new Date().toISOString()],
     ['driveFolderId', state.googleConfig?.driveFolderId || '', new Date().toISOString()],
@@ -673,14 +695,34 @@ export function parseConfigFromSheetRows(
       const langs = val
         .split(',')
         .map((s) => s.trim())
-        .filter((s) => s === 'en' || s === 'hi' || s === 'gu') as Language[];
+        .filter(Boolean) as Language[];
       if (langs.length > 0) cfg.enabledLanguages = langs;
+    }
+    if (key === 'menu_languages_json' && val) {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          cfg.menuLanguages = parsed;
+        }
+      } catch {
+        // ignore invalid JSON
+      }
     }
     if (key === 'show_veg_filter' && val !== '') {
       cfg.showVegFilter = val.toUpperCase() !== 'FALSE' && val !== '0';
     }
     if (key === 'show_jain_filter' && val !== '') {
       cfg.showJainFilter = val.toUpperCase() !== 'FALSE' && val !== '0';
+    }
+    if (key === 'dietary_filters_json' && val) {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) {
+          cfg.dietaryFilters = parsed;
+        }
+      } catch {
+        // ignore invalid JSON
+      }
     }
     if (key === 'appsScriptWebAppUrl' && val) cfg.appsScriptWebAppUrl = val;
     if (key === 'spreadsheetId' && val) cfg.spreadsheetId = val;

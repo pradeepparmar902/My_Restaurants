@@ -2,7 +2,17 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
-import { Language, RewardRulesConfig, StaffRoleName } from '@/types/tadka';
+import {
+  DietaryFilterOption,
+  Language,
+  MenuLanguageOption,
+  RewardRulesConfig,
+  StaffRoleName,
+} from '@/types/tadka';
+import {
+  DEFAULT_DIETARY_FILTERS,
+  DEFAULT_MENU_LANGUAGES,
+} from '@/lib/googleSheetsShared';
 import {
   DEFAULT_REWARD_RULES,
   ORDER_STATUS_LABELS,
@@ -2206,17 +2216,19 @@ export function AdminPortalView() {
   const [restaurantTaglineInput, setRestaurantTaglineInput] = useState(
     S.googleConfig.restaurantTagline || ''
   );
-  const [enabledLangsInput, setEnabledLangsInput] = useState<Language[]>(
-    S.googleConfig.enabledLanguages?.length
-      ? S.googleConfig.enabledLanguages
-      : ['en', 'hi', 'gu']
+  const [menuLanguagesInput, setMenuLanguagesInput] = useState<MenuLanguageOption[]>(
+    S.googleConfig.menuLanguages?.length
+      ? S.googleConfig.menuLanguages
+      : DEFAULT_MENU_LANGUAGES
   );
-  const [showVegFilterInput, setShowVegFilterInput] = useState(
-    S.googleConfig.showVegFilter !== false
+  const [newLangLabel, setNewLangLabel] = useState('');
+  const [dietaryFiltersInput, setDietaryFiltersInput] = useState<DietaryFilterOption[]>(
+    S.googleConfig.dietaryFilters
+      ? S.googleConfig.dietaryFilters
+      : DEFAULT_DIETARY_FILTERS
   );
-  const [showJainFilterInput, setShowJainFilterInput] = useState(
-    S.googleConfig.showJainFilter !== false
-  );
+  const [newDietaryEmoji, setNewDietaryEmoji] = useState('🍗');
+  const [newDietaryLabel, setNewDietaryLabel] = useState('');
   const [revUrlInput, setRevUrlInput] = useState(
     S.googleConfig.googleReviewUrl || ''
   );
@@ -2241,6 +2253,47 @@ export function AdminPortalView() {
     S.googleConfig.gstMode === 'item' ? 'item' : 'bill'
   );
   const [gstinInput, setGstinInput] = useState(S.googleConfig.gstin || '');
+
+  // Keep Admin form inputs synced when Google Sheets finishes pulling S.googleConfig
+  useEffect(() => {
+    setRestaurantNameInput(S.googleConfig.restaurantName || 'Tadka Truck');
+    setRestaurantTaglineInput(S.googleConfig.restaurantTagline || '');
+    if (S.googleConfig.menuLanguages?.length) {
+      setMenuLanguagesInput(S.googleConfig.menuLanguages);
+    } else if (S.googleConfig.enabledLanguages?.length) {
+      setMenuLanguagesInput(
+        DEFAULT_MENU_LANGUAGES.map((l) => ({
+          ...l,
+          enabled: S.googleConfig.enabledLanguages!.includes(l.code),
+        }))
+      );
+    }
+    if (S.googleConfig.dietaryFilters) {
+      setDietaryFiltersInput(S.googleConfig.dietaryFilters);
+    } else {
+      setDietaryFiltersInput(
+        DEFAULT_DIETARY_FILTERS.map((f) => ({
+          ...f,
+          enabled:
+            f.id === 'veg'
+              ? S.googleConfig.showVegFilter !== false
+              : f.id === 'jain'
+                ? S.googleConfig.showJainFilter !== false
+                : f.enabled,
+        }))
+      );
+    }
+    setRevUrlInput(S.googleConfig.googleReviewUrl || '');
+    setIgHandleInput(S.googleConfig.instagramHandle || '@tadkatruck');
+    setFbUrlInput(S.googleConfig.facebookUrl || '');
+    setSocTagInput(S.googleConfig.socialTag || '#TadkaTruck @tadkatruck');
+    setUpiIdInput(S.googleConfig.upiId || '');
+    setUpiNameInput(S.googleConfig.upiName || 'Tadka Truck');
+    setGstEnabledInput(S.googleConfig.gstEnabled !== false);
+    setGstRateInput(String(S.googleConfig.gstRate ?? 5));
+    setGstModeInput(S.googleConfig.gstMode === 'item' ? 'item' : 'bill');
+    setGstinInput(S.googleConfig.gstin || '');
+  }, [S.googleConfig]);
 
   const [openAdminSections, setOpenAdminSections] = useState<
     Record<string, boolean>
@@ -2495,73 +2548,231 @@ export function AdminPortalView() {
         />
 
         <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
-          🌐 Enabled Customer Menu Languages
+          🌐 Customer Menu Languages (Toggle, Delete, or Add New)
         </div>
-        <div className="row" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-          {(
-            [
-              ['en', 'English'],
-              ['hi', 'हिन्दी'],
-              ['gu', 'ગુજરાતી'],
-            ] as [Language, string][]
-          ).map(([code, label]) => {
-            const active = enabledLangsInput.includes(code);
-            return (
+        <div className="row" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
+          {menuLanguagesInput.map((lang) => (
+            <span
+              key={lang.code}
+              className="row"
+              style={{
+                gap: '4px',
+                padding: '2px 6px 2px 2px',
+                borderRadius: '999px',
+                background: 'rgba(255,255,255,0.06)',
+              }}
+            >
               <button
-                key={code}
                 type="button"
-                className={`chip ${active ? 'on' : ''}`}
+                className={`chip ${lang.enabled ? 'on' : ''}`}
+                style={{ margin: 0 }}
                 onClick={() => {
-                  if (active && enabledLangsInput.length <= 1) {
+                  const enabledCount = menuLanguagesInput.filter((l) => l.enabled).length;
+                  if (lang.enabled && enabledCount <= 1) {
                     say('Keep at least 1 language enabled');
                     return;
                   }
-                  setEnabledLangsInput((prev) =>
-                    active ? prev.filter((l) => l !== code) : [...prev, code]
+                  setMenuLanguagesInput((prev) =>
+                    prev.map((l) =>
+                      l.code === lang.code ? { ...l, enabled: !l.enabled } : l
+                    )
                   );
                 }}
               >
-                {active ? '✅ ' : ''}{label}
+                {lang.enabled ? '✅ ' : ''}{lang.label}
               </button>
-            );
-          })}
+              {menuLanguagesInput.length > 1 && (
+                <button
+                  type="button"
+                  title={`Delete ${lang.label}`}
+                  onClick={() => {
+                    const remaining = menuLanguagesInput.filter(
+                      (l) => l.code !== lang.code
+                    );
+                    if (!remaining.some((l) => l.enabled) && remaining[0]) {
+                      remaining[0] = { ...remaining[0], enabled: true };
+                    }
+                    setMenuLanguagesInput(remaining);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#fca5a5',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    padding: '0 4px',
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+        <div className="row" style={{ gap: '6px', marginBottom: '10px' }}>
+          <input
+            value={newLangLabel}
+            onChange={(e) => setNewLangLabel(e.target.value)}
+            placeholder="Add language (e.g. मराठी, ਪੰਜਾਬੀ, Tamil)"
+            className="inp"
+            style={{ flex: 1 }}
+          />
+          <button
+            type="button"
+            className="chip on"
+            onClick={() => {
+              const label = newLangLabel.trim();
+              if (!label) return;
+              const code =
+                label
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '_')
+                  .replace(/^_|_$/g, '') || `lang_${Date.now().toString(36)}`;
+              if (
+                menuLanguagesInput.some(
+                  (l) =>
+                    l.code === code ||
+                    l.label.toLowerCase() === label.toLowerCase()
+                )
+              ) {
+                say('Language already exists');
+                return;
+              }
+              setMenuLanguagesInput((prev) => [
+                ...prev,
+                { code, label, enabled: true },
+              ]);
+              setNewLangLabel('');
+            }}
+          >
+            + Add Language
+          </button>
         </div>
 
         <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
-          🥗 Customer Dietary Filter Chips (Veg / Jain / Non-Veg per dish is set in Menu Admin)
+          🥗 Customer Dietary Filter Chips (Toggle, Delete, or Add New)
         </div>
-        <div className="row" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+        <div className="row" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
+          {dietaryFiltersInput.map((f) => (
+            <span
+              key={f.id}
+              className="row"
+              style={{
+                gap: '4px',
+                padding: '2px 6px 2px 2px',
+                borderRadius: '999px',
+                background: 'rgba(255,255,255,0.06)',
+              }}
+            >
+              <button
+                type="button"
+                className={`chip ${f.enabled ? 'on' : ''}`}
+                style={{ margin: 0 }}
+                onClick={() =>
+                  setDietaryFiltersInput((prev) =>
+                    prev.map((x) =>
+                      x.id === f.id ? { ...x, enabled: !x.enabled } : x
+                    )
+                  )
+                }
+              >
+                {f.enabled ? '✅ ' : ''}{f.emoji ? `${f.emoji} ` : ''}{f.label}
+              </button>
+              <button
+                type="button"
+                title={`Delete ${f.label}`}
+                onClick={() =>
+                  setDietaryFiltersInput((prev) =>
+                    prev.filter((x) => x.id !== f.id)
+                  )
+                }
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#fca5a5',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  padding: '0 4px',
+                }}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="row" style={{ gap: '6px', marginBottom: '10px' }}>
+          <input
+            value={newDietaryEmoji}
+            onChange={(e) => setNewDietaryEmoji(e.target.value)}
+            placeholder="🍗"
+            className="inp"
+            style={{ width: '52px', textAlign: 'center' }}
+          />
+          <input
+            value={newDietaryLabel}
+            onChange={(e) => setNewDietaryLabel(e.target.value)}
+            placeholder="Add dietary filter (e.g. Non-Veg, Vegan, Spicy)"
+            className="inp"
+            style={{ flex: 1 }}
+          />
           <button
             type="button"
-            className={`chip ${showVegFilterInput ? 'on' : ''}`}
-            onClick={() => setShowVegFilterInput((v) => !v)}
+            className="chip on"
+            onClick={() => {
+              const label = newDietaryLabel.trim();
+              if (!label) return;
+              const id =
+                label
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '') || `diet_${Date.now().toString(36)}`;
+              if (
+                dietaryFiltersInput.some(
+                  (x) =>
+                    x.id === id ||
+                    x.label.toLowerCase() === label.toLowerCase()
+                )
+              ) {
+                say('Dietary filter already exists');
+                return;
+              }
+              setDietaryFiltersInput((prev) => [
+                ...prev,
+                {
+                  id,
+                  label,
+                  emoji: newDietaryEmoji.trim() || '🍽️',
+                  enabled: true,
+                },
+              ]);
+              setNewDietaryLabel('');
+            }}
           >
-            {showVegFilterInput ? '✅ ' : ''}🌱 Show Veg-only Filter
-          </button>
-          <button
-            type="button"
-            className={`chip ${showJainFilterInput ? 'on' : ''}`}
-            onClick={() => setShowJainFilterInput((v) => !v)}
-          >
-            {showJainFilterInput ? '✅ ' : ''}🙏 Show Jain Filter
+            + Add Filter
           </button>
         </div>
 
         <button
           className="btn alt"
           onClick={async () => {
+            const enabledLangs = menuLanguagesInput
+              .filter((l) => l.enabled)
+              .map((l) => l.code as Language);
+            const vegItem = dietaryFiltersInput.find((f) => f.id === 'veg');
+            const jainItem = dietaryFiltersInput.find((f) => f.id === 'jain');
             const nextBrand = {
               restaurantName: restaurantNameInput.trim() || 'Tadka Truck',
               restaurantTagline: restaurantTaglineInput.trim(),
-              enabledLanguages: enabledLangsInput.length
-                ? enabledLangsInput
-                : (['en', 'hi', 'gu'] as Language[]),
-              showVegFilter: showVegFilterInput,
-              showJainFilter: showJainFilterInput,
+              menuLanguages: menuLanguagesInput,
+              enabledLanguages: enabledLangs.length
+                ? enabledLangs
+                : (['en'] as Language[]),
+              dietaryFilters: dietaryFiltersInput,
+              showVegFilter: vegItem ? vegItem.enabled : false,
+              showJainFilter: jainItem ? jainItem.enabled : false,
             };
             saveGoogleConfig(nextBrand);
             await syncToGoogleSheets(nextBrand);
-            say('Brand profile, tagline & filters saved & synced ✅');
+            say('Brand profile, languages & dietary filters saved & synced ✅');
           }}
         >
           Save &amp; Sync Brand Profile
