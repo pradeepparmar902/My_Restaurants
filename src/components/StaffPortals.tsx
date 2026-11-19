@@ -2252,6 +2252,7 @@ export function AdminPortalView() {
       team: val,
       giveAccess: val,
       whatsappBill: val,
+      brandProfile: val,
       gstSettings: val,
       rewardMaster: val,
       loginTest: val,
@@ -2446,6 +2447,42 @@ export function AdminPortalView() {
             ? 'After payment, customers who gave their WhatsApp number get the final bill.'
             : 'No bill is sent on WhatsApp. Customers still see it in the app.'}
         </p>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="🏪 Restaurant / Brand Profile"
+        badge={S.googleConfig.restaurantName || 'Tadka Truck'}
+        isOpen={!!openAdminSections.brandProfile}
+        onToggle={() => toggleAdminSection('brandProfile')}
+      >
+        <p className="mu" style={{ margin: '0 0 8px', fontSize: '12px' }}>
+          Set your restaurant&apos;s display name shown on the Customer Menu,
+          Table QR posters, and digital bills. Synced via Google Sheets
+          (`Restaurant_Config`).
+        </p>
+        <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+          🏪 Restaurant / Brand Name
+        </div>
+        <input
+          value={restaurantNameInput}
+          onChange={(e) => setRestaurantNameInput(e.target.value)}
+          placeholder="Tadka Truck"
+          className="inp"
+          style={{ width: '100%', marginBottom: '8px' }}
+        />
+        <button
+          className="btn alt"
+          onClick={async () => {
+            const nextBrand = {
+              restaurantName: restaurantNameInput.trim() || 'Tadka Truck',
+            };
+            saveGoogleConfig(nextBrand);
+            await syncToGoogleSheets(nextBrand);
+            say('Restaurant name saved & synced ✅');
+          }}
+        >
+          Save &amp; Sync Restaurant Name
+        </button>
       </CollapsibleSection>
 
       <CollapsibleSection
@@ -3026,18 +3063,6 @@ export function AdminPortalView() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div>
             <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
-              🏪 Restaurant / Brand Name (shown on Customer Menu, QR &amp; Bills)
-            </div>
-            <input
-              value={restaurantNameInput}
-              onChange={(e) => setRestaurantNameInput(e.target.value)}
-              placeholder="Tadka Truck"
-              className="inp"
-              style={{ width: '100%' }}
-            />
-          </div>
-          <div>
-            <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
               ⭐ Google Review URL (from Google Business Profile → Ask for reviews)
             </div>
             <input
@@ -3112,7 +3137,6 @@ export function AdminPortalView() {
             className="btn alt"
             onClick={async () => {
               const nextSocial = {
-                restaurantName: restaurantNameInput.trim() || 'Tadka Truck',
                 googleReviewUrl: revUrlInput.trim(),
                 instagramHandle: igHandleInput.trim(),
                 facebookUrl: fbUrlInput.trim(),
