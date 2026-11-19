@@ -56,11 +56,21 @@ export function LoginBar() {
     isStandaloneMode,
   } = useTadka();
   const st = staffOf();
+  const roleDisplay =
+    S.role === 'sa'
+      ? 'Super Admin'
+      : st
+      ? st.r
+      : S.role === 'o'
+      ? 'Owner'
+      : S.role === 'a'
+      ? 'Admin'
+      : 'User';
   return (
     <div className="row sp" style={{ marginBottom: '10px' }}>
       <span className="mu">
         {S.me.mob
-          ? `📱 ${S.me.mob}${st ? ' · ' + st.r : ''}`
+          ? `📱 ${S.me.mob} · ${roleDisplay}`
           : 'Guest · login to find your orders'}
       </span>
       <div className="row">
@@ -114,19 +124,19 @@ export function RoleBar() {
     ['sa', 'Super'],
   ];
 
+  const activeTabs = roleLabels.filter(([r]) => allowed.includes(r));
+
   return (
-    <div className="roles">
-      {roleLabels
-        .filter(([r]) => allowed.includes(r))
-        .map(([r, label]) => (
-          <button
-            key={r}
-            className={S.role === r ? 'on' : ''}
-            onClick={() => setRole(r)}
-          >
-            {label}
-          </button>
-        ))}
+    <div className={`roles ${activeTabs.length >= 6 ? 'has-6-tabs' : ''}`}>
+      {activeTabs.map(([r, label]) => (
+        <button
+          key={r}
+          className={S.role === r ? 'on' : ''}
+          onClick={() => setRole(r)}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
