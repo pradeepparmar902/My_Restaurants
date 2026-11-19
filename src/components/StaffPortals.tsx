@@ -2200,6 +2200,9 @@ export function AdminPortalView() {
   const [staffName, setStaffName] = useState('');
   const [staffMob, setStaffMob] = useState('');
   const [checkMob, setCheckMob] = useState('');
+  const [restaurantNameInput, setRestaurantNameInput] = useState(
+    S.googleConfig.restaurantName || 'Tadka Truck'
+  );
   const [revUrlInput, setRevUrlInput] = useState(
     S.googleConfig.googleReviewUrl || ''
   );
@@ -2941,7 +2944,7 @@ export function AdminPortalView() {
                       }}
                     >
                       <b style={{ fontSize: '18px' }}>
-                        Tadka Truck · {t.label}
+                        {(S.googleConfig.restaurantName || '').trim() || 'Tadka Truck'} · {t.label}
                       </b>
                       <p style={{ fontSize: '12px', color: '#4a3680', margin: '4px 0 10px' }}>
                         Scan to view menu, order & pay
@@ -3023,6 +3026,18 @@ export function AdminPortalView() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div>
             <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+              🏪 Restaurant / Brand Name (shown on Customer Menu, QR &amp; Bills)
+            </div>
+            <input
+              value={restaurantNameInput}
+              onChange={(e) => setRestaurantNameInput(e.target.value)}
+              placeholder="Tadka Truck"
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
               ⭐ Google Review URL (from Google Business Profile → Ask for reviews)
             </div>
             <input
@@ -3097,6 +3112,7 @@ export function AdminPortalView() {
             className="btn alt"
             onClick={async () => {
               const nextSocial = {
+                restaurantName: restaurantNameInput.trim() || 'Tadka Truck',
                 googleReviewUrl: revUrlInput.trim(),
                 instagramHandle: igHandleInput.trim(),
                 facebookUrl: fbUrlInput.trim(),

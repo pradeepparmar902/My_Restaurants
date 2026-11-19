@@ -160,6 +160,7 @@ export interface RewardRulesConfig {
 
 export interface GoogleCloudStorageConfig {
   enabled: boolean;
+  restaurantName?: string;
   appsScriptWebAppUrl: string;
   spreadsheetId: string;
   driveFolderId: string;

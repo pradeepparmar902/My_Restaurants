@@ -84,7 +84,7 @@ export function MenuTabView() {
     <>
       <div className="hero">
         <h1>
-          Tadka Truck
+          {(S.googleConfig.restaurantName || '').trim() || 'Tadka Truck'}
           <br />
           {activeTableLabel} 🔥
         </h1>
@@ -1410,7 +1410,7 @@ export function BillTabView() {
     <>
       {S.billSrc === 'waiter' && (
         <div className="wa" style={{ margin: '0 0 10px' }}>
-          <b>🧾 Bill from Tadka Truck</b>
+          <b>🧾 Bill from {(S.googleConfig.restaurantName || '').trim() || 'Tadka Truck'}</b>
           <p>
             Your waiter order for Table {S.activeTable}. Check the items and pay
             below.

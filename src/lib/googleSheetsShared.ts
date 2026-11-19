@@ -45,7 +45,7 @@ export function buildSheetRowsForState(
   const Restaurant_Config: (string | number | boolean)[][] = [
     ['Config_Key', 'Config_Value', 'Updated_At'],
     ['restaurant_slug', 'tadka-truck', new Date().toISOString()],
-    ['restaurant_name', 'Tadka Truck', new Date().toISOString()],
+    ['restaurant_name', (state.googleConfig?.restaurantName || '').trim() || 'Tadka Truck', new Date().toISOString()],
     ['appsScriptWebAppUrl', state.googleConfig?.appsScriptWebAppUrl || '', new Date().toISOString()],
     ['spreadsheetId', state.googleConfig?.spreadsheetId || '', new Date().toISOString()],
     ['driveFolderId', state.googleConfig?.driveFolderId || '', new Date().toISOString()],
@@ -663,6 +663,7 @@ export function parseConfigFromSheetRows(
     if (!r || !r[0]) continue;
     const key = String(r[0]).trim();
     const val = String(r[1] ?? '').trim();
+    if (key === 'restaurant_name' && val) cfg.restaurantName = val;
     if (key === 'appsScriptWebAppUrl' && val) cfg.appsScriptWebAppUrl = val;
     if (key === 'spreadsheetId' && val) cfg.spreadsheetId = val;
     if (key === 'driveFolderId' && val) cfg.driveFolderId = val;
