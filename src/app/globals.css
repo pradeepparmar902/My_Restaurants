@@ -983,3 +983,138 @@ select:focus-visible {
   background: #0d9488;
   color: #ffffff;
 }
+
+/* ==========================================================================
+   STYLE 6: Royal Gold & Maharaja Amber / Imperial Maroon Theme
+   Gold background with burnished gold, ivory-gold cards & royal espresso/maroon
+   ========================================================================== */
+:root[data-app-style='style6'] {
+  color-scheme: light;
+  --bg: #fae596;
+  --sf: #fffbeb;
+  --sf2: #fef08a;
+  --tx: #2d1a04;
+  --mu: #785216;
+  --pk: #9f1239;
+  --mg: #d97706;
+  --mn: #b45309;
+}
+
+:root[data-app-style='style6'] body {
+  background: linear-gradient(135deg, #eab308 0%, #facc15 50%, #fde047 100%);
+  color: #2d1a04;
+}
+
+:root[data-app-style='style6'] #app {
+  background: linear-gradient(180deg, #fdf3c7 0%, #fae596 100%);
+  min-height: 100vh;
+  box-shadow: 0 0 40px rgba(146, 64, 14, 0.22);
+}
+
+:root[data-app-style='style6'] .card {
+  background: #fffbeb;
+  border: 1.5px solid #e5c158;
+  box-shadow: 0 4px 16px rgba(180, 130, 15, 0.14);
+}
+
+:root[data-app-style='style6'] .roles {
+  background: #fffbeb;
+  border: 1.5px solid #e5c158;
+  box-shadow: 0 2px 10px rgba(180, 130, 15, 0.14);
+}
+
+:root[data-app-style='style6'] .roles button {
+  color: #785216;
+}
+
+:root[data-app-style='style6'] .roles button.on {
+  background: linear-gradient(135deg, #b45309, #d97706);
+  color: #ffffff;
+}
+
+:root[data-app-style='style6'] .hero {
+  background: linear-gradient(135deg, #451a03 0%, #92400e 45%, #d97706 80%, #f59e0b 100%) !important;
+  color: #fffbeb !important;
+  border: 1.5px solid #fbbf24;
+  box-shadow: 0 6px 20px rgba(180, 83, 9, 0.3);
+}
+
+:root[data-app-style='style6'] .chip {
+  border: 1px solid #d4af37;
+  background: #fffdf5;
+  color: #2d1a04;
+}
+
+:root[data-app-style='style6'] .chip.on {
+  background: linear-gradient(135deg, #fde68a, #fcd34d);
+  color: #451a03;
+  border-color: #b45309;
+  font-weight: 800;
+}
+
+:root[data-app-style='style6'] .btn {
+  background: linear-gradient(135deg, #9f1239 0%, #be123c 100%);
+  color: #fffbeb;
+  box-shadow: 0 4px 14px rgba(159, 18, 57, 0.28);
+}
+
+:root[data-app-style='style6'] .btn.alt {
+  background: linear-gradient(135deg, #b45309 0%, #d97706 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(180, 83, 9, 0.28);
+}
+
+:root[data-app-style='style6'] .btn.ghost {
+  background: #fef3c7;
+  color: #451a03;
+  border: 1px solid #d4af37;
+  box-shadow: none;
+}
+
+:root[data-app-style='style6'] nav {
+  background: #fffbeb;
+  border-top: 1.5px solid #e5c158;
+  box-shadow: 0 -4px 18px rgba(180, 130, 15, 0.16);
+}
+
+:root[data-app-style='style6'] nav button {
+  color: #785216;
+}
+
+:root[data-app-style='style6'] nav button.on {
+  color: #9f1239;
+}
+
+:root[data-app-style='style6'] .inp,
+:root[data-app-style='style6'] .sel-cc {
+  background: #fffdf5;
+  border: 1.5px solid #d4af37;
+  color: #2d1a04;
+}
+
+:root[data-app-style='style6'] .sbox {
+  border-color: #d4af37;
+  background: #fffdf5;
+}
+
+:root[data-app-style='style6'] .sbox.on {
+  border-color: #b45309;
+  background: #fde68a;
+}
+
+:root[data-app-style='style6'] .tot {
+  border-top-color: #d4af37;
+}
+
+:root[data-app-style='style6'] .wa {
+  background: #fef3c7;
+  color: #451a03;
+  border-left: 4px solid #b45309;
+}
+
+:root[data-app-style='style6'] .tag.ok,
+:root[data-app-style='style6'] .step.on i,
+:root[data-app-style='style6'] .toast {
+  background: #b45309;
+  color: #ffffff;
+}

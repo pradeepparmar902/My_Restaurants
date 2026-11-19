@@ -274,7 +274,7 @@ export function TadkaProvider({
     ((overrideConfig?: Partial<AppState['googleConfig']>, silent?: boolean) => Promise<void>) | null
   >(null);
 
-  // Apply active workspace appStyle ('style1' .. 'style5') to <html> root attribute for global theme switching
+  // Apply active workspace appStyle ('style1' .. 'style6') to <html> root attribute for global theme switching
   useEffect(() => {
     if (typeof document !== 'undefined') {
       const raw = S.googleConfig?.appStyle;
@@ -282,7 +282,8 @@ export function TadkaProvider({
         raw === 'style2' ||
         raw === 'style3' ||
         raw === 'style4' ||
-        raw === 'style5'
+        raw === 'style5' ||
+        raw === 'style6'
           ? raw
           : 'style1';
       document.documentElement.setAttribute('data-app-style', styleMode);

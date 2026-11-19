@@ -38,34 +38,47 @@ export function MenuTabView() {
   const [onlyBestsellers, setOnlyBestsellers] = useState(false);
   const [sortPriceAsc, setSortPriceAsc] = useState(false);
   const [gridView, setGridView] = useState<'grid' | 'list'>('grid');
-  const currentStyle: 'style1' | 'style2' | 'style3' | 'style4' | 'style5' =
-    S.googleConfig.appStyle === 'style5'
-      ? 'style5'
-      : S.googleConfig.appStyle === 'style4'
-        ? 'style4'
-        : S.googleConfig.appStyle === 'style3'
-          ? 'style3'
-          : S.googleConfig.appStyle === 'style2'
-            ? 'style2'
-            : 'style1';
+  const currentStyle:
+    | 'style1'
+    | 'style2'
+    | 'style3'
+    | 'style4'
+    | 'style5'
+    | 'style6' =
+    S.googleConfig.appStyle === 'style6'
+      ? 'style6'
+      : S.googleConfig.appStyle === 'style5'
+        ? 'style5'
+        : S.googleConfig.appStyle === 'style4'
+          ? 'style4'
+          : S.googleConfig.appStyle === 'style3'
+            ? 'style3'
+            : S.googleConfig.appStyle === 'style2'
+              ? 'style2'
+              : 'style1';
   const isStyle3 = currentStyle === 'style3';
   const isStyle4 = currentStyle === 'style4';
   const isStyle5 = currentStyle === 'style5';
+  const isStyle6 = currentStyle === 'style6';
   const lightTheme = currentStyle !== 'style1';
-  const accentCol = isStyle5
-    ? '#0d9488'
-    : isStyle4
-      ? '#006aff'
-      : isStyle3
-        ? '#e11d48'
-        : '#16a34a';
-  const accentDark = isStyle5
-    ? '#0f766e'
-    : isStyle4
-      ? '#0052cc'
-      : isStyle3
-        ? '#be123c'
-        : '#15803d';
+  const accentCol = isStyle6
+    ? '#b45309'
+    : isStyle5
+      ? '#0d9488'
+      : isStyle4
+        ? '#006aff'
+        : isStyle3
+          ? '#e11d48'
+          : '#16a34a';
+  const accentDark = isStyle6
+    ? '#78350f'
+    : isStyle5
+      ? '#0f766e'
+      : isStyle4
+        ? '#0052cc'
+        : isStyle3
+          ? '#be123c'
+          : '#15803d';
   const currentStaff = staffOf();
 
   const L: Record<string, string> = {
@@ -248,47 +261,57 @@ export function MenuTabView() {
     'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
   ];
 
-  const surfaceBg = isStyle5
-    ? '#f0fdfa'
-    : isStyle4
-      ? '#f4f7fe'
-      : isStyle3
-        ? '#fdfbf7'
-        : lightTheme
-          ? '#f4f6f8'
-          : 'rgba(255,255,255,0.03)';
-  const cardSurface = isStyle3
-    ? '#fffdf9'
-    : lightTheme
-      ? '#ffffff'
-      : '#23153c';
-  const textPrimary = isStyle5
-    ? '#02111a'
-    : isStyle4
-      ? '#191b41'
-      : isStyle3
-        ? '#291c14'
-        : lightTheme
-          ? '#0f172a'
-          : '#f8fafc';
-  const textMuted = isStyle5
-    ? '#335c67'
-    : isStyle4
-      ? '#52587a'
-      : isStyle3
-        ? '#786452'
-        : lightTheme
-          ? '#64748b'
-          : '#b9a8e0';
-  const borderCol = isStyle5
-    ? '#ccfbf1'
-    : isStyle4
-      ? '#dbe4ff'
-      : isStyle3
-        ? '#efe6d5'
-        : lightTheme
-          ? '#e2e8f0'
-          : 'rgba(255,255,255,0.12)';
+  const surfaceBg = isStyle6
+    ? 'linear-gradient(180deg, #fef08a 0%, #fae596 100%)'
+    : isStyle5
+      ? '#f0fdfa'
+      : isStyle4
+        ? '#f4f7fe'
+        : isStyle3
+          ? '#fdfbf7'
+          : lightTheme
+            ? '#f4f6f8'
+            : 'rgba(255,255,255,0.03)';
+  const cardSurface = isStyle6
+    ? '#fffbeb'
+    : isStyle3
+      ? '#fffdf9'
+      : lightTheme
+        ? '#ffffff'
+        : '#23153c';
+  const textPrimary = isStyle6
+    ? '#2d1a04'
+    : isStyle5
+      ? '#02111a'
+      : isStyle4
+        ? '#191b41'
+        : isStyle3
+          ? '#291c14'
+          : lightTheme
+            ? '#0f172a'
+            : '#f8fafc';
+  const textMuted = isStyle6
+    ? '#785216'
+    : isStyle5
+      ? '#335c67'
+      : isStyle4
+        ? '#52587a'
+        : isStyle3
+          ? '#786452'
+          : lightTheme
+            ? '#64748b'
+            : '#b9a8e0';
+  const borderCol = isStyle6
+    ? '#e5c158'
+    : isStyle5
+      ? '#ccfbf1'
+      : isStyle4
+        ? '#dbe4ff'
+        : isStyle3
+          ? '#efe6d5'
+          : lightTheme
+            ? '#e2e8f0'
+            : 'rgba(255,255,255,0.12)';
 
   return (
     <div
@@ -307,25 +330,29 @@ export function MenuTabView() {
       {/* Top Restaurant Header Bar + Language & Theme Controls */}
       <div
         style={{
-          background: isStyle5
-            ? 'linear-gradient(135deg, #02111a 0%, #0f766e 55%, #0d9488 100%)'
-            : isStyle4
-              ? 'linear-gradient(135deg, #191b41 0%, #0052cc 52%, #006aff 100%)'
-              : isStyle3
-                ? 'linear-gradient(135deg, #431407 0%, #9a3412 52%, #e11d48 100%)'
-                : 'linear-gradient(135deg, #065f46 0%, #16a34a 55%, #ea580c 100%)',
+          background: isStyle6
+            ? 'linear-gradient(135deg, #451a03 0%, #92400e 45%, #d97706 78%, #f59e0b 100%)'
+            : isStyle5
+              ? 'linear-gradient(135deg, #02111a 0%, #0f766e 55%, #0d9488 100%)'
+              : isStyle4
+                ? 'linear-gradient(135deg, #191b41 0%, #0052cc 52%, #006aff 100%)'
+                : isStyle3
+                  ? 'linear-gradient(135deg, #431407 0%, #9a3412 52%, #e11d48 100%)'
+                  : 'linear-gradient(135deg, #065f46 0%, #16a34a 55%, #ea580c 100%)',
           borderRadius: '16px',
           padding: '14px',
           color: '#ffffff',
           position: 'relative',
           overflow: 'hidden',
-          boxShadow: isStyle5
-            ? '0 6px 18px rgba(13, 148, 136, 0.24)'
-            : isStyle4
-              ? '0 6px 18px rgba(0, 106, 255, 0.24)'
-              : isStyle3
-                ? '0 6px 18px rgba(225, 29, 72, 0.22)'
-                : '0 6px 18px rgba(22, 163, 74, 0.25)',
+          boxShadow: isStyle6
+            ? '0 6px 20px rgba(180, 83, 9, 0.3)'
+            : isStyle5
+              ? '0 6px 18px rgba(13, 148, 136, 0.24)'
+              : isStyle4
+                ? '0 6px 18px rgba(0, 106, 255, 0.24)'
+                : isStyle3
+                  ? '0 6px 18px rgba(225, 29, 72, 0.22)'
+                  : '0 6px 18px rgba(22, 163, 74, 0.25)',
         }}
       >
         <div className="row sp" style={{ alignItems: 'flex-start', gap: '8px' }}>
@@ -381,10 +408,12 @@ export function MenuTabView() {
                         ? 'style4'
                         : currentStyle === 'style4'
                           ? 'style5'
-                          : 'style1',
+                          : currentStyle === 'style5'
+                            ? 'style6'
+                            : 'style1',
               })
             }
-            title="Cycle App Styles 1 to 5"
+            title="Cycle App Styles 1 to 6"
             style={{
               background: 'rgba(255,255,255,0.2)',
               border: '1px solid rgba(255,255,255,0.35)',
@@ -405,7 +434,9 @@ export function MenuTabView() {
                   ? '⚡ Style 4'
                   : currentStyle === 'style4'
                     ? '🎁 Style 5'
-                    : '🌙 Style 1'}
+                    : currentStyle === 'style5'
+                      ? '👑 Style 6'
+                      : '🌙 Style 1'}
           </button>
         </div>
 
