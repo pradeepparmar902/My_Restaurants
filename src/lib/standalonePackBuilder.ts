@@ -1,0 +1,266 @@
+import { WorkspaceTenantRecord } from '@/types/tadka';
+import { GOOGLE_APPS_SCRIPT_TEMPLATE } from '@/lib/googleSheetsShared';
+
+/**
+ * Standard IEEE 802.3 CRC-32 implementation for valid ZIP archives
+ */
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) {
+    crc = CRC_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/**
+ * Zero-dependency browser ZIP file generator (Store / method 0).
+ * Compatible with Windows Explorer, macOS Archive Utility, 7-Zip, WinRAR, and cPanel.
+ */
+export function createZipBlob(
+  files: { path: string; content: string }[]
+): Blob {
+  const encoder = new TextEncoder();
+  const encodedFiles = files.map((f) => {
+    const nameBytes = encoder.encode(f.path.replace(/^\/+/, ''));
+    const dataBytes = encoder.encode(f.content);
+    const checksum = crc32(dataBytes);
+    return { nameBytes, dataBytes, checksum };
+  });
+
+  const localParts: Uint8Array[] = [];
+  const centralParts: Uint8Array[] = [];
+  let offset = 0;
+
+  for (const file of encodedFiles) {
+    const nameLen = file.nameBytes.length;
+    const dataLen = file.dataBytes.length;
+
+    // Local File Header (30 bytes + filename)
+    const localHeader = new Uint8Array(30 + nameLen);
+    const lv = new DataView(localHeader.buffer);
+    lv.setUint32(0, 0x04034b50, true); // Local file header signature
+    lv.setUint16(4, 20, true); // Version needed to extract (2.0)
+    lv.setUint16(6, 0x0800, true); // General purpose bit flag (UTF-8)
+    lv.setUint16(8, 0, true); // Compression method (0 = Store)
+    lv.setUint16(10, 0, true); // Last mod file time
+    lv.setUint16(12, 0x5421, true); // Last mod file date
+    lv.setUint32(14, file.checksum, true); // CRC-32
+    lv.setUint32(18, dataLen, true); // Compressed size
+    lv.setUint32(22, dataLen, true); // Uncompressed size
+    lv.setUint16(26, nameLen, true); // File name length
+    lv.setUint16(28, 0, true); // Extra field length
+    localHeader.set(file.nameBytes, 30);
+
+    localParts.push(localHeader, file.dataBytes);
+
+    // Central Directory Header (46 bytes + filename)
+    const centralHeader = new Uint8Array(46 + nameLen);
+    const cv = new DataView(centralHeader.buffer);
+    cv.setUint32(0, 0x02014b50, true); // Central directory file header signature
+    cv.setUint16(4, 20, true); // Version made by
+    cv.setUint16(6, 20, true); // Version needed to extract
+    cv.setUint16(8, 0x0800, true); // General purpose bit flag (UTF-8)
+    cv.setUint16(10, 0, true); // Compression method (0 = Store)
+    cv.setUint16(12, 0, true); // Last mod file time
+    cv.setUint16(14, 0x5421, true); // Last mod file date
+    cv.setUint32(16, file.checksum, true); // CRC-32
+    cv.setUint32(20, dataLen, true); // Compressed size
+    cv.setUint32(24, dataLen, true); // Uncompressed size
+    cv.setUint16(28, nameLen, true); // File name length
+    cv.setUint16(30, 0, true); // Extra field length
+    cv.setUint16(32, 0, true); // File comment length
+    cv.setUint16(34, 0, true); // Disk number start
+    cv.setUint16(36, 0, true); // Internal file attributes
+    cv.setUint32(38, 0, true); // External file attributes
+    cv.setUint32(42, offset, true); // Relative offset of local header
+    centralHeader.set(file.nameBytes, 46);
+
+    centralParts.push(centralHeader);
+    offset += localHeader.length + dataLen;
+  }
+
+  const centralDirSize = centralParts.reduce((acc, p) => acc + p.length, 0);
+
+  // End of Central Directory Record (22 bytes)
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true); // EOCD signature
+  ev.setUint16(4, 0, true); // Number of this disk
+  ev.setUint16(6, 0, true); // Disk where central directory starts
+  ev.setUint16(8, encodedFiles.length, true); // Number of central dir records on this disk
+  ev.setUint16(10, encodedFiles.length, true); // Total number of central dir records
+  ev.setUint32(12, centralDirSize, true); // Size of central directory
+  ev.setUint32(16, offset, true); // Offset of start of central directory
+  ev.setUint16(20, 0, true); // Comment length
+
+  return new Blob([...localParts, ...centralParts, eocd], {
+    type: 'application/zip',
+  });
+}
+
+/**
+ * Generates and downloads a complete Standalone Single-Restaurant App ZIP package
+ * directly to the browser's Downloads folder.
+ */
+export function downloadStandaloneRestaurantZip(
+  client: WorkspaceTenantRecord,
+  appBaseUrl: string
+) {
+  const cleanSlug =
+    (client.slug || 'my-restaurant')
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '-') || 'my-restaurant';
+  const restaurantName = client.restaurantName || 'My Restaurant';
+
+  const standaloneRestaurantsJson = JSON.stringify(
+    {
+      standaloneMode: true,
+      defaultRestaurant: cleanSlug,
+      restaurants: {
+        [cleanSlug]: {
+          name: restaurantName,
+          slug: cleanSlug,
+          appStyle: client.appStyle || 'style2',
+          ownerName: client.ownerName || 'Owner',
+          ownerMobile: client.ownerMobile || '',
+          appsScriptWebAppUrl: client.appsScriptWebAppUrl || '',
+          spreadsheetId: client.spreadsheetId || '',
+          driveFolderId: client.driveFolderId || '',
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    },
+    null,
+    2
+  );
+
+  const standaloneTargetUrl = `${appBaseUrl}/?standalone=1&w=${encodeURIComponent(
+    cleanSlug
+  )}${
+    client.spreadsheetId ? `&s=${encodeURIComponent(client.spreadsheetId)}` : ''
+  }`;
+
+  const standaloneIndexHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>${restaurantName} — Digital QR Ordering & Rewards</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0f172a;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <!-- Standalone Single-Restaurant Wrapper for ${restaurantName} (Super Admin disabled) -->
+  <iframe
+    id="restaurant-app"
+    src="${standaloneTargetUrl}"
+    allow="clipboard-read; clipboard-write; geolocation; camera"
+    title="${restaurantName}"
+  ></iframe>
+  <script>
+    // Forward QR table parameters (?t=...&table=...&label=...) from custom domain to standalone app
+    (function() {
+      var sp = new URLSearchParams(window.location.search);
+      var frame = document.getElementById('restaurant-app');
+      if (frame && sp.toString()) {
+        var base = new URL(frame.src);
+        sp.forEach(function(val, key) {
+          if (key !== 'w' && key !== 's' && key !== 'standalone') {
+            base.searchParams.set(key, val);
+          }
+        });
+        frame.src = base.toString();
+      }
+    })();
+  </script>
+</body>
+</html>
+`;
+
+  const envLocalContent = `# Standalone Single-Restaurant Build Configuration for ${restaurantName}
+NEXT_PUBLIC_STANDALONE_MODE=true
+NEXT_PUBLIC_DEFAULT_RESTAURANT_SLUG=${cleanSlug}
+`;
+
+  const readmeContent = `===============================================================================
+🏪 ${restaurantName.toUpperCase()} — STANDALONE RESTAURANT APP PACKAGE
+===============================================================================
+
+Owner Name:       ${client.ownerName || 'Owner'}
+Owner Login:      ${client.ownerMobile || 'Registered Mobile'} (Demo OTP: 1234)
+Default Theme:    ${client.appStyle || 'style2'}
+Google Sheet ID:  ${client.spreadsheetId || 'Not set'}
+Google Drive ID:  ${client.driveFolderId || 'Not set'}
+
+What is included in this Standalone ZIP Pack:
+-------------------------------------------------------------------------------
+1. index.html
+   - Instant, zero-build standalone web launcher pre-configured for ${restaurantName}
+     with Super Admin / multi-restaurant creation completely disabled.
+   - Upload this single file to ANY domain or hosting (Hostinger, GoDaddy,
+     cPanel, Netlify Drop, Vercel, Cloudflare Pages, or GitHub Pages) and your
+     restaurant app works immediately on the owner's custom domain!
+
+2. public/config/restaurants.json  &  .env.production
+   - If you are building the full Next.js project exclusively for ${restaurantName}:
+     a) Copy "public/config/restaurants.json" into your project's "public/config/restaurants.json"
+     b) Copy ".env.production" into your project root
+     c) Run "npm run build"
+     - Because "standaloneMode": true is set, the built app runs exclusively
+       for ${restaurantName} with NO Super Admin tab and NO multi-restaurant
+       creation options, while keeping "Google Sheet & Drive Storage Setup"
+       available inside the Owner's Admin tab.
+
+3. google-apps-script/Code.gs
+   - Complete Google Apps Script backend code.
+   - If the owner wants their own independent Apps Script inside their Google
+     Sheet (${client.spreadsheetId || 'their Google Sheet'}), open the Sheet ->
+     Extensions -> Apps Script -> paste Code.gs -> Deploy -> New deployment ->
+     Web app (Execute as: Me, Who has access: Anyone).
+===============================================================================
+`;
+
+  const zipBlob = createZipBlob([
+    { path: 'index.html', content: standaloneIndexHtml },
+    { path: 'public/config/restaurants.json', content: standaloneRestaurantsJson },
+    { path: '.env.production', content: envLocalContent },
+    { path: 'google-apps-script/Code.gs', content: GOOGLE_APPS_SCRIPT_TEMPLATE },
+    { path: 'DEPLOY_README.txt', content: readmeContent },
+  ]);
+
+  const url = URL.createObjectURL(zipBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${cleanSlug}-standalone-app-pack.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}

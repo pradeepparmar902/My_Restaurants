@@ -156,6 +156,7 @@ interface TadkaContextValue {
   }) => Promise<string | undefined>;
   saveGoogleConfig: (cfg: Partial<AppState['googleConfig']>) => void;
   activeWorkspaceSlug: string;
+  isStandaloneMode: boolean;
   isSuperAdmin: boolean;
   unlockSuperAdmin: (pin: string) => boolean;
   createAndProvisionWorkspace: (
@@ -268,6 +269,9 @@ export function TadkaProvider({
   const appliedProofIdsRef = useRef<Set<string>>(new Set());
   const [activeWorkspaceSlug, setActiveWorkspaceSlug] =
     useState<string>('tadka-truck');
+  const [isStandaloneMode, setIsStandaloneMode] = useState<boolean>(
+    process.env.NEXT_PUBLIC_STANDALONE_MODE === 'true'
+  );
   const [superAdminPinUnlocked, setSuperAdminPinUnlocked] =
     useState<boolean>(false);
 
@@ -508,11 +512,16 @@ export function TadkaProvider({
     setS((prev) => {
       const next = updater(prev);
       const staffMember = getActiveStaffMember(next.staff, next.me.mob);
+      const urlStandalone =
+        typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).get('standalone') === '1';
       const isSuper =
-        SUPER_ADMIN_MOBILES.includes(next.me.mob) ||
-        (getActiveWorkspaceSlug() === 'tadka-truck' &&
-          staffMember?.r === 'Admin' &&
-          !next.googleConfig.ownerMobile);
+        !isStandaloneMode &&
+        !urlStandalone &&
+        (SUPER_ADMIN_MOBILES.includes(next.me.mob) ||
+          (getActiveWorkspaceSlug() === 'tadka-truck' &&
+            staffMember?.r === 'Admin' &&
+            !next.googleConfig.ownerMobile));
       const allowed: PortalRole[] = [
         ...getAllowedPortals(staffMember),
         ...(isSuper ? (['sa'] as PortalRole[]) : []),
@@ -689,14 +698,25 @@ export function TadkaProvider({
   const staffOf = useCallback(() => getActiveStaffMember(S.staff, S.me.mob), [S.staff, S.me.mob]);
   const portals = useCallback(() => {
     const base = getAllowedPortals(staffOf());
+    const urlStandalone =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('standalone') === '1';
     const isSuper =
-      superAdminPinUnlocked ||
-      SUPER_ADMIN_MOBILES.includes(S.me.mob) ||
-      (getActiveWorkspaceSlug() === 'tadka-truck' &&
-        staffOf()?.r === 'Admin' &&
-        !S.googleConfig.ownerMobile);
+      !isStandaloneMode &&
+      !urlStandalone &&
+      (superAdminPinUnlocked ||
+        SUPER_ADMIN_MOBILES.includes(S.me.mob) ||
+        (getActiveWorkspaceSlug() === 'tadka-truck' &&
+          staffOf()?.r === 'Admin' &&
+          !S.googleConfig.ownerMobile));
     return isSuper ? ([...base, 'sa'] as PortalRole[]) : base;
-  }, [S.googleConfig.ownerMobile, S.me.mob, staffOf, superAdminPinUnlocked]);
+  }, [
+    S.googleConfig.ownerMobile,
+    S.me.mob,
+    isStandaloneMode,
+    staffOf,
+    superAdminPinUnlocked,
+  ]);
 
   const setRole = useCallback(
     (role: PortalRole) => {
@@ -3140,11 +3160,12 @@ export function TadkaProvider({
   pullFromGoogleSheetsRef.current = pullFromGoogleSheets;
 
   const isSuperAdmin =
-    superAdminPinUnlocked ||
-    SUPER_ADMIN_MOBILES.includes(S.me.mob) ||
-    (activeWorkspaceSlug === 'tadka-truck' &&
-      getActiveStaffMember(S.staff, S.me.mob)?.r === 'Admin' &&
-      !S.googleConfig.ownerMobile);
+    !isStandaloneMode &&
+    (superAdminPinUnlocked ||
+      SUPER_ADMIN_MOBILES.includes(S.me.mob) ||
+      (activeWorkspaceSlug === 'tadka-truck' &&
+        getActiveStaffMember(S.staff, S.me.mob)?.r === 'Admin' &&
+        !S.googleConfig.ownerMobile));
 
   const unlockSuperAdmin = useCallback(
     (pin: string) => {
@@ -3296,6 +3317,9 @@ export function TadkaProvider({
         urlSheetId = (sp.get('s') || sp.get('sheet') || '').trim();
         urlDriveId = (sp.get('d') || '').trim();
         urlScript = (sp.get('u') || '').trim();
+        if (sp.get('standalone') === '1') {
+          setIsStandaloneMode(true);
+        }
       }
 
       if (urlSheetId) {
@@ -3322,6 +3346,9 @@ export function TadkaProvider({
           });
           if (res.ok) {
             const data = await res.json();
+            if (data?.standaloneMode === true) {
+              setIsStandaloneMode(true);
+            }
             const defaultEntry =
               data?.restaurants?.[data?.defaultRestaurant || 'tadka-truck'];
             if (defaultEntry?.spreadsheetId) {
@@ -3528,6 +3555,7 @@ export function TadkaProvider({
         uploadMediaToDrive,
         saveGoogleConfig,
         activeWorkspaceSlug,
+        isStandaloneMode,
         isSuperAdmin,
         unlockSuperAdmin,
         createAndProvisionWorkspace,

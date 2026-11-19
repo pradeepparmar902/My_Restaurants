@@ -14,6 +14,7 @@ import {
   DEFAULT_DIETARY_FILTERS,
   DEFAULT_MENU_LANGUAGES,
 } from '@/lib/googleSheetsShared';
+import { downloadStandaloneRestaurantZip } from '@/lib/standalonePackBuilder';
 import {
   DEFAULT_REWARD_RULES,
   ORDER_STATUS_LABELS,
@@ -2229,10 +2230,12 @@ export function SuperAdminPortalView() {
   const [openSaSections, setOpenSaSections] = useState<Record<string, boolean>>({
     clients: true,
     addClient: false,
+    standalonePack: false,
     storage: false,
     loginTest: false,
     resetDemo: false,
   });
+  const [selectedPackSlug, setSelectedPackSlug] = useState<string>('');
 
   const toggleSaSection = (key: string) =>
     setOpenSaSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -2241,6 +2244,7 @@ export function SuperAdminPortalView() {
     setOpenSaSections({
       clients: val,
       addClient: val,
+      standalonePack: val,
       storage: val,
       loginTest: val,
       resetDemo: val,
@@ -2550,6 +2554,19 @@ export function SuperAdminPortalView() {
                       }}
                     >
                       📋 Copy Owner Link
+                    </button>
+                    <button
+                      type="button"
+                      className="chip on"
+                      style={{ fontSize: '11px' }}
+                      onClick={() => {
+                        downloadStandaloneRestaurantZip(w, baseUrl);
+                        say(
+                          `Extracted & downloaded ${w.slug}-standalone-app-pack.zip to Downloads 📦`
+                        );
+                      }}
+                    >
+                      📦 Download Standalone ZIP
                     </button>
                     <a
                       href={waHref}
@@ -2864,6 +2881,83 @@ export function SuperAdminPortalView() {
             </div>
           )}
         </div>
+      </CollapsibleSection>
+
+      {/* Section 2B: Extract & Download Standalone App ZIP Pack */}
+      <CollapsibleSection
+        title="📦 Download Standalone App ZIP (Single-Restaurant Buyer Pack)"
+        badge="ZIP Download"
+        isOpen={!!openSaSections.standalonePack}
+        onToggle={() => toggleSaSection('standalonePack')}
+      >
+        <p className="mu" style={{ margin: '0 0 8px', fontSize: '12px' }}>
+          If a restaurant owner buys a standalone app to host on their own
+          domain (without multiple restaurant creation or Super Admin), select
+          their restaurant below and click the button to extract and save their
+          ready-to-host <b>.zip</b> package into your <b>Downloads</b> folder.
+        </p>
+        {(() => {
+          const allPackOptions: WorkspaceTenantRecord[] = [
+            ...registry,
+            {
+              slug: 'tadka-truck',
+              restaurantName:
+                S.googleConfig.restaurantName || 'Tadka Truck',
+              appStyle: S.googleConfig.appStyle || 'style2',
+              ownerName: S.googleConfig.ownerName || 'Owner',
+              ownerMobile: S.googleConfig.ownerMobile || S.me.mob || '',
+              spreadsheetId: S.googleConfig.spreadsheetId || '',
+              driveFolderId: S.googleConfig.driveFolderId || '',
+              appsScriptWebAppUrl:
+                S.googleConfig.appsScriptWebAppUrl || '',
+              createdAt: new Date().toISOString(),
+            },
+          ];
+          const activePackSlug =
+            selectedPackSlug &&
+            allPackOptions.some((o) => o.slug === selectedPackSlug)
+              ? selectedPackSlug
+              : allPackOptions[0]?.slug || 'tadka-truck';
+          const selectedClient =
+            allPackOptions.find((o) => o.slug === activePackSlug) ||
+            allPackOptions[0];
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="mu" style={{ fontSize: '11px' }}>
+                🏪 Choose Restaurant to Package as Standalone App
+              </div>
+              <select
+                aria-label="Choose restaurant for standalone ZIP download"
+                value={activePackSlug}
+                onChange={(e) => setSelectedPackSlug(e.target.value)}
+                className="sel-cc"
+                style={{ width: '100%' }}
+              >
+                {allPackOptions.map((o) => (
+                  <option key={o.slug} value={o.slug}>
+                    🏪 {o.restaurantName} ({o.slug}) · Owner:{' '}
+                    {o.ownerName || '—'}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                className="btn alt"
+                onClick={() => {
+                  if (!selectedClient) return;
+                  downloadStandaloneRestaurantZip(selectedClient, baseUrl);
+                  say(
+                    `Saved ${selectedClient.slug}-standalone-app-pack.zip to your Downloads folder 📦`
+                  );
+                }}
+              >
+                📦 Extract &amp; Download Standalone App ZIP
+              </button>
+            </div>
+          );
+        })()}
       </CollapsibleSection>
 
       {/* Section 3: Master Google Sheet & Drive Storage Setup */}
@@ -3365,6 +3459,7 @@ export function AdminPortalView() {
   const {
     S,
     activeWorkspaceSlug,
+    isStandaloneMode,
     updateState,
     addStaff,
     toggleManagerAccess,
@@ -4995,6 +5090,17 @@ export function AdminPortalView() {
           </details>
         </div>
       </CollapsibleSection>
+
+      {isStandaloneMode && (
+        <CollapsibleSection
+          title="☁️ Google Sheet &amp; Drive Storage Setup"
+          isOpen={!!openAdminSections.storage}
+          onToggle={() => toggleAdminSection('storage')}
+          wrapInCard={false}
+        >
+          <GoogleStorageAdminCard />
+        </CollapsibleSection>
+      )}
     </>
   );
 }

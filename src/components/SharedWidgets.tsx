@@ -53,6 +53,7 @@ export function LoginBar() {
     logoutOrOpenLogin,
     updateState,
     activeWorkspaceSlug,
+    isStandaloneMode,
   } = useTadka();
   const st = staffOf();
   return (
@@ -65,7 +66,7 @@ export function LoginBar() {
       <div className="row">
         {!S.me.mob && (
           <>
-            {activeWorkspaceSlug === 'tadka-truck' && (
+            {!isStandaloneMode && activeWorkspaceSlug === 'tadka-truck' && (
               <button
                 className="chip"
                 title="Open Super Admin SaaS Dashboard"
