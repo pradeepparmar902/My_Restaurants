@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import { COUNTRY_CODES, SOCIAL_PLATFORMS } from '@/lib/constants';
 import {
@@ -113,17 +113,34 @@ export function StarsStrip() {
   const t = total();
   const isStaff = Boolean(staffOf());
   const currentMob = S.me.mob;
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
-  // Customers only see their own paid bill history; Staff with designated access can see all or their own
-  const visibleHist = isStaff
-    ? S.hist.slice(0, 3)
-    : S.hist
-        .filter((x) =>
-          currentMob
-            ? x.customerMob === currentMob
-            : !x.customerMob || x.customerMob === 'Guest'
-        )
-        .slice(0, 3);
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const ONE_HOUR_MS = 60 * 60 * 1000;
+  const isRecentWithinOneHour = (paidAt?: string) => {
+    if (!paidAt) return false;
+    const paidMs = new Date(paidAt).getTime();
+    return (
+      !Number.isNaN(paidMs) &&
+      nowMs - paidMs >= -60000 &&
+      nowMs - paidMs <= ONE_HOUR_MS
+    );
+  };
+
+  // Show paid bills on the first page ONLY for 1 hour after payment so the list never grows large
+  const visibleHist = S.hist
+    .filter((x) => {
+      if (!isRecentWithinOneHour(x.paidAt)) return false;
+      if (isStaff) return true;
+      return currentMob
+        ? x.customerMob === currentMob
+        : !x.customerMob || x.customerMob === 'Guest';
+    })
+    .slice(0, 3);
 
   const cur =
     S.status && !S.paid && S.sess ? (
@@ -157,38 +174,44 @@ export function StarsStrip() {
           </div>
         ))}
       </div>
-      <div
-        style={{
-          marginTop: '10px',
-          borderTop: '1px dashed #5a4690',
-          paddingTop: '6px',
-        }}
-      >
-        {S.sess && S.orders.length > 0 && !S.paid && (
-          <div className="row sp" style={{ marginBottom: '6px' }}>
-            <span>🎟️ Counter number</span>
-            <span className="tag hot" style={{ fontSize: '16px' }}>
-              {S.sess.no}
-            </span>
+      {(Boolean(S.sess && S.orders.length > 0 && !S.paid) ||
+        Boolean(cur) ||
+        visibleHist.length > 0) && (
+        <div
+          style={{
+            marginTop: '10px',
+            borderTop: '1px dashed #5a4690',
+            paddingTop: '6px',
+          }}
+        >
+          {S.sess && S.orders.length > 0 && !S.paid && (
+            <div className="row sp" style={{ marginBottom: '6px' }}>
+              <span>🎟️ Counter number</span>
+              <span className="tag hot" style={{ fontSize: '16px' }}>
+                {S.sess.no}
+              </span>
+            </div>
+          )}
+          <div className="row sp">
+            <div className="mu">Your bills</div>
+            {visibleHist.length > 0 && (
+              <span className="mu" style={{ fontSize: '10px' }}>
+                ⏱️ Shown for 1 hr after payment
+              </span>
+            )}
           </div>
-        )}
-        <div className="mu">Your bills</div>
-        {cur}
-        {visibleHist.length === 0 && !cur && (
-          <p className="mu" style={{ fontSize: '12px', marginTop: '4px' }}>
-            No bills for {currentMob || 'Guest'} yet.
-          </p>
-        )}
-        {visibleHist.map((x, idx) => (
-          <div key={x.id || idx} className="line">
-            <span>
-              {x.counterNo ? `${x.counterNo} · ` : ''}₹{x.a} · {x.m}
-              {x.o === 'owner' ? ' · tagged by restaurant' : ''}
-            </span>
-            <span className="tag ok">✅ Paid</span>
-          </div>
-        ))}
-      </div>
+          {cur}
+          {visibleHist.map((x, idx) => (
+            <div key={x.id || idx} className="line">
+              <span>
+                {x.counterNo ? `${x.counterNo} · ` : ''}₹{x.a} · {x.m}
+                {x.o === 'owner' ? ' · tagged by restaurant' : ''}
+              </span>
+              <span className="tag ok">✅ Paid</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
