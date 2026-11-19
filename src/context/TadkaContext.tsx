@@ -274,11 +274,15 @@ export function TadkaProvider({
     ((overrideConfig?: Partial<AppState['googleConfig']>, silent?: boolean) => Promise<void>) | null
   >(null);
 
-  // Apply active workspace appStyle ('style1' | 'style2') to <html> root attribute for global theme switching
+  // Apply active workspace appStyle ('style1' | 'style2' | 'style3') to <html> root attribute for global theme switching
   useEffect(() => {
     if (typeof document !== 'undefined') {
       const styleMode =
-        S.googleConfig?.appStyle === 'style2' ? 'style2' : 'style1';
+        S.googleConfig?.appStyle === 'style3'
+          ? 'style3'
+          : S.googleConfig?.appStyle === 'style2'
+            ? 'style2'
+            : 'style1';
       document.documentElement.setAttribute('data-app-style', styleMode);
     }
   }, [S.googleConfig?.appStyle]);

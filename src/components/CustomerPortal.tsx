@@ -38,7 +38,16 @@ export function MenuTabView() {
   const [onlyBestsellers, setOnlyBestsellers] = useState(false);
   const [sortPriceAsc, setSortPriceAsc] = useState(false);
   const [gridView, setGridView] = useState<'grid' | 'list'>('grid');
-  const lightTheme = S.googleConfig.appStyle === 'style2';
+  const currentStyle: 'style1' | 'style2' | 'style3' =
+    S.googleConfig.appStyle === 'style3'
+      ? 'style3'
+      : S.googleConfig.appStyle === 'style2'
+        ? 'style2'
+        : 'style1';
+  const isStyle3 = currentStyle === 'style3';
+  const lightTheme = currentStyle === 'style2' || currentStyle === 'style3';
+  const accentCol = isStyle3 ? '#e11d48' : '#16a34a';
+  const accentDark = isStyle3 ? '#be123c' : '#15803d';
   const currentStaff = staffOf();
 
   const L: Record<string, string> = {
@@ -221,11 +230,19 @@ export function MenuTabView() {
     'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
   ];
 
-  const surfaceBg = lightTheme ? '#f4f6f8' : 'rgba(255,255,255,0.03)';
-  const cardSurface = lightTheme ? '#ffffff' : '#23153c';
-  const textPrimary = lightTheme ? '#0f172a' : '#f8fafc';
-  const textMuted = lightTheme ? '#64748b' : '#b9a8e0';
-  const borderCol = lightTheme ? '#e2e8f0' : 'rgba(255,255,255,0.12)';
+  const surfaceBg = isStyle3
+    ? '#fdfbf7'
+    : lightTheme
+      ? '#f4f6f8'
+      : 'rgba(255,255,255,0.03)';
+  const cardSurface = isStyle3 ? '#fffdf9' : lightTheme ? '#ffffff' : '#23153c';
+  const textPrimary = isStyle3 ? '#291c14' : lightTheme ? '#0f172a' : '#f8fafc';
+  const textMuted = isStyle3 ? '#786452' : lightTheme ? '#64748b' : '#b9a8e0';
+  const borderCol = isStyle3
+    ? '#efe6d5'
+    : lightTheme
+      ? '#e2e8f0'
+      : 'rgba(255,255,255,0.12)';
 
   return (
     <div
@@ -244,13 +261,17 @@ export function MenuTabView() {
       {/* Top Restaurant Header Bar + Language & Theme Controls */}
       <div
         style={{
-          background: 'linear-gradient(135deg, #065f46 0%, #16a34a 55%, #ea580c 100%)',
+          background: isStyle3
+            ? 'linear-gradient(135deg, #431407 0%, #9a3412 52%, #e11d48 100%)'
+            : 'linear-gradient(135deg, #065f46 0%, #16a34a 55%, #ea580c 100%)',
           borderRadius: '16px',
           padding: '14px',
           color: '#ffffff',
           position: 'relative',
           overflow: 'hidden',
-          boxShadow: '0 6px 18px rgba(22, 163, 74, 0.25)',
+          boxShadow: isStyle3
+            ? '0 6px 18px rgba(225, 29, 72, 0.22)'
+            : '0 6px 18px rgba(22, 163, 74, 0.25)',
         }}
       >
         <div className="row sp" style={{ alignItems: 'flex-start', gap: '8px' }}>
@@ -296,9 +317,16 @@ export function MenuTabView() {
           <button
             type="button"
             onClick={() =>
-              saveGoogleConfig({ appStyle: lightTheme ? 'style1' : 'style2' })
+              saveGoogleConfig({
+                appStyle:
+                  currentStyle === 'style1'
+                    ? 'style2'
+                    : currentStyle === 'style2'
+                      ? 'style3'
+                      : 'style1',
+              })
             }
-            title="Switch App Style 1 (Dark) / Style 2 (Fresh Food-App)"
+            title="Cycle App Style 1 (Dark) / Style 2 (Fresh Emerald) / Style 3 (Milky White)"
             style={{
               background: 'rgba(255,255,255,0.2)',
               border: '1px solid rgba(255,255,255,0.35)',
@@ -311,7 +339,11 @@ export function MenuTabView() {
               whiteSpace: 'nowrap',
             }}
           >
-            {lightTheme ? '🌙 Style 1' : '☀️ Style 2'}
+            {currentStyle === 'style1'
+              ? '☀️ Style 2'
+              : currentStyle === 'style2'
+                ? '🥛 Style 3'
+                : '🌙 Style 1'}
           </button>
         </div>
 
@@ -856,15 +888,19 @@ export function MenuTabView() {
                 aria-label="Add"
                 onClick={() => changeDraftQty(m.id, 1)}
                 style={{
-                  background: lightTheme ? '#ffffff' : '#16a34a',
-                  color: lightTheme ? '#15803d' : '#ffffff',
-                  border: '1.5px solid #16a34a',
+                  background: lightTheme ? '#ffffff' : accentCol,
+                  color: lightTheme ? accentDark : '#ffffff',
+                  border: `1.5px solid ${accentCol}`,
                   borderRadius: '10px',
-                  padding: '6px 16px',
-                  fontSize: '12px',
+                  padding: '5px 12px',
+                  fontSize: '11.5px',
                   fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(22,163,74,0.18)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  boxShadow: isStyle3
+                    ? '0 2px 6px rgba(225,29,72,0.16)'
+                    : '0 2px 6px rgba(22,163,74,0.18)',
                 }}
               >
                 ADD +
@@ -874,11 +910,14 @@ export function MenuTabView() {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  background: '#16a34a',
+                  background: accentCol,
                   color: '#ffffff',
                   borderRadius: '10px',
                   overflow: 'hidden',
-                  boxShadow: '0 2px 6px rgba(22,163,74,0.28)',
+                  flexShrink: 0,
+                  boxShadow: isStyle3
+                    ? '0 2px 6px rgba(225,29,72,0.28)'
+                    : '0 2px 6px rgba(22,163,74,0.28)',
                 }}
               >
                 <button

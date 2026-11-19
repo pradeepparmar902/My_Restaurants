@@ -584,3 +584,136 @@ select:focus-visible {
   background: #16a34a;
   color: #ffffff;
 }
+
+/* ==========================================================================
+   STYLE 3: Milky White & Gourmet Crimson / Warm Espresso Theme
+   Applied globally across the entire app when Admin selects Style 3
+   ========================================================================== */
+:root[data-app-style='style3'] {
+  color-scheme: light;
+  --bg: #fdfbf7;
+  --sf: #ffffff;
+  --sf2: #f7f2e7;
+  --tx: #291c14;
+  --mu: #786452;
+  --pk: #e11d48;
+  --mg: #b45309;
+  --mn: #c2410c;
+}
+
+:root[data-app-style='style3'] body {
+  background: #f5efe4;
+  color: #291c14;
+}
+
+:root[data-app-style='style3'] #app {
+  background: #fffdf9;
+  min-height: 100vh;
+  box-shadow: 0 0 36px rgba(120, 83, 45, 0.08);
+}
+
+:root[data-app-style='style3'] .card {
+  background: #ffffff;
+  border: 1px solid #efe6d5;
+  box-shadow: 0 4px 14px rgba(120, 83, 45, 0.05);
+}
+
+:root[data-app-style='style3'] .roles {
+  background: #fffdf9;
+  border: 1px solid #efe6d5;
+  box-shadow: 0 2px 8px rgba(120, 83, 45, 0.05);
+}
+
+:root[data-app-style='style3'] .roles button {
+  color: #786452;
+}
+
+:root[data-app-style='style3'] .roles button.on {
+  background: #e11d48;
+  color: #ffffff;
+}
+
+:root[data-app-style='style3'] .hero {
+  background: linear-gradient(135deg, #431407 0%, #9a3412 52%, #e11d48 100%) !important;
+  color: #fffdf9 !important;
+  box-shadow: 0 6px 18px rgba(225, 29, 72, 0.2);
+}
+
+:root[data-app-style='style3'] .chip {
+  border: 1px solid #e6dac3;
+  background: #fffdf9;
+  color: #291c14;
+}
+
+:root[data-app-style='style3'] .chip.on {
+  background: #ffe4e6;
+  color: #be123c;
+  border-color: #e11d48;
+}
+
+:root[data-app-style='style3'] .btn {
+  background: #e11d48;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25);
+}
+
+:root[data-app-style='style3'] .btn.alt {
+  background: #c2410c;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(194, 65, 12, 0.24);
+}
+
+:root[data-app-style='style3'] .btn.ghost {
+  background: #f7f2e7;
+  color: #291c14;
+  border: 1px solid #e6dac3;
+  box-shadow: none;
+}
+
+:root[data-app-style='style3'] nav {
+  background: #fffdf9;
+  border-top: 1px solid #efe6d5;
+  box-shadow: 0 -4px 16px rgba(120, 83, 45, 0.06);
+}
+
+:root[data-app-style='style3'] nav button {
+  color: #786452;
+}
+
+:root[data-app-style='style3'] nav button.on {
+  color: #e11d48;
+}
+
+:root[data-app-style='style3'] .inp,
+:root[data-app-style='style3'] .sel-cc {
+  background: #fdfbf7;
+  border: 1.5px solid #e6dac3;
+  color: #291c14;
+}
+
+:root[data-app-style='style3'] .sbox {
+  border-color: #e6dac3;
+  background: #fdfbf7;
+}
+
+:root[data-app-style='style3'] .sbox.on {
+  border-color: #d97706;
+  background: #fef3c7;
+}
+
+:root[data-app-style='style3'] .tot {
+  border-top-color: #e6dac3;
+}
+
+:root[data-app-style='style3'] .wa {
+  background: #fff1f2;
+  color: #881337;
+  border-left: 4px solid #e11d48;
+}
+
+:root[data-app-style='style3'] .tag.ok,
+:root[data-app-style='style3'] .step.on i,
+:root[data-app-style='style3'] .toast {
+  background: #e11d48;
+  color: #ffffff;
+}
