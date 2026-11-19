@@ -47,7 +47,13 @@ export function CountryCodeMobileInput({
 }
 
 export function LoginBar() {
-  const { S, staffOf, logoutOrOpenLogin, updateState } = useTadka();
+  const {
+    S,
+    staffOf,
+    logoutOrOpenLogin,
+    updateState,
+    activeWorkspaceSlug,
+  } = useTadka();
   const st = staffOf();
   return (
     <div className="row sp" style={{ marginBottom: '10px' }}>
@@ -58,17 +64,32 @@ export function LoginBar() {
       </span>
       <div className="row">
         {!S.me.mob && (
-          <button
-            className="chip"
-            title="Quick Demo Staff Switcher"
-            onClick={() =>
-              updateState((p) =>
-                switchUserSessionInState(p, '+919800000001', 'a')
-              )
-            }
-          >
-            ⚡ Demo Staff
-          </button>
+          <>
+            {activeWorkspaceSlug === 'tadka-truck' && (
+              <button
+                className="chip"
+                title="Open Super Admin SaaS Dashboard"
+                onClick={() =>
+                  updateState((p) =>
+                    switchUserSessionInState(p, '+919800000001', 'sa')
+                  )
+                }
+              >
+                🏢 Super Admin
+              </button>
+            )}
+            <button
+              className="chip"
+              title="Quick Demo Staff Switcher"
+              onClick={() =>
+                updateState((p) =>
+                  switchUserSessionInState(p, '+919800000001', 'a')
+                )
+              }
+            >
+              ⚡ Demo Staff
+            </button>
+          </>
         )}
         <button className="chip" onClick={logoutOrOpenLogin}>
           {S.me.mob ? 'Logout' : 'Login'}
@@ -89,6 +110,7 @@ export function RoleBar() {
     ['w', 'Waiter'],
     ['o', 'Owner'],
     ['a', 'Admin'],
+    ['sa', '🏢 Super'],
   ];
 
   return (

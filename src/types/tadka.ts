@@ -1,5 +1,5 @@
 export type Language = 'en' | 'hi' | 'gu' | (string & {});
-export type PortalRole = 'c' | 'k' | 'w' | 'o' | 'a';
+export type PortalRole = 'c' | 'k' | 'w' | 'o' | 'a' | 'sa';
 export type StaffRoleName = 'Admin' | 'Manager' | 'Chef' | 'Waiter' | 'Reception';
 export type CustomerTab = 'menu' | 'order' | 'reward' | 'bill';
 export type WaiterTab = 'serve' | 'book';
@@ -177,6 +177,9 @@ export interface WorkspaceTenantRecord {
   slug: string;
   restaurantName: string;
   appStyle?: 'style1' | 'style2' | 'style3' | 'style4' | 'style5' | 'style6';
+  status?: 'ACTIVE' | 'TRIAL' | 'SUSPENDED';
+  planName?: 'Starter' | 'Growth' | 'Pro';
+  monthlyFeeInr?: number;
   ownerName: string;
   ownerMobile: string;
   spreadsheetId: string;

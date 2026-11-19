@@ -527,6 +527,37 @@ export function buildSheetRowsForState(
     ]),
   ];
 
+  const SuperAdmin_Workspaces: (string | number | boolean)[][] = [
+    [
+      'Workspace_Slug',
+      'Restaurant_Name',
+      'Owner_Name',
+      'Owner_Mobile',
+      'Default_Style',
+      'Status',
+      'Plan_Name',
+      'Monthly_Fee_INR',
+      'Client_Spreadsheet_ID',
+      'Client_Drive_Folder_ID',
+      'Apps_Script_URL',
+      'Created_At',
+    ],
+    ...(state.googleConfig?.workspacesRegistry || []).map((w) => [
+      w.slug,
+      w.restaurantName,
+      w.ownerName || '',
+      w.ownerMobile || '',
+      w.appStyle || 'style2',
+      w.status || 'ACTIVE',
+      w.planName || 'Growth',
+      w.monthlyFeeInr ?? 999,
+      w.spreadsheetId || '',
+      w.driveFolderId || '',
+      w.appsScriptWebAppUrl || '',
+      w.createdAt || '',
+    ]),
+  ];
+
   return {
     Daily_Counters,
     Orders,
@@ -539,6 +570,9 @@ export function buildSheetRowsForState(
     Audit_Log,
     Drive_Assets,
     Restaurant_Config,
+    ...((state.googleConfig?.workspacesRegistry || []).length > 0
+      ? { SuperAdmin_Workspaces }
+      : {}),
   };
 }
 

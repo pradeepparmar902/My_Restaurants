@@ -161,6 +161,11 @@ interface TadkaContextValue {
   createAndProvisionWorkspace: (
     payload: Omit<WorkspaceTenantRecord, 'createdAt'>
   ) => Promise<string>;
+  updateWorkspaceRecord: (
+    slug: string,
+    patch: Partial<WorkspaceTenantRecord>
+  ) => Promise<void>;
+  removeWorkspaceRecord: (slug: string) => Promise<void>;
 }
 
 const STORAGE_KEY_BASE = 'tadka_production_state_v1';
@@ -503,7 +508,15 @@ export function TadkaProvider({
     setS((prev) => {
       const next = updater(prev);
       const staffMember = getActiveStaffMember(next.staff, next.me.mob);
-      const allowed = getAllowedPortals(staffMember);
+      const isSuper =
+        SUPER_ADMIN_MOBILES.includes(next.me.mob) ||
+        (getActiveWorkspaceSlug() === 'tadka-truck' &&
+          staffMember?.r === 'Admin' &&
+          !next.googleConfig.ownerMobile);
+      const allowed: PortalRole[] = [
+        ...getAllowedPortals(staffMember),
+        ...(isSuper ? (['sa'] as PortalRole[]) : []),
+      ];
       const validatedRole = allowed.includes(next.role) ? next.role : 'c';
       const activeUserKey = next.sess?.mob || next.me.mob || '__guest__';
       const syncedSessionsByUser = {
@@ -674,7 +687,16 @@ export function TadkaProvider({
   ]);
 
   const staffOf = useCallback(() => getActiveStaffMember(S.staff, S.me.mob), [S.staff, S.me.mob]);
-  const portals = useCallback(() => getAllowedPortals(staffOf()), [staffOf]);
+  const portals = useCallback(() => {
+    const base = getAllowedPortals(staffOf());
+    const isSuper =
+      superAdminPinUnlocked ||
+      SUPER_ADMIN_MOBILES.includes(S.me.mob) ||
+      (getActiveWorkspaceSlug() === 'tadka-truck' &&
+        staffOf()?.r === 'Admin' &&
+        !S.googleConfig.ownerMobile);
+    return isSuper ? ([...base, 'sa'] as PortalRole[]) : base;
+  }, [S.googleConfig.ownerMobile, S.me.mob, staffOf, superAdminPinUnlocked]);
 
   const setRole = useCallback(
     (role: PortalRole) => {
@@ -3232,6 +3254,30 @@ export function TadkaProvider({
     [S.googleConfig.workspacesRegistry, saveGoogleConfig, say, syncToGoogleSheets]
   );
 
+  const updateWorkspaceRecord = useCallback(
+    async (slug: string, patch: Partial<WorkspaceTenantRecord>) => {
+      const existingRegistry = S.googleConfig.workspacesRegistry || [];
+      const nextRegistry = existingRegistry.map((w) =>
+        w.slug === slug ? { ...w, ...patch } : w
+      );
+      saveGoogleConfig({ workspacesRegistry: nextRegistry });
+      await syncToGoogleSheets({ workspacesRegistry: nextRegistry });
+      say(`Updated workspace "${slug}" in Super Admin registry ✅`);
+    },
+    [S.googleConfig.workspacesRegistry, saveGoogleConfig, say, syncToGoogleSheets]
+  );
+
+  const removeWorkspaceRecord = useCallback(
+    async (slug: string) => {
+      const existingRegistry = S.googleConfig.workspacesRegistry || [];
+      const nextRegistry = existingRegistry.filter((w) => w.slug !== slug);
+      saveGoogleConfig({ workspacesRegistry: nextRegistry });
+      await syncToGoogleSheets({ workspacesRegistry: nextRegistry });
+      say(`Removed workspace "${slug}" from registry ✅`);
+    },
+    [S.googleConfig.workspacesRegistry, saveGoogleConfig, say, syncToGoogleSheets]
+  );
+
   // Commercial Multi-Tenant Startup Loader:
   // Resolves active workspace (?w=<slug>&s=<sheetId>), loads config from URL / restaurants.json / Master Sheet registry,
   // then auto-pulls Menu, Staff & Restaurant_Config from that restaurant's isolated Google Sheet!
@@ -3485,6 +3531,8 @@ export function TadkaProvider({
         isSuperAdmin,
         unlockSuperAdmin,
         createAndProvisionWorkspace,
+        updateWorkspaceRecord,
+        removeWorkspaceRecord,
       }}
     >
       {children}

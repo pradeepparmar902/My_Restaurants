@@ -22,6 +22,7 @@ import {
   AdminPortalView,
   ChefPortalView,
   OwnerPortalView,
+  SuperAdminPortalView,
   WaiterPortalView,
 } from '@/components/StaffPortals';
 
@@ -68,6 +69,8 @@ export function TadkaShell() {
         <WaiterPortalView />
       ) : S.role === 'a' ? (
         <AdminPortalView />
+      ) : S.role === 'sa' ? (
+        <SuperAdminPortalView />
       ) : (
         <OwnerPortalView />
       )}

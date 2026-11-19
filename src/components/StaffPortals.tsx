@@ -8,6 +8,7 @@ import {
   MenuLanguageOption,
   RewardRulesConfig,
   StaffRoleName,
+  WorkspaceTenantRecord,
 } from '@/types/tadka';
 import {
   DEFAULT_DIETARY_FILTERS,
@@ -2197,6 +2198,716 @@ function extractGoogleIdFromUrl(raw: string, kind: 'sheet' | 'folder'): string {
     if (m?.[1]) return m[1];
   }
   return s;
+}
+
+export function SuperAdminPortalView() {
+  const {
+    S,
+    activeWorkspaceSlug,
+    isSuperAdmin,
+    unlockSuperAdmin,
+    createAndProvisionWorkspace,
+    updateWorkspaceRecord,
+    removeWorkspaceRecord,
+    syncToGoogleSheets,
+    pullFromGoogleSheets,
+    say,
+  } = useTadka();
+
+  const [pinInput, setPinInput] = useState('');
+  const [searchClient, setSearchClient] = useState('');
+  const [wsName, setWsName] = useState('');
+  const [wsSlug, setWsSlug] = useState('');
+  const [wsDefaultStyle, setWsDefaultStyle] = useState<
+    'style1' | 'style2' | 'style3' | 'style4' | 'style5' | 'style6'
+  >('style2');
+  const [wsPlanName, setWsPlanName] = useState<'Starter' | 'Growth' | 'Pro'>('Growth');
+  const [wsMonthlyFee, setWsMonthlyFee] = useState('999');
+  const [wsOwnerName, setWsOwnerName] = useState('');
+  const [wsOwnerMob, setWsOwnerMob] = useState('');
+  const [wsSheetRaw, setWsSheetRaw] = useState('');
+  const [wsDriveRaw, setWsDriveRaw] = useState('');
+  const [wsScriptUrl, setWsScriptUrl] = useState(
+    S.googleConfig.appsScriptWebAppUrl || ''
+  );
+  const [provisioning, setProvisioning] = useState(false);
+  const [lastHandoverUrl, setLastHandoverUrl] = useState('');
+
+  const registry = S.googleConfig.workspacesRegistry || [];
+  const activeCount = registry.filter((w) => (w.status || 'ACTIVE') === 'ACTIVE').length;
+  const trialCount = registry.filter((w) => w.status === 'TRIAL').length;
+  const suspendedCount = registry.filter((w) => w.status === 'SUSPENDED').length;
+  const totalMrr = registry
+    .filter((w) => (w.status || 'ACTIVE') === 'ACTIVE')
+    .reduce((sum, w) => sum + (Number(w.monthlyFeeInr) || 999), 0);
+
+  const filteredRegistry = registry.filter((w) => {
+    if (!searchClient.trim()) return true;
+    const q = searchClient.trim().toLowerCase();
+    return (
+      w.restaurantName.toLowerCase().includes(q) ||
+      w.slug.toLowerCase().includes(q) ||
+      (w.ownerName || '').toLowerCase().includes(q) ||
+      (w.ownerMobile || '').toLowerCase().includes(q)
+    );
+  });
+
+  const baseUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}${
+          window.location.pathname.includes('/My_Restaurants')
+            ? '/My_Restaurants'
+            : ''
+        }`
+      : 'https://pradeepparmar902.github.io/My_Restaurants';
+
+  const masterSheetUrl = S.googleConfig.spreadsheetId
+    ? `https://docs.google.com/spreadsheets/d/${S.googleConfig.spreadsheetId}/edit`
+    : '';
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="card">
+        <h3>🏢 Super Admin SaaS Dashboard</h3>
+        <p className="mu" style={{ margin: '6px 0 10px' }}>
+          Enter Super Admin Master PIN (<code>SUPER123</code>) or log in with
+          Super Admin mobile (<code>+919800000001</code>) to access the SaaS
+          Workspace Control Center.
+        </p>
+        <div className="row" style={{ gap: '6px' }}>
+          <input
+            type="password"
+            value={pinInput}
+            onChange={(e) => setPinInput(e.target.value)}
+            placeholder="Super Admin PIN (SUPER123)"
+            className="inp"
+            style={{ flex: 1 }}
+          />
+          <button
+            type="button"
+            className="chip on"
+            onClick={() => unlockSuperAdmin(pinInput)}
+          >
+            🔓 Unlock
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* SaaS Executive KPI Hero Banner */}
+      <div
+        className="hero"
+        style={{
+          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 45%, #4f46e5 100%)',
+          color: '#ffffff',
+        }}
+      >
+        <div className="row sp" style={{ alignItems: 'flex-start' }}>
+          <div>
+            <span
+              style={{
+                display: 'inline-block',
+                background: 'rgba(255,255,255,0.18)',
+                padding: '3px 10px',
+                borderRadius: '999px',
+                fontSize: '11px',
+                fontWeight: 700,
+                marginBottom: '6px',
+              }}
+            >
+              🏢 SaaS Platform Control Center · Master ({activeWorkspaceSlug})
+            </span>
+            <h1 style={{ color: '#ffffff' }}>
+              {registry.length} {registry.length === 1 ? 'Restaurant' : 'Restaurants'}
+            </h1>
+            <p style={{ color: 'rgba(255,255,255,0.88)' }}>
+              🟢 {activeCount} Active · 🟡 {trialCount} Trial · 🔴 {suspendedCount} Suspended · MRR ₹{totalMrr.toLocaleString('en-IN')}/mo
+            </p>
+          </div>
+          <button
+            type="button"
+            className="chip"
+            style={{
+              background: 'rgba(255,255,255,0.18)',
+              color: '#fff',
+              borderColor: 'rgba(255,255,255,0.35)',
+              fontSize: '11px',
+            }}
+            onClick={() => pullFromGoogleSheets()}
+          >
+            🔄 Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Metric Cards */}
+      <div className="pts" style={{ marginBottom: '10px' }}>
+        <div>
+          <div className="mu">Total Clients</div>
+          <div className="big">{registry.length}</div>
+          <div className="mu" style={{ fontSize: '11px' }}>
+            {activeCount} active workspaces
+          </div>
+        </div>
+        <div>
+          <div className="mu">Monthly MRR</div>
+          <div className="big">₹{totalMrr.toLocaleString('en-IN')}</div>
+          <div className="mu" style={{ fontSize: '11px' }}>
+            Recurring subscription
+          </div>
+        </div>
+      </div>
+
+      {/* Where Super Admin Data is Stored Card */}
+      <div className="card">
+        <div className="row sp" style={{ marginBottom: '6px' }}>
+          <h3 style={{ margin: 0 }}>🗄️ Super Admin Master Database Storage</h3>
+          <span className="tag ok">Google Sheets Synced</span>
+        </div>
+        <p className="mu" style={{ fontSize: '12px', margin: '0 0 8px' }}>
+          All created client workspaces, owner names/mobile numbers, default styles,
+          subscription plans, and Google Sheet IDs are stored in your{' '}
+          <b>Master Google Sheet</b> in two places:
+        </p>
+        <div
+          style={{
+            fontSize: '12px',
+            padding: '8px 10px',
+            borderRadius: '10px',
+            background: 'var(--sf2)',
+            marginBottom: '8px',
+            lineHeight: 1.5,
+          }}
+        >
+          <div>
+            1️⃣ <b><code>SuperAdmin_Workspaces</code> Sheet Tab:</b> Clean row-by-row
+            CRM table of every restaurant client (<code>Workspace_Slug</code>,{' '}
+            <code>Restaurant_Name</code>, <code>Owner_Name</code>,{' '}
+            <code>Owner_Mobile</code>, <code>Default_Style</code>,{' '}
+            <code>Status</code>, <code>Plan_Name</code>,{' '}
+            <code>Monthly_Fee_INR</code>, <code>Client_Spreadsheet_ID</code>,{' '}
+            <code>Created_At</code>).
+          </div>
+          <div style={{ marginTop: '4px' }}>
+            2️⃣ <b><code>Restaurant_Config</code> Tab (<code>workspaces_registry_json</code>):</b>{' '}
+            Used by any browser opening <code>?w=&lt;client-slug&gt;</code> to
+            automatically resolve that client&apos;s isolated Google Sheet.
+          </div>
+        </div>
+        <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+          {masterSheetUrl && (
+            <a
+              href={masterSheetUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="chip on"
+              style={{ textDecoration: 'none', fontSize: '12px' }}
+            >
+              📊 Open Master Google Sheet ↗
+            </a>
+          )}
+          <button
+            type="button"
+            className="chip"
+            style={{ fontSize: '12px' }}
+            onClick={() => syncToGoogleSheets()}
+          >
+            ☁️ Sync Master Registry Now
+          </button>
+        </div>
+      </div>
+
+      {/* Client Workspaces Directory */}
+      <div className="card">
+        <div className="row sp" style={{ marginBottom: '8px' }}>
+          <h3 style={{ margin: 0 }}>
+            📋 Client Workspaces Directory ({filteredRegistry.length})
+          </h3>
+        </div>
+        <input
+          value={searchClient}
+          onChange={(e) => setSearchClient(e.target.value)}
+          placeholder="🔍 Search by restaurant name, slug, owner name or mobile..."
+          className="inp"
+          style={{ width: '100%', marginBottom: '10px' }}
+        />
+
+        {filteredRegistry.length === 0 ? (
+          <p className="mu">
+            No client workspaces found. Use the form below to onboard and
+            provision your first restaurant client.
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gap: '10px' }}>
+            {filteredRegistry.map((w) => {
+              const link = `${baseUrl}/?w=${encodeURIComponent(w.slug)}${
+                w.spreadsheetId
+                  ? `&s=${encodeURIComponent(w.spreadsheetId)}`
+                  : ''
+              }`;
+              const clientSheetUrl = w.spreadsheetId
+                ? `https://docs.google.com/spreadsheets/d/${w.spreadsheetId}/edit`
+                : '';
+              const clientDriveUrl = w.driveFolderId
+                ? `https://drive.google.com/drive/folders/${w.driveFolderId}`
+                : '';
+              const waText =
+                `🏪 *Welcome to ${w.restaurantName} Digital QR Ordering & Growth Platform!*\n\n` +
+                `🔗 *Your Dedicated Workspace Link:*\n${link}\n\n` +
+                `👤 *Owner Login Mobile:* ${w.ownerMobile || 'Your registered mobile'}\n` +
+                `🔑 *Demo OTP:* 1234\n\n` +
+                `Log in with your mobile number to open your *Owner Panel* & *Admin Settings* (Menu, GST, Brand Profile, Table QR Codes & Rewards).`;
+              const waHref = `https://wa.me/${(w.ownerMobile || '').replace(
+                /\D/g,
+                ''
+              )}?text=${encodeURIComponent(waText)}`;
+              const statusVal = w.status || 'ACTIVE';
+
+              return (
+                <div
+                  key={w.slug}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '14px',
+                    background: 'var(--sf2)',
+                    border: '1px solid rgba(148,163,184,0.28)',
+                  }}
+                >
+                  <div
+                    className="row sp"
+                    style={{ alignItems: 'flex-start', gap: '8px', flexWrap: 'wrap' }}
+                  >
+                    <div>
+                      <strong style={{ fontSize: '15px' }}>
+                        🏪 {w.restaurantName}
+                      </strong>{' '}
+                      <code style={{ fontSize: '11px', opacity: 0.85 }}>
+                        ?w={w.slug}
+                      </code>
+                      <div className="mu" style={{ fontSize: '12px', marginTop: '2px' }}>
+                        👤 Owner: <b>{w.ownerName || '—'}</b> · 📱{' '}
+                        {w.ownerMobile || '—'} · 💳 {w.planName || 'Growth'} (₹
+                        {w.monthlyFeeInr ?? 999}/mo)
+                      </div>
+                      <div className="mu" style={{ fontSize: '11px', marginTop: '2px' }}>
+                        📊 Sheet ID: <code>{w.spreadsheetId || '—'}</code>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`tag ${
+                        statusVal === 'ACTIVE'
+                          ? 'ok'
+                          : statusVal === 'TRIAL'
+                            ? 'vip'
+                            : 'hot'
+                      }`}
+                    >
+                      {statusVal === 'ACTIVE'
+                        ? '🟢 ACTIVE'
+                        : statusVal === 'TRIAL'
+                          ? '🟡 TRIAL'
+                          : '🔴 SUSPENDED'}
+                    </span>
+                  </div>
+
+                  {/* Quick Edit Controls: Default Style & Status */}
+                  <div
+                    className="row"
+                    style={{
+                      gap: '6px',
+                      flexWrap: 'wrap',
+                      marginTop: '8px',
+                    }}
+                  >
+                    <select
+                      aria-label={`Default style for ${w.restaurantName}`}
+                      value={w.appStyle || 'style2'}
+                      onChange={(e) =>
+                        updateWorkspaceRecord(w.slug, {
+                          appStyle: e.target.value as WorkspaceTenantRecord['appStyle'],
+                        })
+                      }
+                      className="sel-cc"
+                      style={{ fontSize: '11px', padding: '5px 8px' }}
+                    >
+                      <option value="style1">🌙 Style 1 (Dark)</option>
+                      <option value="style2">☀️ Style 2 (Emerald)</option>
+                      <option value="style3">🥛 Style 3 (Milky White)</option>
+                      <option value="style4">⚡ Style 4 (DotPe Blue)</option>
+                      <option value="style5">🎁 Style 5 (Reelo Teal)</option>
+                      <option value="style6">👑 Style 6 (Royal Gold)</option>
+                    </select>
+
+                    <select
+                      aria-label={`Status for ${w.restaurantName}`}
+                      value={statusVal}
+                      onChange={(e) =>
+                        updateWorkspaceRecord(w.slug, {
+                          status: e.target.value as WorkspaceTenantRecord['status'],
+                        })
+                      }
+                      className="sel-cc"
+                      style={{ fontSize: '11px', padding: '5px 8px' }}
+                    >
+                      <option value="ACTIVE">🟢 Active</option>
+                      <option value="TRIAL">🟡 Trial</option>
+                      <option value="SUSPENDED">🔴 Suspended</option>
+                    </select>
+                  </div>
+
+                  {/* Action Links */}
+                  <div
+                    className="row"
+                    style={{ gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}
+                  >
+                    <button
+                      type="button"
+                      className="chip on"
+                      style={{ fontSize: '11px' }}
+                      onClick={() => {
+                        navigator.clipboard?.writeText(link);
+                        say(`Copied handover link for ${w.restaurantName} ✅`);
+                      }}
+                    >
+                      📋 Copy Owner Link
+                    </button>
+                    <a
+                      href={waHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="chip"
+                      style={{ fontSize: '11px', textDecoration: 'none' }}
+                    >
+                      📲 WhatsApp Handover
+                    </a>
+                    <a
+                      href={link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="chip"
+                      style={{ fontSize: '11px', textDecoration: 'none' }}
+                    >
+                      ↗️ Open Workspace
+                    </a>
+                    {clientSheetUrl && (
+                      <a
+                        href={clientSheetUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="chip"
+                        style={{ fontSize: '11px', textDecoration: 'none' }}
+                      >
+                        📊 Client Sheet ↗
+                      </a>
+                    )}
+                    {clientDriveUrl && (
+                      <a
+                        href={clientDriveUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="chip"
+                        style={{ fontSize: '11px', textDecoration: 'none' }}
+                      >
+                        📁 Client Drive ↗
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      className="chip"
+                      style={{ fontSize: '11px', color: '#ef4444' }}
+                      onClick={() => removeWorkspaceRecord(w.slug)}
+                    >
+                      🗑️ Remove
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Onboard & Provision New Restaurant Client Card */}
+      <div className="card">
+        <h3 style={{ margin: '0 0 8px' }}>➕ Onboard &amp; Provision New Restaurant Client</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="mu" style={{ fontSize: '11px' }}>
+            🏪 Client Restaurant / Brand Name
+          </div>
+          <input
+            value={wsName}
+            onChange={(e) => {
+              const v = e.target.value;
+              setWsName(v);
+              setWsSlug(
+                v
+                  .toLowerCase()
+                  .trim()
+                  .replace(/[^a-z0-9]+/g, '-')
+                  .replace(/^-|-$/g, '')
+              );
+            }}
+            placeholder="e.g. Royal Dhaba"
+            className="inp"
+          />
+
+          <div className="mu" style={{ fontSize: '11px' }}>
+            🔗 Workspace Slug (URL identifier: <code>?w={wsSlug || 'royal-dhaba'}</code>)
+          </div>
+          <input
+            value={wsSlug}
+            onChange={(e) =>
+              setWsSlug(
+                e.target.value
+                  .toLowerCase()
+                  .replace(/[^a-z0-9_-]/g, '-')
+              )
+            }
+            placeholder="e.g. royal-dhaba"
+            className="inp"
+          />
+
+          <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 2, minWidth: '160px' }}>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                🎨 Default App Style
+              </div>
+              <select
+                aria-label="Workspace Default App Style"
+                value={wsDefaultStyle}
+                onChange={(e) =>
+                  setWsDefaultStyle(
+                    e.target.value as
+                      | 'style1'
+                      | 'style2'
+                      | 'style3'
+                      | 'style4'
+                      | 'style5'
+                      | 'style6'
+                  )
+                }
+                className="sel-cc"
+                style={{ width: '100%' }}
+              >
+                <option value="style1">🌙 Style 1 · Classic Neon Dark</option>
+                <option value="style2">☀️ Style 2 · Fresh Food-App (Emerald)</option>
+                <option value="style3">🥛 Style 3 · Milky White &amp; Crimson</option>
+                <option value="style4">⚡ Style 4 · DotPe Electric Blue</option>
+                <option value="style5">🎁 Style 5 · Reelo Loyalty Teal</option>
+                <option value="style6">👑 Style 6 · Royal Gold &amp; Amber</option>
+              </select>
+            </div>
+            <div style={{ flex: 1, minWidth: '100px' }}>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                📦 Plan
+              </div>
+              <select
+                aria-label="Subscription Plan"
+                value={wsPlanName}
+                onChange={(e) =>
+                  setWsPlanName(e.target.value as 'Starter' | 'Growth' | 'Pro')
+                }
+                className="sel-cc"
+                style={{ width: '100%' }}
+              >
+                <option value="Starter">Starter</option>
+                <option value="Growth">Growth</option>
+                <option value="Pro">Pro</option>
+              </select>
+            </div>
+            <div style={{ flex: 1, minWidth: '90px' }}>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                💳 Fee (₹/mo)
+              </div>
+              <input
+                value={wsMonthlyFee}
+                onChange={(e) => setWsMonthlyFee(e.target.value)}
+                placeholder="999"
+                inputMode="numeric"
+                className="inp"
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
+
+          <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '140px' }}>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                👤 Owner Name
+              </div>
+              <input
+                value={wsOwnerName}
+                onChange={(e) => setWsOwnerName(e.target.value)}
+                placeholder="e.g. Rajesh Patel"
+                className="inp"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: '180px' }}>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                📱 Owner Login Mobile (lands on Owner Panel)
+              </div>
+              <CountryCodeMobileInput
+                id="sa-ws-owner-mob"
+                value={wsOwnerMob}
+                onChange={setWsOwnerMob}
+              />
+            </div>
+          </div>
+
+          <div className="mu" style={{ fontSize: '11px' }}>
+            📊 Client&apos;s Blank Google Sheet URL or ID (Share → Anyone with link → Editor)
+          </div>
+          <input
+            value={wsSheetRaw}
+            onChange={(e) => setWsSheetRaw(e.target.value)}
+            placeholder="Paste new Google Sheet link or ID"
+            className="inp"
+          />
+
+          <div className="mu" style={{ fontSize: '11px' }}>
+            📁 Client&apos;s Google Drive Folder URL or ID (optional)
+          </div>
+          <input
+            value={wsDriveRaw}
+            onChange={(e) => setWsDriveRaw(e.target.value)}
+            placeholder="Paste Google Drive folder link or ID"
+            className="inp"
+          />
+
+          <div className="row sp">
+            <span className="mu" style={{ fontSize: '11px' }}>
+              ⚙️ Apps Script Web App URL
+            </span>
+            {S.googleConfig.appsScriptWebAppUrl && (
+              <button
+                type="button"
+                className="chip"
+                style={{ fontSize: '10px', padding: '2px 7px' }}
+                onClick={() =>
+                  setWsScriptUrl(S.googleConfig.appsScriptWebAppUrl)
+                }
+              >
+                ⚡ Use Master Script URL
+              </button>
+            )}
+          </div>
+          <input
+            value={wsScriptUrl}
+            onChange={(e) => setWsScriptUrl(e.target.value)}
+            placeholder="https://script.google.com/macros/s/.../exec"
+            className="inp"
+          />
+
+          <button
+            type="button"
+            className="btn alt"
+            disabled={provisioning}
+            onClick={async () => {
+              const cleanName = wsName.trim();
+              const cleanSlug = wsSlug
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9_-]/g, '-');
+              const cleanSheetId = extractGoogleIdFromUrl(wsSheetRaw, 'sheet');
+              const cleanDriveId = extractGoogleIdFromUrl(wsDriveRaw, 'folder');
+              if (!cleanName || !cleanSlug) {
+                say('Enter Restaurant Name and Workspace Slug');
+                return;
+              }
+              if (!cleanSheetId) {
+                say('Paste a dedicated Google Sheet URL or ID for this workspace');
+                return;
+              }
+              const normOwnerMob = wsOwnerMob.trim()
+                ? `${S.cc}${wsOwnerMob.replace(/\D/g, '')}`
+                : '';
+              setProvisioning(true);
+              try {
+                const url = await createAndProvisionWorkspace({
+                  slug: cleanSlug,
+                  restaurantName: cleanName,
+                  appStyle: wsDefaultStyle,
+                  status: 'ACTIVE',
+                  planName: wsPlanName,
+                  monthlyFeeInr: Number(wsMonthlyFee) || 999,
+                  ownerName: wsOwnerName.trim() || 'Owner',
+                  ownerMobile: normOwnerMob,
+                  spreadsheetId: cleanSheetId,
+                  driveFolderId: cleanDriveId,
+                  appsScriptWebAppUrl:
+                    wsScriptUrl.trim() ||
+                    S.googleConfig.appsScriptWebAppUrl ||
+                    '',
+                });
+                setLastHandoverUrl(url);
+                setWsName('');
+                setWsSlug('');
+                setWsOwnerName('');
+                setWsOwnerMob('');
+                setWsSheetRaw('');
+                setWsDriveRaw('');
+              } finally {
+                setProvisioning(false);
+              }
+            }}
+          >
+            {provisioning
+              ? '⏳ Provisioning Client Sheet & Creating Workspace...'
+              : '🚀 Create, Provision Sheet & Generate Owner Handover Link'}
+          </button>
+
+          {lastHandoverUrl && (
+            <div
+              style={{
+                padding: '10px',
+                borderRadius: '10px',
+                background: 'rgba(92,242,192,0.12)',
+                border: '1px solid rgba(92,242,192,0.35)',
+                fontSize: '12px',
+              }}
+            >
+              <b>✅ Workspace Provisioned! Handover Link:</b>
+              <div
+                style={{
+                  wordBreak: 'break-all',
+                  margin: '4px 0 8px',
+                  color: '#3b82f6',
+                }}
+              >
+                {lastHandoverUrl}
+              </div>
+              <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="chip on"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(lastHandoverUrl);
+                    say('Owner Handover Link copied ✅');
+                  }}
+                >
+                  📋 Copy Handover Link
+                </button>
+                <a
+                  href={lastHandoverUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="chip"
+                  style={{ textDecoration: 'none' }}
+                >
+                  ↗️ Open Client Workspace
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
 }
 
 function SuperAdminWorkspaceManagerSection({
