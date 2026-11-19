@@ -717,3 +717,269 @@ select:focus-visible {
   background: #e11d48;
   color: #ffffff;
 }
+
+/* ==========================================================================
+   STYLE 4: DotPe Commerce Theme (Electric Blue #006AFF & Deep Navy #191B41)
+   Inspired by https://dotpe.in/
+   ========================================================================== */
+:root[data-app-style='style4'] {
+  color-scheme: light;
+  --bg: #f4f7fe;
+  --sf: #ffffff;
+  --sf2: #eef2ff;
+  --tx: #191b41;
+  --mu: #52587a;
+  --pk: #006aff;
+  --mg: #6366f1;
+  --mn: #0052cc;
+}
+
+:root[data-app-style='style4'] body {
+  background: #e6edfc;
+  color: #191b41;
+}
+
+:root[data-app-style='style4'] #app {
+  background: #f4f7fe;
+  min-height: 100vh;
+  box-shadow: 0 0 36px rgba(25, 27, 65, 0.08);
+}
+
+:root[data-app-style='style4'] .card {
+  background: #ffffff;
+  border: 1px solid #dbe4ff;
+  box-shadow: 0 4px 16px rgba(0, 106, 255, 0.06);
+}
+
+:root[data-app-style='style4'] .roles {
+  background: #ffffff;
+  border: 1px solid #dbe4ff;
+  box-shadow: 0 2px 8px rgba(0, 106, 255, 0.05);
+}
+
+:root[data-app-style='style4'] .roles button {
+  color: #52587a;
+}
+
+:root[data-app-style='style4'] .roles button.on {
+  background: #006aff;
+  color: #ffffff;
+}
+
+:root[data-app-style='style4'] .hero {
+  background: linear-gradient(135deg, #191b41 0%, #0052cc 52%, #006aff 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 18px rgba(0, 106, 255, 0.24);
+}
+
+:root[data-app-style='style4'] .chip {
+  border: 1px solid #c7d2fe;
+  background: #ffffff;
+  color: #191b41;
+}
+
+:root[data-app-style='style4'] .chip.on {
+  background: #e0eaff;
+  color: #0052cc;
+  border-color: #006aff;
+}
+
+:root[data-app-style='style4'] .btn {
+  background: #006aff;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 106, 255, 0.28);
+}
+
+:root[data-app-style='style4'] .btn.alt {
+  background: #191b41;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(25, 27, 65, 0.24);
+}
+
+:root[data-app-style='style4'] .btn.ghost {
+  background: #eef2ff;
+  color: #191b41;
+  border: 1px solid #c7d2fe;
+  box-shadow: none;
+}
+
+:root[data-app-style='style4'] nav {
+  background: #ffffff;
+  border-top: 1px solid #dbe4ff;
+  box-shadow: 0 -4px 16px rgba(25, 27, 65, 0.06);
+}
+
+:root[data-app-style='style4'] nav button {
+  color: #52587a;
+}
+
+:root[data-app-style='style4'] nav button.on {
+  color: #006aff;
+}
+
+:root[data-app-style='style4'] .inp,
+:root[data-app-style='style4'] .sel-cc {
+  background: #f8faff;
+  border: 1.5px solid #c7d2fe;
+  color: #191b41;
+}
+
+:root[data-app-style='style4'] .sbox {
+  border-color: #c7d2fe;
+  background: #f8faff;
+}
+
+:root[data-app-style='style4'] .sbox.on {
+  border-color: #006aff;
+  background: #e0eaff;
+}
+
+:root[data-app-style='style4'] .tot {
+  border-top-color: #c7d2fe;
+}
+
+:root[data-app-style='style4'] .wa {
+  background: #eef2ff;
+  color: #191b41;
+  border-left: 4px solid #006aff;
+}
+
+:root[data-app-style='style4'] .tag.ok,
+:root[data-app-style='style4'] .step.on i,
+:root[data-app-style='style4'] .toast {
+  background: #006aff;
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   STYLE 5: Reelo Loyalty Theme (Teal-Cyan #0D9488, Deep Ocean #02111A & Gold)
+   Inspired by https://reelo.io/
+   ========================================================================== */
+:root[data-app-style='style5'] {
+  color-scheme: light;
+  --bg: #f0fdfa;
+  --sf: #ffffff;
+  --sf2: #ccfbf1;
+  --tx: #02111a;
+  --mu: #335c67;
+  --pk: #0d9488;
+  --mg: #f59e0b;
+  --mn: #0f766e;
+}
+
+:root[data-app-style='style5'] body {
+  background: #e0f2fe;
+  color: #02111a;
+}
+
+:root[data-app-style='style5'] #app {
+  background: #f4fbf9;
+  min-height: 100vh;
+  box-shadow: 0 0 36px rgba(2, 17, 26, 0.08);
+}
+
+:root[data-app-style='style5'] .card {
+  background: #ffffff;
+  border: 1px solid #ccfbf1;
+  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.06);
+}
+
+:root[data-app-style='style5'] .roles {
+  background: #ffffff;
+  border: 1px solid #ccfbf1;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.05);
+}
+
+:root[data-app-style='style5'] .roles button {
+  color: #335c67;
+}
+
+:root[data-app-style='style5'] .roles button.on {
+  background: #0d9488;
+  color: #ffffff;
+}
+
+:root[data-app-style='style5'] .hero {
+  background: linear-gradient(135deg, #02111a 0%, #0f766e 55%, #0d9488 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 18px rgba(13, 148, 136, 0.24);
+}
+
+:root[data-app-style='style5'] .chip {
+  border: 1px solid #99f6e4;
+  background: #ffffff;
+  color: #02111a;
+}
+
+:root[data-app-style='style5'] .chip.on {
+  background: #ccfbf1;
+  color: #0f766e;
+  border-color: #0d9488;
+}
+
+:root[data-app-style='style5'] .btn {
+  background: #0d9488;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.28);
+}
+
+:root[data-app-style='style5'] .btn.alt {
+  background: #f59e0b;
+  color: #02111a;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+}
+
+:root[data-app-style='style5'] .btn.ghost {
+  background: #f0fdfa;
+  color: #02111a;
+  border: 1px solid #99f6e4;
+  box-shadow: none;
+}
+
+:root[data-app-style='style5'] nav {
+  background: #ffffff;
+  border-top: 1px solid #ccfbf1;
+  box-shadow: 0 -4px 16px rgba(2, 17, 26, 0.06);
+}
+
+:root[data-app-style='style5'] nav button {
+  color: #335c67;
+}
+
+:root[data-app-style='style5'] nav button.on {
+  color: #0d9488;
+}
+
+:root[data-app-style='style5'] .inp,
+:root[data-app-style='style5'] .sel-cc {
+  background: #f8fafc;
+  border: 1.5px solid #99f6e4;
+  color: #02111a;
+}
+
+:root[data-app-style='style5'] .sbox {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+}
+
+:root[data-app-style='style5'] .sbox.on {
+  border-color: #f59e0b;
+  background: #fef3c7;
+}
+
+:root[data-app-style='style5'] .tot {
+  border-top-color: #99f6e4;
+}
+
+:root[data-app-style='style5'] .wa {
+  background: #f0fdfa;
+  color: #0f766e;
+  border-left: 4px solid #0d9488;
+}
+
+:root[data-app-style='style5'] .tag.ok,
+:root[data-app-style='style5'] .step.on i,
+:root[data-app-style='style5'] .toast {
+  background: #0d9488;
+  color: #ffffff;
+}

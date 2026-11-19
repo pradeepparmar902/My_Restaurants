@@ -2615,13 +2615,17 @@ export function AdminPortalView() {
   const [staffMob, setStaffMob] = useState('');
   const [checkMob, setCheckMob] = useState('');
   const [appStyleInput, setAppStyleInput] = useState<
-    'style1' | 'style2' | 'style3'
+    'style1' | 'style2' | 'style3' | 'style4' | 'style5'
   >(
-    S.googleConfig.appStyle === 'style3'
-      ? 'style3'
-      : S.googleConfig.appStyle === 'style2'
-        ? 'style2'
-        : 'style1'
+    S.googleConfig.appStyle === 'style5'
+      ? 'style5'
+      : S.googleConfig.appStyle === 'style4'
+        ? 'style4'
+        : S.googleConfig.appStyle === 'style3'
+          ? 'style3'
+          : S.googleConfig.appStyle === 'style2'
+            ? 'style2'
+            : 'style1'
   );
   const [restaurantNameInput, setRestaurantNameInput] = useState(
     S.googleConfig.restaurantName || 'Tadka Truck'
@@ -2675,11 +2679,15 @@ export function AdminPortalView() {
   // Keep Admin form inputs synced when Google Sheets finishes pulling S.googleConfig
   useEffect(() => {
     setAppStyleInput(
-      S.googleConfig.appStyle === 'style3'
-        ? 'style3'
-        : S.googleConfig.appStyle === 'style2'
-          ? 'style2'
-          : 'style1'
+      S.googleConfig.appStyle === 'style5'
+        ? 'style5'
+        : S.googleConfig.appStyle === 'style4'
+          ? 'style4'
+          : S.googleConfig.appStyle === 'style3'
+            ? 'style3'
+            : S.googleConfig.appStyle === 'style2'
+              ? 'style2'
+              : 'style1'
     );
     setRestaurantNameInput(S.googleConfig.restaurantName || 'Tadka Truck');
     setRestaurantTaglineInput(S.googleConfig.restaurantTagline || '');
@@ -2949,11 +2957,15 @@ export function AdminPortalView() {
       <CollapsibleSection
         title="🏪 Restaurant / Brand Profile"
         badge={`${S.googleConfig.restaurantName || 'Tadka Truck'} · ${
-          S.googleConfig.appStyle === 'style3'
-            ? 'Style 3'
-            : S.googleConfig.appStyle === 'style2'
-              ? 'Style 2'
-              : 'Style 1'
+          S.googleConfig.appStyle === 'style5'
+            ? 'Style 5 (Reelo)'
+            : S.googleConfig.appStyle === 'style4'
+              ? 'Style 4 (DotPe)'
+              : S.googleConfig.appStyle === 'style3'
+                ? 'Style 3'
+                : S.googleConfig.appStyle === 'style2'
+                  ? 'Style 2'
+                  : 'Style 1'
         }`}
         isOpen={!!openAdminSections.brandProfile}
         onToggle={() => toggleAdminSection('brandProfile')}
@@ -3003,6 +3015,28 @@ export function AdminPortalView() {
             }}
           >
             {appStyleInput === 'style3' ? '✅ ' : ''}🥛 Style 3 · Milky White &amp; Gourmet Crimson
+          </button>
+          <button
+            type="button"
+            className={`chip ${appStyleInput === 'style4' ? 'on' : ''}`}
+            style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}
+            onClick={() => {
+              setAppStyleInput('style4');
+              saveGoogleConfig({ appStyle: 'style4' });
+            }}
+          >
+            {appStyleInput === 'style4' ? '✅ ' : ''}⚡ Style 4 · DotPe Commerce (Electric Blue &amp; Navy)
+          </button>
+          <button
+            type="button"
+            className={`chip ${appStyleInput === 'style5' ? 'on' : ''}`}
+            style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}
+            onClick={() => {
+              setAppStyleInput('style5');
+              saveGoogleConfig({ appStyle: 'style5' });
+            }}
+          >
+            {appStyleInput === 'style5' ? '✅ ' : ''}🎁 Style 5 · Reelo Loyalty (Teal-Cyan &amp; Gold)
           </button>
         </div>
 

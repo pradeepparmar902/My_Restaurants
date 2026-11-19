@@ -66,7 +66,7 @@ export function buildSheetRowsForState(
     ['Config_Key', 'Config_Value', 'Updated_At'],
     ['restaurant_slug', (state.googleConfig?.workspaceSlug || '').trim() || 'tadka-truck', new Date().toISOString()],
     ['restaurant_name', (state.googleConfig?.restaurantName || '').trim() || 'Tadka Truck', new Date().toISOString()],
-    ['app_style', state.googleConfig?.appStyle === 'style3' ? 'style3' : state.googleConfig?.appStyle === 'style2' ? 'style2' : 'style1', new Date().toISOString()],
+    ['app_style', ['style2', 'style3', 'style4', 'style5'].includes(state.googleConfig?.appStyle || '') ? (state.googleConfig!.appStyle as string) : 'style1', new Date().toISOString()],
     ['owner_name', (state.googleConfig?.ownerName || '').trim(), new Date().toISOString()],
     ['owner_mobile', (state.googleConfig?.ownerMobile || '').trim(), new Date().toISOString()],
     ...(state.googleConfig?.workspacesRegistry && state.googleConfig.workspacesRegistry.length > 0
@@ -697,7 +697,14 @@ export function parseConfigFromSheetRows(
     const val = String(r[1] ?? '').trim();
     if (key === 'restaurant_slug' && val) cfg.workspaceSlug = val;
     if (key === 'restaurant_name' && val) cfg.restaurantName = val;
-    if (key === 'app_style' && (val === 'style1' || val === 'style2' || val === 'style3')) {
+    if (
+      key === 'app_style' &&
+      (val === 'style1' ||
+        val === 'style2' ||
+        val === 'style3' ||
+        val === 'style4' ||
+        val === 'style5')
+    ) {
       cfg.appStyle = val;
     }
     if (key === 'owner_name' && val) cfg.ownerName = val;
