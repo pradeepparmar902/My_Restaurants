@@ -111,7 +111,7 @@ export function RoleBar() {
     ['w', 'Waiter'],
     ['o', 'Owner'],
     ['a', 'Admin'],
-    ['sa', '🏢 Super'],
+    ['sa', 'Super'],
   ];
 
   return (

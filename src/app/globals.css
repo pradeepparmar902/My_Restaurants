@@ -46,22 +46,32 @@ h3,
 
 .roles {
   display: flex;
-  gap: 6px;
+  gap: 3px;
   background: var(--sf);
-  padding: 5px;
+  padding: 4px;
   border-radius: 99px;
   margin-bottom: 14px;
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.roles::-webkit-scrollbar {
+  display: none;
 }
 
 .roles button {
   flex: 1;
+  min-width: 0;
   border: 0;
   background: none;
   color: var(--mu);
-  padding: 9px;
+  padding: 8px 6px;
   border-radius: 99px;
   font: inherit;
+  font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
 }
 

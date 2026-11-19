@@ -2352,6 +2352,8 @@ export function SuperAdminPortalView() {
               color: '#fff',
               borderColor: 'rgba(255,255,255,0.35)',
               fontSize: '11px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
             onClick={() => pullFromGoogleSheets()}
           >
