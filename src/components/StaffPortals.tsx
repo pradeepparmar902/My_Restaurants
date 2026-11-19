@@ -134,6 +134,43 @@ export function ChefPortalView() {
         </p>
       </div>
 
+      <details
+        className="card"
+        style={{
+          margin: '0 0 12px',
+          padding: '10px 12px',
+          fontSize: '12px',
+          borderLeft: '4px solid var(--mg)',
+        }}
+      >
+        <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+          📘 Chef Process &amp; Kitchen Guide Notes (Tap to view)
+        </summary>
+        <ol style={{ margin: '8px 0 4px', paddingLeft: '18px', lineHeight: 1.6 }}>
+          <li>
+            <b>Live Order Queue:</b> Customer QR orders and Waiter-booked orders
+            appear here automatically every few seconds with <b>Counter #</b>,{' '}
+            <b>Table #</b>, and Round number.
+          </li>
+          <li>
+            <b>🔥 Rush &amp; VIP Priority:</b> Orders tagged <code>RUSH</code> or{' '}
+            <code>VIP</code> by the Waiter/Owner are highlighted — prepare these
+            first.
+          </li>
+          <li>
+            <b>Cooking → Ready Workflow:</b> Tap <b>Start cooking</b> when
+            preparation begins (<code>NEW → COOKING</code>), and tap{' '}
+            <b>Mark ready</b> when plating is complete so the Waiter is notified
+            immediately under <i>Ready to serve</i>.
+          </li>
+          <li>
+            <b>📦 Dish Stock Control:</b> In the <b>Stock</b> list at the bottom,
+            tap <b>In stock / Out</b> to hide sold-out dishes from the Customer
+            Menu across all customer phones in real time.
+          </li>
+        </ol>
+      </details>
+
       {combinedQueue.map((o) => (
         <div key={o.id} className="card">
           <div className="row sp">
@@ -312,6 +349,50 @@ export function WaiterPortalView() {
           📝 Book order
         </button>
       </div>
+
+      <details
+        className="card"
+        style={{
+          margin: '0 0 12px',
+          padding: '10px 12px',
+          fontSize: '12px',
+          borderLeft: '4px solid var(--pk)',
+        }}
+      >
+        <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: '13px' }}>
+          📘 Waiter Process &amp; Service Guide Notes (Tap to view)
+        </summary>
+        <ol style={{ margin: '8px 0 4px', paddingLeft: '18px', lineHeight: 1.6 }}>
+          <li>
+            <b>🛎️ Ready to Serve Tab:</b> When Chef marks an order <b>Ready</b>,
+            match the <b>Counter #</b> and <b>Table #</b> with the guest, serve
+            the dishes, and tap <b>Mark delivered</b>.
+          </li>
+          <li>
+            <b>🎟️ Manual Counter Number (if Manual Mode is active):</b> If a
+            table shows <i>needs a counter number</i>, assign the next counter
+            number or type the paper slip number so delivery and billing unlock.
+          </li>
+          <li>
+            <b>✏️ Edit Open Counters &amp; Quantities:</b> Under{' '}
+            <b>Open counters</b>, tap any counter to adjust dish quantities (
+            <code>+</code> / <code>−</code>), mark an order <b>🔥 Rush</b>, or
+            update the guest&apos;s table number before payment.
+          </li>
+          <li>
+            <b>🧾 Push Final Bill or Tag Offline Payment:</b> When guests finish
+            dining, tap <b>Push final bill to customer</b> so the bill opens on
+            their phone, or tap <b>💵 Cash / 💳 Card machine / 📱 UPI at counter</b>{' '}
+            if they pay you directly.
+          </li>
+          <li>
+            <b>📝 Book Order Tab (Table-Side Ordering):</b> Select the{' '}
+            <b>Table</b>, enter the <b>Customer&apos;s Mobile Number</b> (so they
+            receive their WhatsApp bill &amp; loyalty stars), add dishes, and tap{' '}
+            <b>Send to kitchen</b>.
+          </li>
+        </ol>
+      </details>
 
       {S.wtab === 'serve' ? (
         <>
@@ -1928,12 +2009,81 @@ function RewardApprovalsSection({
   );
 }
 
+function CustomerGuideNotesContent() {
+  const { S, say } = useTadka();
+  const brandName = (S.googleConfig.restaurantName || '').trim() || 'Tadka Truck';
+
+  const guideSummaryText =
+    `📱 *How to Order & Earn Rewards at ${brandName}*\n\n` +
+    `1️⃣ *Scan & Pick Dishes (Menu Tab):* Scan the Table QR code, switch your preferred language or dietary filter (Veg / Jain), tap ADD + on dishes, and tap Place Order.\n` +
+    `2️⃣ *Track & Add More Rounds (Order Tab):* Get your Counter Number (e.g. C1). You can order more dishes anytime during your visit under the same Counter Number, or invite friends at your table to club orders together.\n` +
+    `3️⃣ *Earn Stars, Coupons & Discounts (Rewards Tab):* Earn 1 Star on qualifying bills toward a free reward! Share a Reel/Story/Status or post a Google Review and submit a 1-tap screenshot, @handle, or tap Verify at Counter for Admin approval.\n` +
+    `4️⃣ *Pay or Split Bill (Bill Tab):* View your itemized GST bill, apply any coupon/referral code, split the bill with friends, and pay via 0%-fee UPI QR or Cash/Card at the counter.`;
+
+  return (
+    <div style={{ fontSize: '12px', lineHeight: 1.6 }}>
+      <p className="mu" style={{ margin: '0 0 8px' }}>
+        Complete step-by-step guide of how guests use the 4 Customer tabs (
+        <b>Menu</b>, <b>Order</b>, <b>Rewards</b>, and <b>Bill</b>). Share this
+        with staff or guests:
+      </p>
+      <ol style={{ margin: '0 0 10px', paddingLeft: '18px' }}>
+        <li>
+          <b>🍽️ Menu Tab (Scan, Filter &amp; Order):</b> Guests scan the Table
+          QR code, choose their language (English / Hindi / Gujarati / custom)
+          and dietary filter (<code>🌱 Veg</code>, <code>🙏 Jain</code>, etc.),
+          search or browse categories, tap <b>ADD +</b>, and tap{' '}
+          <b>Place Order</b> from the floating bottom cart bar.
+        </li>
+        <li>
+          <b>🧾 Order Tab (Live Kitchen Status &amp; Group Ordering):</b> Guests
+          receive a single <b>Counter Number</b> (e.g. <code>C1</code>) for their
+          entire visit. They see live status (
+          <i>Received → Cooking → Ready → Delivered</i>), can order additional
+          rounds anytime before paying, and can invite tablemates by mobile
+          number so everyone&apos;s orders club into one bill.
+        </li>
+        <li>
+          <b>🎁 Rewards Tab (Stars, Reels &amp; Google Reviews):</b> Guests track
+          their loyalty stars toward a free dish, scratch reward cards after
+          payment, and submit social media Reel/Story/WhatsApp Status or Google
+          Review proof via <b>📸 1-Tap Screenshot</b>, <b>@handle/link</b>, or{' '}
+          <b>⚡ Verify at Counter</b>. Once approved in{' '}
+          <b>🎬 Reward Approvals</b>, their Coupon, +1 Star, or Discount unlocks
+          automatically.
+        </li>
+        <li>
+          <b>💳 Bill Tab (GST Bill, Split &amp; Payment):</b> Guests inspect
+          their itemized bill (with automatic discounts &amp; GST breakdown),
+          split the bill equally by number of people, and pay via{' '}
+          <b>Direct UPI QR</b>, <b>Card / Net Banking</b>, or{' '}
+          <b>Cash at Counter</b>, then download their PDF tax receipt or receive
+          it on WhatsApp.
+        </li>
+      </ol>
+      <button
+        type="button"
+        className="chip on"
+        style={{ fontSize: '11px' }}
+        onClick={() => {
+          navigator.clipboard?.writeText(guideSummaryText);
+          say('Customer Ordering Guide copied to clipboard 📋');
+        }}
+      >
+        📋 Copy Customer Guide for Staff / WhatsApp
+      </button>
+    </div>
+  );
+}
+
 export function OwnerPortalView() {
   const { S, sheetOrdersToday, updateState, say } = useTadka();
   const [offerMsg, setOfferMsg] = useState(
     '🔥 We miss you at Tadka Truck! Show this WhatsApp message today for 15% OFF your order + a free Gulab Jamun! 🍮'
   );
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    ownerGuide: false,
+    customerGuide: false,
     bills: true,
     counter: false,
     openSession: false,
@@ -1950,6 +2100,8 @@ export function OwnerPortalView() {
 
   const setAllOwner = (val: boolean) =>
     setOpenSections({
+      ownerGuide: val,
+      customerGuide: val,
       bills: val,
       counter: val,
       openSession: val,
@@ -1998,6 +2150,52 @@ export function OwnerPortalView() {
           </button>
         </div>
       </div>
+
+      <CollapsibleSection
+        title="📘 Owner Portal &amp; Daily Operations Guide Notes"
+        badge="Guide"
+        isOpen={!!openSections.ownerGuide}
+        onToggle={() => toggleSection('ownerGuide')}
+      >
+        <ol style={{ margin: '0', paddingLeft: '18px', fontSize: '12px', lineHeight: 1.6 }}>
+          <li>
+            <b>💳 Live &amp; Pending Bills:</b> Monitor today&apos;s live
+            orders, filter by business date, counter, table, or customer mobile,
+            and tag offline <b>Cash / Card / UPI</b> payments as Paid.
+          </li>
+          <li>
+            <b>🎟️ Counter Number Mode (Auto vs Manual):</b> Use <b>Auto</b> (
+            <code>C1, C2...</code>, resets daily at 4:00 AM) for fast QR
+            self-ordering, or switch to <b>Manual</b> if staff issue handwritten
+            token numbers.
+          </li>
+          <li>
+            <b>🎬 Reward Approvals:</b> Inspect customer Reel/Story/Status and
+            Google Review proofs (tap <b>🔔 Meta Business Suite ↗</b> or open
+            their uploaded screenshot) and release a <b>Coupon</b>,{' '}
+            <b>+1 Star</b>, or <b>Discount</b>.
+          </li>
+          <li>
+            <b>🎁 Rewards, Discounts, Coupons &amp; Stars Master:</b> Set the
+            minimum bill for earning stars, star target for free items, promo
+            coupon codes, referral discounts, and review/reel discount rules.
+          </li>
+          <li>
+            <b>📈 Repeat Customer Growth &amp; 💬 WhatsApp Offers:</b> View your
+            top repeat customers and send 1-tap promotional WhatsApp messages to
+            captured guest phone numbers.
+          </li>
+        </ol>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="📱 Customer Ordering &amp; App Guide Notes"
+        badge="Customer Flow"
+        isOpen={!!openSections.customerGuide}
+        onToggle={() => toggleSection('customerGuide')}
+      >
+        <CustomerGuideNotesContent />
+      </CollapsibleSection>
 
       <CollapsibleSection
         title="💳 Live & Pending Bills"
@@ -2228,6 +2426,7 @@ export function SuperAdminPortalView() {
   const [checkMob, setCheckMob] = useState('');
 
   const [openSaSections, setOpenSaSections] = useState<Record<string, boolean>>({
+    saGuide: false,
     clients: true,
     addClient: false,
     standalonePack: false,
@@ -2242,6 +2441,7 @@ export function SuperAdminPortalView() {
 
   const setAllSa = (val: boolean) =>
     setOpenSaSections({
+      saGuide: val,
       clients: val,
       addClient: val,
       standalonePack: val,
@@ -2404,6 +2604,45 @@ export function SuperAdminPortalView() {
           </button>
         </div>
       </div>
+
+      {/* Section 0: Super Admin Guide Notes */}
+      <CollapsibleSection
+        title="📘 Super Admin Business &amp; Handover Guide Notes"
+        badge="Guide"
+        isOpen={!!openSaSections.saGuide}
+        onToggle={() => toggleSaSection('saGuide')}
+      >
+        <ol style={{ margin: '0', paddingLeft: '18px', fontSize: '12px', lineHeight: 1.6 }}>
+          <li>
+            <b>➕ Add New Restaurant Client (Multi-Workspace SaaS):</b> Create a
+            blank Google Sheet (set Share → <i>Anyone with link → Editor</i>),
+            enter the client&apos;s Restaurant Name, Default Theme Style (
+            <code>Style 1–6</code>), Plan, Monthly Price, Owner Name, and Owner
+            Mobile Number, paste their Google Sheet link, and tap{' '}
+            <b>✅ Create Restaurant &amp; Get Owner Link</b>. All 9 tabs are
+            created automatically in their sheet.
+          </li>
+          <li>
+            <b>📲 Owner Handover &amp; Login:</b> In{' '}
+            <b>🏪 All Restaurant Clients</b>, tap <b>📲 Send on WhatsApp</b> or{' '}
+            <b>📋 Copy Owner Link</b>. When the restaurant owner logs in with
+            their mobile number, they land directly on their{' '}
+            <b>Owner Panel</b> and never see Super Admin or other clients.
+          </li>
+          <li>
+            <b>📦 Standalone App Buyer Pack (ZIP Download):</b> If a buyer
+            purchases a standalone single-restaurant app for their own domain,
+            open <b>📦 Download Standalone App ZIP</b> (or tap it on their client
+            card) to save <code>&lt;slug&gt;-standalone-app-pack.zip</code> into
+            your <b>Downloads</b> folder.
+          </li>
+          <li>
+            <b>☁️ Master Google Sheet Storage:</b> All client records and plans
+            are stored in your Master Google Sheet under the{' '}
+            <b>SuperAdmin_Workspaces</b> tab.
+          </li>
+        </ol>
+      </CollapsibleSection>
 
       {/* Section 1: All Restaurant Clients */}
       <CollapsibleSection
@@ -3604,6 +3843,8 @@ export function AdminPortalView() {
   const [openAdminSections, setOpenAdminSections] = useState<
     Record<string, boolean>
   >({
+    adminGuide: false,
+    customerGuide: false,
     team: true,
     giveAccess: false,
     whatsappBill: false,
@@ -3622,6 +3863,8 @@ export function AdminPortalView() {
 
   const setAllAdmin = (val: boolean) => {
     setOpenAdminSections({
+      adminGuide: val,
+      customerGuide: val,
       team: val,
       giveAccess: val,
       whatsappBill: val,
@@ -3700,6 +3943,57 @@ export function AdminPortalView() {
           </button>
         </div>
       </div>
+
+      <CollapsibleSection
+        title="📘 Admin Setup &amp; Configuration Guide Notes"
+        badge="Guide"
+        isOpen={!!openAdminSections.adminGuide}
+        onToggle={() => toggleAdminSection('adminGuide')}
+      >
+        <ol style={{ margin: '0', paddingLeft: '18px', fontSize: '12px', lineHeight: 1.6 }}>
+          <li>
+            <b>👥 Team &amp; 🔑 Give Access:</b> Register mobile numbers for your{' '}
+            <b>Manager</b>, <b>Chef</b>, <b>Waiter</b>, and <b>Reception</b>{' '}
+            staff. When they log in with their mobile number, their assigned
+            portal opens automatically.
+          </li>
+          <li>
+            <b>🏪 Restaurant / Brand Profile:</b> Pick your app-wide visual theme
+            (<b>Style 1 to Style 6</b>), set your <b>Restaurant Name</b> and{' '}
+            <b>Hero Tagline</b>, and add/edit/delete <b>Menu Languages</b> and{' '}
+            <b>Customer Dietary Filters</b>.
+          </li>
+          <li>
+            <b>🧾 GST &amp; GSTIN Master:</b> Toggle GST on/off, choose between{' '}
+            <b>Bottom of Bill (Single %)</b> or <b>Each Menu Item (Item-wise %)</b>,
+            and save your 15-digit <b>GSTIN</b> for customer tax receipts.
+          </li>
+          <li>
+            <b>🎬 Reward Approvals &amp; 🎁 Rewards Master:</b> Approve customer
+            social/review proofs and configure star targets, coupon codes,
+            referral codes, and discount rules.
+          </li>
+          <li>
+            <b>🍽️ Menu Admin &amp; 📱 Tables &amp; QR Generator:</b> Add or edit
+            dishes (with language translations, dietary dropdown, and item GST %)
+            and print Table QR posters for dine-in tables.
+          </li>
+          <li>
+            <b>📣 Social Media, Google Review &amp; Direct UPI:</b> Save your
+            Google Review link, Instagram handle, Facebook Page, caption tag, and{' '}
+            <b>Direct UPI ID</b> for 0%-commission customer QR payments.
+          </li>
+        </ol>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="📱 Customer Ordering &amp; App Guide Notes"
+        badge="Customer Flow"
+        isOpen={!!openAdminSections.customerGuide}
+        onToggle={() => toggleAdminSection('customerGuide')}
+      >
+        <CustomerGuideNotesContent />
+      </CollapsibleSection>
 
       <CollapsibleSection
         title="👥 Team"
