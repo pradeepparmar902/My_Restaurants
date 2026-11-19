@@ -3167,17 +3167,14 @@ export function AdminPortalView() {
                 />
               </div>
               {(() => {
-                const extraLangs = menuLanguagesInput.filter(
-                  (l) => l.code !== 'en'
-                );
-                const langOptions = extraLangs.length
-                  ? extraLangs
-                  : menuLanguagesInput;
+                const langOptions = menuLanguagesInput.length
+                  ? menuLanguagesInput
+                  : DEFAULT_MENU_LANGUAGES;
                 const activeLangCode = langOptions.some(
                   (l) => l.code === newDishLangCode
                 )
                   ? newDishLangCode
-                  : langOptions[0]?.code || 'hi';
+                  : langOptions[0]?.code || 'en';
                 const activeLangObj = langOptions.find(
                   (l) => l.code === activeLangCode
                 );
