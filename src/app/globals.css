@@ -451,3 +451,136 @@ select:focus-visible {
   color: var(--tx);
   font: inherit;
 }
+
+/* ==========================================================================
+   STYLE 2: Fresh Food-App Theme (Swiggy / Zomato / EatClub Emerald & Saffron)
+   Applied globally across the entire app when Admin selects Style 2
+   ========================================================================== */
+:root[data-app-style='style2'] {
+  color-scheme: light;
+  --bg: #f1f5f9;
+  --sf: #ffffff;
+  --sf2: #f1f5f9;
+  --tx: #0f172a;
+  --mu: #475569;
+  --pk: #ea580c;
+  --mg: #d97706;
+  --mn: #16a34a;
+}
+
+:root[data-app-style='style2'] body {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+:root[data-app-style='style2'] #app {
+  background: #f8fafc;
+  min-height: 100vh;
+  box-shadow: 0 0 36px rgba(15, 23, 42, 0.08);
+}
+
+:root[data-app-style='style2'] .card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+}
+
+:root[data-app-style='style2'] .roles {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+:root[data-app-style='style2'] .roles button {
+  color: #475569;
+}
+
+:root[data-app-style='style2'] .roles button.on {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+:root[data-app-style='style2'] .hero {
+  background: linear-gradient(135deg, #065f46 0%, #16a34a 55%, #ea580c 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.22);
+}
+
+:root[data-app-style='style2'] .chip {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+:root[data-app-style='style2'] .chip.on {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #16a34a;
+}
+
+:root[data-app-style='style2'] .btn {
+  background: #ea580c;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);
+}
+
+:root[data-app-style='style2'] .btn.alt {
+  background: #16a34a;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+}
+
+:root[data-app-style='style2'] .btn.ghost {
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  box-shadow: none;
+}
+
+:root[data-app-style='style2'] nav {
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+}
+
+:root[data-app-style='style2'] nav button {
+  color: #64748b;
+}
+
+:root[data-app-style='style2'] nav button.on {
+  color: #16a34a;
+}
+
+:root[data-app-style='style2'] .inp,
+:root[data-app-style='style2'] .sel-cc {
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  color: #0f172a;
+}
+
+:root[data-app-style='style2'] .sbox {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+:root[data-app-style='style2'] .sbox.on {
+  border-color: #f59e0b;
+  background: #fef3c7;
+}
+
+:root[data-app-style='style2'] .tot {
+  border-top-color: #cbd5e1;
+}
+
+:root[data-app-style='style2'] .wa {
+  background: #ecfdf5;
+  color: #065f46;
+  border-left: 4px solid #16a34a;
+}
+
+:root[data-app-style='style2'] .tag.ok,
+:root[data-app-style='style2'] .step.on i,
+:root[data-app-style='style2'] .toast {
+  background: #16a34a;
+  color: #ffffff;
+}

@@ -66,6 +66,7 @@ export function buildSheetRowsForState(
     ['Config_Key', 'Config_Value', 'Updated_At'],
     ['restaurant_slug', (state.googleConfig?.workspaceSlug || '').trim() || 'tadka-truck', new Date().toISOString()],
     ['restaurant_name', (state.googleConfig?.restaurantName || '').trim() || 'Tadka Truck', new Date().toISOString()],
+    ['app_style', state.googleConfig?.appStyle === 'style2' ? 'style2' : 'style1', new Date().toISOString()],
     ['owner_name', (state.googleConfig?.ownerName || '').trim(), new Date().toISOString()],
     ['owner_mobile', (state.googleConfig?.ownerMobile || '').trim(), new Date().toISOString()],
     ...(state.googleConfig?.workspacesRegistry && state.googleConfig.workspacesRegistry.length > 0
@@ -696,6 +697,9 @@ export function parseConfigFromSheetRows(
     const val = String(r[1] ?? '').trim();
     if (key === 'restaurant_slug' && val) cfg.workspaceSlug = val;
     if (key === 'restaurant_name' && val) cfg.restaurantName = val;
+    if (key === 'app_style' && (val === 'style1' || val === 'style2')) {
+      cfg.appStyle = val;
+    }
     if (key === 'owner_name' && val) cfg.ownerName = val;
     if (key === 'owner_mobile' && val) cfg.ownerMobile = val;
     if (key === 'workspaces_registry_json' && val) {

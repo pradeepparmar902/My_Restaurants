@@ -2614,6 +2614,9 @@ export function AdminPortalView() {
   const [staffName, setStaffName] = useState('');
   const [staffMob, setStaffMob] = useState('');
   const [checkMob, setCheckMob] = useState('');
+  const [appStyleInput, setAppStyleInput] = useState<'style1' | 'style2'>(
+    S.googleConfig.appStyle === 'style2' ? 'style2' : 'style1'
+  );
   const [restaurantNameInput, setRestaurantNameInput] = useState(
     S.googleConfig.restaurantName || 'Tadka Truck'
   );
@@ -2665,6 +2668,9 @@ export function AdminPortalView() {
 
   // Keep Admin form inputs synced when Google Sheets finishes pulling S.googleConfig
   useEffect(() => {
+    setAppStyleInput(
+      S.googleConfig.appStyle === 'style2' ? 'style2' : 'style1'
+    );
     setRestaurantNameInput(S.googleConfig.restaurantName || 'Tadka Truck');
     setRestaurantTaglineInput(S.googleConfig.restaurantTagline || '');
     if (S.googleConfig.menuLanguages?.length) {
@@ -2932,14 +2938,49 @@ export function AdminPortalView() {
 
       <CollapsibleSection
         title="🏪 Restaurant / Brand Profile"
-        badge={S.googleConfig.restaurantName || 'Tadka Truck'}
+        badge={`${S.googleConfig.restaurantName || 'Tadka Truck'} · ${
+          S.googleConfig.appStyle === 'style2' ? 'Style 2' : 'Style 1'
+        }`}
         isOpen={!!openAdminSections.brandProfile}
         onToggle={() => toggleAdminSection('brandProfile')}
       >
         <p className="mu" style={{ margin: '0 0 8px', fontSize: '12px' }}>
-          Set your restaurant&apos;s display name, tagline, menu languages, and
-          dietary filter chips. Synced via Google Sheets (`Restaurant_Config`).
+          Set your restaurant&apos;s app theme style, display name, tagline,
+          menu languages, and dietary filter chips. Synced via Google Sheets
+          (`Restaurant_Config`).
         </p>
+
+        <div className="mu" style={{ fontSize: '11px', marginBottom: '4px' }}>
+          🎨 App Visual Style &amp; Colour Combination (Applies to Entire App)
+        </div>
+        <div
+          className="row"
+          style={{ gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}
+        >
+          <button
+            type="button"
+            className={`chip ${appStyleInput === 'style1' ? 'on' : ''}`}
+            style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}
+            onClick={() => {
+              setAppStyleInput('style1');
+              saveGoogleConfig({ appStyle: 'style1' });
+            }}
+          >
+            {appStyleInput === 'style1' ? '✅ ' : ''}🌙 Style 1 · Classic Neon Dark
+          </button>
+          <button
+            type="button"
+            className={`chip ${appStyleInput === 'style2' ? 'on' : ''}`}
+            style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}
+            onClick={() => {
+              setAppStyleInput('style2');
+              saveGoogleConfig({ appStyle: 'style2' });
+            }}
+          >
+            {appStyleInput === 'style2' ? '✅ ' : ''}☀️ Style 2 · Fresh Food-App (Emerald &amp; Saffron)
+          </button>
+        </div>
+
         <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
           🏪 Restaurant / Brand Name
         </div>
@@ -3315,6 +3356,7 @@ export function AdminPortalView() {
             const vegItem = dietaryFiltersInput.find((f) => f.id === 'veg');
             const jainItem = dietaryFiltersInput.find((f) => f.id === 'jain');
             const nextBrand = {
+              appStyle: appStyleInput,
               restaurantName: restaurantNameInput.trim() || 'Tadka Truck',
               restaurantTagline: restaurantTaglineInput.trim(),
               menuLanguages: menuLanguagesInput,

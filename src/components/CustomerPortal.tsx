@@ -28,6 +28,7 @@ export function MenuTabView() {
     updateState,
     staffOf,
     sheetOrdersToday,
+    saveGoogleConfig,
   } = useTadka();
   const [optMob, setOptMob] = useState('');
   const [showOptMob, setShowOptMob] = useState(false);
@@ -37,7 +38,7 @@ export function MenuTabView() {
   const [onlyBestsellers, setOnlyBestsellers] = useState(false);
   const [sortPriceAsc, setSortPriceAsc] = useState(false);
   const [gridView, setGridView] = useState<'grid' | 'list'>('grid');
-  const [lightTheme, setLightTheme] = useState(true);
+  const lightTheme = S.googleConfig.appStyle === 'style2';
   const currentStaff = staffOf();
 
   const L: Record<string, string> = {
@@ -294,8 +295,10 @@ export function MenuTabView() {
           </div>
           <button
             type="button"
-            onClick={() => setLightTheme((v) => !v)}
-            title="Switch Light / Dark Menu Style"
+            onClick={() =>
+              saveGoogleConfig({ appStyle: lightTheme ? 'style1' : 'style2' })
+            }
+            title="Switch App Style 1 (Dark) / Style 2 (Fresh Food-App)"
             style={{
               background: 'rgba(255,255,255,0.2)',
               border: '1px solid rgba(255,255,255,0.35)',
@@ -308,7 +311,7 @@ export function MenuTabView() {
               whiteSpace: 'nowrap',
             }}
           >
-            {lightTheme ? '🌙 Dark' : '☀️ Light'}
+            {lightTheme ? '🌙 Style 1' : '☀️ Style 2'}
           </button>
         </div>
 

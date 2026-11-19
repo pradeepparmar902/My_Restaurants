@@ -186,6 +186,7 @@ export interface WorkspaceTenantRecord {
 
 export interface GoogleCloudStorageConfig {
   enabled: boolean;
+  appStyle?: 'style1' | 'style2';
   workspaceSlug?: string;
   ownerName?: string;
   ownerMobile?: string;
