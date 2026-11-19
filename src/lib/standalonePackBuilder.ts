@@ -105,9 +105,12 @@ export function createZipBlob(
   ev.setUint32(16, offset, true); // Offset of start of central directory
   ev.setUint16(20, 0, true); // Comment length
 
-  return new Blob([...localParts, ...centralParts, eocd], {
-    type: 'application/zip',
-  });
+  return new Blob(
+    [...localParts, ...centralParts, eocd] as unknown as BlobPart[],
+    {
+      type: 'application/zip',
+    }
+  );
 }
 
 /**
