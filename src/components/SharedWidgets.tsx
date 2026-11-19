@@ -597,6 +597,183 @@ export function ShareMomentCard() {
           📋 Copy Post
         </button>
       </div>
+
+      <ProofSubmissionBox kind="social" />
+    </div>
+  );
+}
+
+function ProofSubmissionBox({ kind }: { kind: 'social' | 'review' }) {
+  const {
+    S,
+    proofSubmissions,
+    submitSocialProof,
+    pullFromGoogleSheets,
+    say,
+  } = useTadka();
+  const socialPlatforms = ['Instagram', 'Facebook', 'WhatsApp Status', 'Snapchat'];
+  const [platform, setPlatform] = useState(
+    kind === 'review' ? 'Google Review' : 'Instagram'
+  );
+  const [proofUrl, setProofUrl] = useState('');
+  const [note, setNote] = useState('');
+
+  const myMob = S.sess?.mob || '';
+  const myProofs = proofSubmissions
+    .filter(
+      (p) =>
+        p.kind === kind &&
+        (!myMob || !p.customerMob || p.customerMob === myMob)
+    )
+    .slice(0, 5);
+
+  const handleSubmit = () => {
+    if (!proofUrl.trim() && !note.trim()) {
+      say(
+        kind === 'review'
+          ? 'Enter your Google reviewer name or review link first'
+          : 'Paste your reel/post link or @handle note first'
+      );
+      return;
+    }
+    submitSocialProof({
+      kind,
+      platform: kind === 'review' ? 'Google Review' : platform,
+      proofUrl: proofUrl.trim() || undefined,
+      note: note.trim() || undefined,
+    });
+    setProofUrl('');
+    setNote('');
+  };
+
+  return (
+    <div
+      style={{
+        marginTop: '12px',
+        padding: '10px',
+        borderRadius: '10px',
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.1)',
+      }}
+    >
+      <div className="row sp" style={{ marginBottom: '6px' }}>
+        <strong style={{ fontSize: '12px' }}>
+          📤 Submit Proof for Admin Approval
+        </strong>
+        <button
+          type="button"
+          className="chip"
+          style={{ fontSize: '11px', padding: '3px 8px' }}
+          onClick={() => pullFromGoogleSheets()}
+        >
+          🔄 Check Status
+        </button>
+      </div>
+      <p className="mu" style={{ fontSize: '11px', margin: '0 0 8px' }}>
+        {kind === 'review'
+          ? 'Posted your Google review? Enter your reviewer name or link. Admin will verify & release your Coupon, +1 Star, or Discount.'
+          : 'Posted your Reel / Snap / Post? Paste the link or @handle below. Admin will verify & release your Coupon, +1 Star, or Discount.'}
+      </p>
+
+      {kind === 'social' && (
+        <div className="row" style={{ flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+          {socialPlatforms.map((p) => (
+            <button
+              key={p}
+              type="button"
+              className={`chip ${platform === p ? 'on' : ''}`}
+              style={{ fontSize: '11px', padding: '3px 8px' }}
+              onClick={() => setPlatform(p)}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <input
+        type="url"
+        value={proofUrl}
+        onChange={(e) => setProofUrl(e.target.value)}
+        placeholder={
+          kind === 'review'
+            ? 'Paste Google Review link (optional)'
+            : 'Paste Reel / Post / Snap link (optional)'
+        }
+        style={{ marginBottom: '6px' }}
+      />
+      <input
+        type="text"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder={
+          kind === 'review'
+            ? 'Your Google Reviewer Name (e.g. Rahul S.)'
+            : 'Your @handle, caption, or screenshot note'
+        }
+        style={{ marginBottom: '8px' }}
+      />
+      <button
+        type="button"
+        className="btn alt"
+        style={{ width: '100%', marginTop: 0 }}
+        onClick={handleSubmit}
+      >
+        📤 Submit Proof for Admin Approval
+      </button>
+
+      {myProofs.length > 0 && (
+        <div style={{ marginTop: '8px', display: 'grid', gap: '6px' }}>
+          {myProofs.map((p) => (
+            <div
+              key={p.id}
+              className="row sp"
+              style={{
+                fontSize: '11px',
+                padding: '6px 8px',
+                borderRadius: '8px',
+                background: 'rgba(0,0,0,0.2)',
+                gap: '8px',
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div>
+                  <strong>{p.platform}</strong>
+                  {p.note ? ` · ${p.note}` : ''}
+                </div>
+                {p.proofUrl && (
+                  <a
+                    href={p.proofUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: '#93c5fd', wordBreak: 'break-all' }}
+                  >
+                    View link ↗
+                  </a>
+                )}
+              </div>
+              <span
+                className={`chip ${p.status === 'APPROVED' ? 'on' : ''}`}
+                style={{
+                  fontSize: '10px',
+                  whiteSpace: 'nowrap',
+                  borderColor:
+                    p.status === 'REJECTED'
+                      ? 'rgba(248,113,113,0.5)'
+                      : p.status === 'PENDING'
+                        ? 'rgba(251,191,36,0.5)'
+                        : undefined,
+                }}
+              >
+                {p.status === 'PENDING' && '⏳ PENDING'}
+                {p.status === 'APPROVED' &&
+                  `✅ ${p.rewardType || 'APPROVED'}${p.rewardValue ? ` (${p.rewardValue})` : ''}`}
+                {p.status === 'REJECTED' && '❌ REJECTED'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -612,16 +789,7 @@ export function ReviewAndShareCard() {
 
   const handleOpenGoogleReview = () => {
     window.open(googleReviewLink, '_blank', 'noopener,noreferrer');
-    updateState((prev) => ({
-      ...prev,
-      reviewed: prev.paid ? true : prev.reviewed,
-      review: prev.paid ? prev.review : true,
-    }));
-    say(
-      S.paid
-        ? 'Opening Google Review — thank you! ⭐'
-        : 'Opening Google Review · ₹50 off applied ✅'
-    );
+    say('Opening Google Review — post your review, then submit proof below for Admin approval ⭐');
   };
 
   const handleQuickShare = async (p: string) => {
@@ -692,7 +860,7 @@ export function ReviewAndShareCard() {
           </div>
           {S.rating >= 4 ? (
             <button className="btn alt" onClick={handleOpenGoogleReview}>
-              ⭐ Post on Google{S.paid ? '' : ' · ₹50 off'}
+              ⭐ Open Google Review
             </button>
           ) : S.rating ? (
             <p className="mu">
@@ -701,6 +869,7 @@ export function ReviewAndShareCard() {
           ) : null}
         </>
       )}
+      <ProofSubmissionBox kind="review" />
       <div className="row" style={{ flexWrap: 'wrap', marginTop: '10px', gap: '6px' }}>
         {platforms.map((p) => (
           <button

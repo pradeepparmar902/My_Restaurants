@@ -1,4 +1,4 @@
-import { AppState, Dish, StaffMember, StaffRoleName } from '@/types/tadka';
+import { AppState, Dish, SocialProofSubmission, StaffMember, StaffRoleName } from '@/types/tadka';
 import {
   getSubtotal,
   getDiscount,
@@ -446,23 +446,18 @@ export function buildSheetRowsForState(
 
   const Social_Reels_Reviews: (string | number | boolean)[][] = [
     [
-      'Session_Counter',
-      'Meal_Rating',
-      'Google_Review_Posted',
-      'Reel_Status',
-      'Reel_Caption',
-      'Connected_Platforms',
-    ],
-    [
-      state.sess?.no || 'None',
-      state.rating,
-      state.review || state.reviewed,
-      state.reel || 'none',
-      state.reelCaption || '',
-      Object.entries(state.soc)
-        .filter(([, v]) => v)
-        .map(([k]) => k)
-        .join(', '),
+      'Proof_ID',
+      'Business_Date',
+      'Counter_No',
+      'Customer_Mobile',
+      'Kind',
+      'Platform',
+      'Proof_URL',
+      'Note',
+      'Status',
+      'Reward_Type',
+      'Reward_Value',
+      'Created_At',
     ],
   ];
 
@@ -843,6 +838,81 @@ export interface PulledSheetOrder {
   paidTime?: string;
 }
 
+export function buildSingleProofSheetRows(
+  p: SocialProofSubmission
+): (string | number | boolean)[][] {
+  return [
+    [
+      'Proof_ID',
+      'Business_Date',
+      'Counter_No',
+      'Customer_Mobile',
+      'Kind',
+      'Platform',
+      'Proof_URL',
+      'Note',
+      'Status',
+      'Reward_Type',
+      'Reward_Value',
+      'Created_At',
+    ],
+    [
+      p.id,
+      p.businessDate,
+      p.counterNo,
+      p.customerMob,
+      p.kind,
+      p.platform,
+      p.proofUrl || '',
+      p.note || '',
+      p.status,
+      p.rewardType || '',
+      p.rewardValue || '',
+      p.createdAt,
+    ],
+  ];
+}
+
+export function parseProofsFromSheetRows(
+  rows: unknown[][]
+): SocialProofSubmission[] {
+  if (!Array.isArray(rows) || rows.length < 2) return [];
+  const headerFirst = String(rows[0]?.[0] || '').trim();
+  if (headerFirst !== 'Proof_ID') return [];
+  const out: SocialProofSubmission[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r[0]) continue;
+    const id = String(r[0] || '').trim();
+    if (!id) continue;
+    const rawMob = String(r[3] || '').replace(/^'+/, '').trim();
+    const normMob = /^\d{11,15}$/.test(rawMob) ? `+${rawMob}` : rawMob;
+    const stRaw = String(r[8] || 'PENDING').trim().toUpperCase();
+    const status: SocialProofSubmission['status'] =
+      stRaw === 'APPROVED' || stRaw === 'REJECTED' ? stRaw : 'PENDING';
+    const rTypeRaw = String(r[9] || '').trim().toUpperCase();
+    const rewardType =
+      rTypeRaw === 'COUPON' || rTypeRaw === 'STAR' || rTypeRaw === 'DISCOUNT'
+        ? rTypeRaw
+        : undefined;
+    out.push({
+      id,
+      businessDate: normalizeSheetDateString(String(r[1] || '')),
+      counterNo: String(r[2] || '').trim(),
+      customerMob: normMob || 'Guest',
+      kind: String(r[4] || '').toLowerCase() === 'review' ? 'review' : 'social',
+      platform: String(r[5] || '').trim(),
+      proofUrl: String(r[6] || '').trim(),
+      note: String(r[7] || '').trim(),
+      status,
+      rewardType,
+      rewardValue: String(r[10] || '').trim(),
+      createdAt: String(r[11] || '').trim(),
+    });
+  }
+  return out;
+}
+
 export function buildSingleOrderSheetRows(
   o: PulledSheetOrder
 ): (string | number | boolean)[][] {
@@ -1105,6 +1175,7 @@ function doPost(e) {
           Orders: function(r) { return String(r[16] || (r[0] + '_' + r[3] + '_' + r[5])); },
           Daily_Counters: function(r) { return String(r[0] || '') + '__' + String(r[3] || ''); },
           Bills_Payments: function(r) { return String(r[14] || (r[0] + '_' + r[3])); },
+          Social_Reels_Reviews: function(r) { return String(r[0] || ''); },
           Audit_Log: function(r) { return String(r[0] || ''); },
           Drive_Assets: function(r) { return String(r[0] || ''); }
         };

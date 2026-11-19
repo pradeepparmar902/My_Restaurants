@@ -193,6 +193,21 @@ export interface DriveMediaAsset {
   createdAt: string;
 }
 
+export interface SocialProofSubmission {
+  id: string;
+  businessDate: string;
+  counterNo: string;
+  customerMob: string;
+  kind: 'social' | 'review';
+  platform: string;
+  proofUrl?: string;
+  note?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rewardType?: 'COUPON' | 'STAR' | 'DISCOUNT';
+  rewardValue?: string;
+  createdAt: string;
+}
+
 export interface UserSessionSnapshot {
   sess: SessionData | null;
   orders: OrderRound[];

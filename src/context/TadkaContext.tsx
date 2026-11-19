@@ -11,6 +11,7 @@ import {
   PaymentMethod,
   StaffRoleName,
   Dish,
+  SocialProofSubmission,
 } from '@/types/tadka';
 import { DEFAULT_REWARD_RULES, INITIAL_STATE, ORDER_STATUS_LABELS } from '@/lib/constants';
 import {
@@ -33,6 +34,7 @@ import {
 import {
   buildSheetRowsForState,
   buildSingleOrderSheetRows,
+  buildSingleProofSheetRows,
   extractSpreadsheetIdFromUrl,
   parseConfigFromSheetRows,
   parseCsvToRows,
@@ -40,6 +42,7 @@ import {
   ParsedSheetCounterState,
   parseMenuFromSheetRows,
   parseOrdersFromSheetRows,
+  parseProofsFromSheetRows,
   parseStaffFromSheetRows,
   PulledSheetOrder,
 } from '@/lib/googleSheetsShared';
@@ -124,6 +127,18 @@ interface TadkaContextValue {
 
   // Google Sheets & Google Drive Storage
   sheetOrdersToday: PulledSheetOrder[];
+  proofSubmissions: SocialProofSubmission[];
+  submitSocialProof: (payload: {
+    kind: 'social' | 'review';
+    platform: string;
+    proofUrl?: string;
+    note?: string;
+  }) => void;
+  decideSocialProof: (
+    proofId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    rewardType?: 'COUPON' | 'STAR' | 'DISCOUNT'
+  ) => void;
   updateSheetOrderStatus: (orderId: string, nextStatus: 1 | 2 | 3 | 4 | 5) => void;
   toggleSheetOrderRush: (orderId: string) => void;
   syncToGoogleSheets: (overrideConfig?: Partial<AppState['googleConfig']>) => Promise<void>;
@@ -165,6 +180,15 @@ export function TadkaProvider({
   const pendingOrderOverridesRef = useRef<
     Record<string, { st?: 1 | 2 | 3 | 4 | 5; rush?: boolean; until: number }>
   >({});
+  const [proofSubmissions, setProofSubmissions] = useState<
+    SocialProofSubmission[]
+  >([]);
+  const proofSubmissionsRef = useRef<SocialProofSubmission[]>([]);
+  proofSubmissionsRef.current = proofSubmissions;
+  const pendingProofOverridesRef = useRef<
+    Record<string, { proof: SocialProofSubmission; until: number }>
+  >({});
+  const appliedProofIdsRef = useRef<Set<string>>(new Set());
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -1066,6 +1090,141 @@ export function TadkaProvider({
       S.googleConfig.driveFolderId,
       S.googleConfig.spreadsheetId,
     ]
+  );
+
+  const pushProofSubmission = useCallback(
+    (proof: SocialProofSubmission) => {
+      const webhookUrl = (S.googleConfig.appsScriptWebAppUrl || '').trim();
+      if (!webhookUrl.startsWith('https://script.google.com/')) return;
+      fetch(webhookUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'SYNC_ALL_SHEETS',
+          spreadsheetId: S.googleConfig.spreadsheetId,
+          driveFolderId: S.googleConfig.driveFolderId,
+          sheets: { Social_Reels_Reviews: buildSingleProofSheetRows(proof) },
+          timestamp: new Date().toISOString(),
+        }),
+      }).catch(() => {});
+    },
+    [
+      S.googleConfig.appsScriptWebAppUrl,
+      S.googleConfig.driveFolderId,
+      S.googleConfig.spreadsheetId,
+    ]
+  );
+
+  const submitSocialProof = useCallback(
+    (payload: {
+      kind: 'social' | 'review';
+      platform: string;
+      proofUrl?: string;
+      note?: string;
+    }) => {
+      const nowIso = new Date().toISOString();
+      const newProof: SocialProofSubmission = {
+        id: `prf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        businessDate: S.sess?.businessDate || getCurrentBusinessDate(),
+        counterNo: S.sess?.no || 'Guest',
+        customerMob: S.sess?.mob || S.me.mob || 'Guest',
+        kind: payload.kind,
+        platform: payload.platform,
+        proofUrl: (payload.proofUrl || '').trim(),
+        note: (payload.note || '').trim(),
+        status: 'PENDING',
+        createdAt: nowIso,
+      };
+      pendingProofOverridesRef.current[newProof.id] = {
+        proof: newProof,
+        until: Date.now() + 20000,
+      };
+      proofSubmissionsRef.current = [newProof, ...proofSubmissionsRef.current];
+      setProofSubmissions(proofSubmissionsRef.current);
+      pushProofSubmission(newProof);
+      if (payload.kind === 'social') {
+        updateState((p) => ({
+          ...p,
+          reel: p.reel === 'ok' ? 'ok' : 'wait',
+          reelCaption: payload.note || p.reelCaption,
+        }));
+      }
+      say('Proof submitted for Admin/Owner verification ⏳');
+    },
+    [S.me.mob, S.sess?.businessDate, S.sess?.mob, S.sess?.no, pushProofSubmission, say, updateState]
+  );
+
+  const decideSocialProof = useCallback(
+    (
+      proofId: string,
+      decision: 'APPROVED' | 'REJECTED',
+      rewardType: 'COUPON' | 'STAR' | 'DISCOUNT' = 'COUPON'
+    ) => {
+      const target = proofSubmissionsRef.current.find((p) => p.id === proofId);
+      if (!target) return;
+      const rules = S.googleConfig?.rewardRules || DEFAULT_REWARD_RULES;
+      const rewardValue =
+        decision === 'APPROVED'
+          ? rewardType === 'STAR'
+            ? '+1 Star'
+            : rewardType === 'COUPON'
+              ? rules.couponCode || 'TADKA50'
+              : target.kind === 'review'
+                ? `₹${rules.reviewDiscountInr} Off`
+                : `${rules.reelDiscountPercent}% Off`
+          : '';
+      const updated: SocialProofSubmission = {
+        ...target,
+        status: decision,
+        rewardType: decision === 'APPROVED' ? rewardType : undefined,
+        rewardValue,
+      };
+      pendingProofOverridesRef.current[proofId] = {
+        proof: updated,
+        until: Date.now() + 20000,
+      };
+      proofSubmissionsRef.current = proofSubmissionsRef.current.map((p) =>
+        p.id === proofId ? updated : p
+      );
+      setProofSubmissions(proofSubmissionsRef.current);
+      pushProofSubmission(updated);
+
+      if (decision === 'APPROVED') {
+        // Also immediately apply if this customer session is active locally
+        updateState((prev) => {
+          const isSameCustomer =
+            (prev.sess?.no && prev.sess.no === updated.counterNo) ||
+            (prev.me.mob && prev.me.mob === updated.customerMob);
+          if (!isSameCustomer) return prev;
+          appliedProofIdsRef.current.add(updated.id);
+          const starsTarget = rules.starsTarget || 5;
+          return {
+            ...prev,
+            appliedCoupon:
+              rewardType === 'COUPON'
+                ? rewardValue || prev.appliedCoupon
+                : prev.appliedCoupon,
+            stars:
+              rewardType === 'STAR'
+                ? Math.min(starsTarget, prev.stars + 1)
+                : prev.stars,
+            reel:
+              rewardType === 'DISCOUNT' && updated.kind === 'social'
+                ? 'ok'
+                : prev.reel,
+            review:
+              rewardType === 'DISCOUNT' && updated.kind === 'review'
+                ? true
+                : prev.review,
+          };
+        });
+        say(`Approved & released ${rewardValue} ✅`);
+      } else {
+        say('Submission rejected');
+      }
+    },
+    [S.googleConfig?.rewardRules, pushProofSubmission, say, updateState]
   );
 
   const updateSheetOrderStatus = useCallback(
@@ -2291,6 +2450,7 @@ export function TadkaProvider({
       let pulledConfig: Partial<AppState['googleConfig']> | null = null;
       let pulledCounters: ParsedSheetCounterState | null = null;
       let pulledOrderRows: unknown[][] | null = null;
+      let pulledProofRows: unknown[][] | null = null;
 
       // 1. Try Server Proxy (/api/storage/sheets?pull=1) — avoids all browser CORS redirect issues on localhost
       try {
@@ -2319,6 +2479,9 @@ export function TadkaProvider({
             );
             if (Array.isArray(apiData.sheets.Orders)) {
               pulledOrderRows = apiData.sheets.Orders;
+            }
+            if (Array.isArray(apiData.sheets.Social_Reels_Reviews)) {
+              pulledProofRows = apiData.sheets.Social_Reels_Reviews;
             }
           }
         }
@@ -2380,15 +2543,18 @@ export function TadkaProvider({
             document.body.appendChild(script);
           });
 
-        const [menuRows, cfgRows, dailyCounterRows, orderRows] = await Promise.all([
-          gvizFetchTab('Menu_Items'),
-          gvizFetchTab('Restaurant_Config'),
-          gvizFetchTab('Daily_Counters'),
-          gvizFetchTab('Orders'),
-        ]);
+        const [menuRows, cfgRows, dailyCounterRows, orderRows, proofRows] =
+          await Promise.all([
+            gvizFetchTab('Menu_Items'),
+            gvizFetchTab('Restaurant_Config'),
+            gvizFetchTab('Daily_Counters'),
+            gvizFetchTab('Orders'),
+            gvizFetchTab('Social_Reels_Reviews'),
+          ]);
         if (menuRows) pulledMenu = parseMenuFromSheetRows(menuRows);
         if (cfgRows) pulledConfig = parseConfigFromSheetRows(cfgRows);
         if (orderRows) pulledOrderRows = orderRows;
+        if (proofRows) pulledProofRows = proofRows;
         if (cfgRows || dailyCounterRows || orderRows) {
           pulledCounters = parseDailyCountersAndStateFromSheets(
             cfgRows || undefined,
@@ -2410,12 +2576,13 @@ export function TadkaProvider({
           config: Partial<AppState['googleConfig']> | null;
           counters: ParsedSheetCounterState | null;
           orderRows: unknown[][] | null;
+          proofRows: unknown[][] | null;
         }>((resolve) => {
           const cbName = `__tadkaScriptCb_${Date.now()}`;
           const script = document.createElement('script');
           const timer = setTimeout(() => {
             cleanup();
-            resolve({ menu: null, staff: null, config: null, counters: null, orderRows: null });
+            resolve({ menu: null, staff: null, config: null, counters: null, orderRows: null, proofRows: null });
           }, 6000);
 
           function cleanup() {
@@ -2443,9 +2610,12 @@ export function TadkaProvider({
                 orderRows: Array.isArray(data.sheets.Orders)
                   ? data.sheets.Orders
                   : null,
+                proofRows: Array.isArray(data.sheets.Social_Reels_Reviews)
+                  ? data.sheets.Social_Reels_Reviews
+                  : null,
               });
             } else {
-              resolve({ menu: null, staff: null, config: null, counters: null, orderRows: null });
+              resolve({ menu: null, staff: null, config: null, counters: null, orderRows: null, proofRows: null });
             }
           };
 
@@ -2455,7 +2625,7 @@ export function TadkaProvider({
           )}&t=${Date.now()}`;
           script.onerror = () => {
             cleanup();
-            resolve({ menu: null, staff: null, config: null, counters: null, orderRows: null });
+            resolve({ menu: null, staff: null, config: null, counters: null, orderRows: null, proofRows: null });
           };
           document.body.appendChild(script);
         });
@@ -2464,6 +2634,7 @@ export function TadkaProvider({
         if (jsonpResult.config) pulledConfig = jsonpResult.config;
         if (jsonpResult.counters) pulledCounters = jsonpResult.counters;
         if (jsonpResult.orderRows) pulledOrderRows = jsonpResult.orderRows;
+        if (jsonpResult.proofRows) pulledProofRows = jsonpResult.proofRows;
       }
 
       // 4. Fallback: Direct Apps Script GET / POST from browser
@@ -2524,10 +2695,41 @@ export function TadkaProvider({
         (pulledMenu && pulledMenu.length > 0) ||
         pulledConfig ||
         pulledCounters ||
-        (pulledOrderRows && pulledOrderRows.length > 1)
+        (pulledOrderRows && pulledOrderRows.length > 1) ||
+        (pulledProofRows && pulledProofRows.length > 1)
       ) {
         const todayBizDateOuter = getCurrentBusinessDate();
         const nowMs = Date.now();
+
+        let mergedProofs: SocialProofSubmission[] = [];
+        if (pulledProofRows && pulledProofRows.length > 1) {
+          const parsedProofs = parseProofsFromSheetRows(pulledProofRows);
+          const proofMap = new Map<string, SocialProofSubmission>();
+          parsedProofs.forEach((p) => {
+            const ov = pendingProofOverridesRef.current[p.id];
+            if (ov && nowMs <= ov.until) {
+              if (ov.proof.status === p.status) {
+                delete pendingProofOverridesRef.current[p.id];
+                proofMap.set(p.id, p);
+              } else {
+                proofMap.set(p.id, ov.proof);
+              }
+            } else {
+              if (ov) delete pendingProofOverridesRef.current[p.id];
+              proofMap.set(p.id, p);
+            }
+          });
+          Object.values(pendingProofOverridesRef.current).forEach((ov) => {
+            if (nowMs <= ov.until && !proofMap.has(ov.proof.id)) {
+              proofMap.set(ov.proof.id, ov.proof);
+            }
+          });
+          mergedProofs = Array.from(proofMap.values()).sort((a, b) =>
+            b.createdAt.localeCompare(a.createdAt)
+          );
+          proofSubmissionsRef.current = mergedProofs;
+          setProofSubmissions(mergedProofs);
+        }
         const applyOverrides = (po: PulledSheetOrder): PulledSheetOrder => {
           const ov = pendingOrderOverridesRef.current[po.id];
           if (!ov) return po;
@@ -2644,12 +2846,51 @@ export function TadkaProvider({
             }
           }
 
+          let nextAppliedCoupon = prev.appliedCoupon;
+          let nextStars = prev.stars;
+          let nextReel = prev.reel;
+          let nextReview = prev.review;
+          const activeRules =
+            pulledConfig?.rewardRules ||
+            prev.googleConfig.rewardRules ||
+            DEFAULT_REWARD_RULES;
+          const starsTarget = activeRules.starsTarget || 5;
+
+          if (mergedProofs.length > 0) {
+            mergedProofs.forEach((prf) => {
+              if (
+                prf.status === 'APPROVED' &&
+                !appliedProofIdsRef.current.has(prf.id)
+              ) {
+                const matchesSess =
+                  (prev.sess?.no && prf.counterNo === prev.sess.no) ||
+                  (prev.me.mob && prf.customerMob === prev.me.mob);
+                if (matchesSess) {
+                  appliedProofIdsRef.current.add(prf.id);
+                  if (prf.rewardType === 'COUPON') {
+                    nextAppliedCoupon =
+                      prf.rewardValue || activeRules.couponCode || nextAppliedCoupon;
+                  } else if (prf.rewardType === 'STAR') {
+                    nextStars = Math.min(starsTarget, nextStars + 1);
+                  } else if (prf.rewardType === 'DISCOUNT') {
+                    if (prf.kind === 'review') nextReview = true;
+                    else nextReel = 'ok';
+                  }
+                }
+              }
+            });
+          }
+
           const nextState: AppState = {
             ...prev,
             menu: effectiveMenu,
             staff: pulledStaff || prev.staff,
             orders: nextOrders,
             cart: nextCart,
+            appliedCoupon: nextAppliedCoupon,
+            stars: nextStars,
+            reel: nextReel,
+            review: nextReview,
             counterBusinessDate: todayBizDate,
             ctr: highestCtr,
             usedCountersToday: mergedUsed,
@@ -2843,6 +3084,9 @@ export function TadkaProvider({
         setActiveTable,
         resetDemoState,
         sheetOrdersToday,
+        proofSubmissions,
+        submitSocialProof,
+        decideSocialProof,
         updateSheetOrderStatus,
         toggleSheetOrderRush,
         syncToGoogleSheets,

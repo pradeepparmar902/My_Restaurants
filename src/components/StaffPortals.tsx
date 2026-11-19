@@ -1709,6 +1709,191 @@ export function RewardRulesMasterContent() {
   );
 }
 
+function RewardApprovalsSection({
+  isOpen,
+  onToggle,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  const {
+    S,
+    proofSubmissions,
+    decideSocialProof,
+    pullFromGoogleSheets,
+    updateState,
+  } = useTadka();
+
+  const pendingProofs = proofSubmissions.filter((p) => p.status === 'PENDING');
+  const decidedProofs = proofSubmissions
+    .filter((p) => p.status !== 'PENDING')
+    .slice(0, 10);
+  const pendingCount = pendingProofs.length + (S.reel === 'wait' ? 1 : 0);
+
+  return (
+    <CollapsibleSection
+      title="🎬 Reward Approvals"
+      badge={pendingCount > 0 ? `${pendingCount} pending` : undefined}
+      isOpen={isOpen}
+      onToggle={() => {
+        if (!isOpen) pullFromGoogleSheets();
+        onToggle();
+      }}
+    >
+      <div className="row sp" style={{ marginBottom: '10px' }}>
+        <span className="mu" style={{ fontSize: '12px' }}>
+          Verify customer Reels, Posts &amp; Google Reviews before releasing rewards
+        </span>
+        <button
+          type="button"
+          className="chip"
+          style={{ fontSize: '11px' }}
+          onClick={() => pullFromGoogleSheets()}
+        >
+          🔄 Refresh Queue
+        </button>
+      </div>
+
+      {S.reel === 'wait' && (
+        <div
+          className="row sp"
+          style={{
+            marginBottom: '8px',
+            padding: '8px 10px',
+            borderRadius: '8px',
+            background: 'rgba(255,255,255,0.05)',
+          }}
+        >
+          <span>
+            🎬 Table {S.activeTable} reel
+            {S.reelCaption ? ` (“${S.reelCaption}”)` : ''}
+          </span>
+          <button
+            className="chip on"
+            onClick={() => updateState((p) => ({ ...p, reel: 'ok' }))}
+          >
+            Approve 10%
+          </button>
+        </div>
+      )}
+
+      {pendingProofs.length === 0 && decidedProofs.length === 0 && S.reel !== 'wait' && (
+        <p className="mu">
+          No customer proof submissions yet. When a customer submits a Reel/Post link or Google Reviewer name, it will appear here.
+        </p>
+      )}
+
+      {pendingProofs.length > 0 && (
+        <div style={{ display: 'grid', gap: '8px', marginBottom: '10px' }}>
+          {pendingProofs.map((p) => (
+            <div
+              key={p.id}
+              style={{
+                padding: '10px',
+                borderRadius: '10px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(251,191,36,0.35)',
+              }}
+            >
+              <div className="row sp" style={{ marginBottom: '4px', gap: '8px' }}>
+                <strong style={{ fontSize: '13px' }}>
+                  {p.kind === 'review' ? '⭐ Google Review' : `🎬 ${p.platform}`}
+                </strong>
+                <span className="mu" style={{ fontSize: '11px' }}>
+                  Counter {p.counterNo || '—'} · {p.customerMob || 'Guest'}
+                </span>
+              </div>
+              {p.note && (
+                <div style={{ fontSize: '12px', marginBottom: '4px' }}>
+                  Note: {p.note}
+                </div>
+              )}
+              {p.proofUrl && (
+                <div style={{ marginBottom: '8px' }}>
+                  <a
+                    href={p.proofUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: '#93c5fd', fontSize: '12px', wordBreak: 'break-all' }}
+                  >
+                    🔗 Open Customer Proof ({p.proofUrl}) ↗
+                  </a>
+                </div>
+              )}
+              <div className="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="chip on"
+                  onClick={() => decideSocialProof(p.id, 'APPROVED', 'COUPON')}
+                >
+                  🎟️ Approve Coupon
+                </button>
+                <button
+                  type="button"
+                  className="chip on"
+                  onClick={() => decideSocialProof(p.id, 'APPROVED', 'STAR')}
+                >
+                  ⭐ Approve +1 Star
+                </button>
+                <button
+                  type="button"
+                  className="chip on"
+                  onClick={() => decideSocialProof(p.id, 'APPROVED', 'DISCOUNT')}
+                >
+                  💸 Approve Discount
+                </button>
+                <button
+                  type="button"
+                  className="chip"
+                  style={{ borderColor: 'rgba(248,113,113,0.5)' }}
+                  onClick={() => decideSocialProof(p.id, 'REJECTED')}
+                >
+                  ❌ Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {decidedProofs.length > 0 && (
+        <div style={{ marginTop: '8px' }}>
+          <div className="mu" style={{ fontSize: '11px', marginBottom: '6px' }}>
+            Recent Decisions
+          </div>
+          <div style={{ display: 'grid', gap: '5px' }}>
+            {decidedProofs.map((p) => (
+              <div
+                key={p.id}
+                className="row sp"
+                style={{
+                  fontSize: '11px',
+                  padding: '6px 8px',
+                  borderRadius: '8px',
+                  background: 'rgba(0,0,0,0.2)',
+                  gap: '8px',
+                }}
+              >
+                <span style={{ minWidth: 0 }}>
+                  <strong>{p.kind === 'review' ? '⭐ Google' : p.platform}</strong>
+                  {' · '}
+                  {p.customerMob || 'Guest'}
+                  {p.note ? ` (${p.note})` : ''}
+                </span>
+                <span className={`chip ${p.status === 'APPROVED' ? 'on' : ''}`} style={{ fontSize: '10px' }}>
+                  {p.status === 'APPROVED'
+                    ? `✅ ${p.rewardType || 'APPROVED'}${p.rewardValue ? ` (${p.rewardValue})` : ''}`
+                    : '❌ REJECTED'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </CollapsibleSection>
+  );
+}
+
 export function OwnerPortalView() {
   const { S, sheetOrdersToday, updateState, say } = useTadka();
   const [offerMsg, setOfferMsg] = useState(
@@ -1808,31 +1993,10 @@ export function OwnerPortalView() {
         <BillForOpenSessionCard />
       </CollapsibleSection>
 
-      <CollapsibleSection
-        title="🎬 Reward Approvals"
-        badge={S.reel === 'wait' ? '1 pending' : undefined}
+      <RewardApprovalsSection
         isOpen={!!openSections.rewards}
         onToggle={() => toggleSection('rewards')}
-      >
-        {S.reel === 'wait' ? (
-          <div className="row sp">
-            <span>
-              🎬 Table {S.activeTable} reel
-              {S.reelCaption ? ` (“${S.reelCaption}”)` : ''}
-            </span>
-            <button
-              className="chip on"
-              onClick={() => updateState((p) => ({ ...p, reel: 'ok' }))}
-            >
-              Approve 10%
-            </button>
-          </div>
-        ) : (
-          <p className="mu">
-            Nothing waiting. Upload a reel as a customer to see it here.
-          </p>
-        )}
-      </CollapsibleSection>
+      />
 
       <CollapsibleSection
         title="🎁 Rewards, Discounts, Coupons &amp; Stars Master"
@@ -2379,6 +2543,11 @@ export function AdminPortalView() {
           Save &amp; Sync GST Settings
         </button>
       </CollapsibleSection>
+
+      <RewardApprovalsSection
+        isOpen={!!openAdminSections.rewards}
+        onToggle={() => toggleAdminSection('rewards')}
+      />
 
       <CollapsibleSection
         title="🎁 Rewards, Discounts, Coupons &amp; Stars Master"
