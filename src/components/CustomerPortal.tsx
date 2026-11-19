@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import { Language, PaymentMethod } from '@/types/tadka';
-import { ORDER_STATUS_LABELS } from '@/lib/constants';
+import { DEFAULT_REWARD_RULES, ORDER_STATUS_LABELS } from '@/lib/constants';
 import { normalizeMobile } from '@/lib/helpers';
 import {
   ConnectedAccountsCard,
@@ -808,6 +808,8 @@ export function BillTabView() {
   const [customSplitMobs, setCustomSplitMobs] = useState<string[]>([]);
   const [sentWaMobs, setSentWaMobs] = useState<string[]>([]);
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
+  const [couponInput, setCouponInput] = useState('');
+  const rules = S.googleConfig?.rewardRules || DEFAULT_REWARD_RULES;
 
   if (!S.status) {
     return (
@@ -1503,14 +1505,32 @@ export function BillTabView() {
         </div>
         {S.reel === 'ok' && (
           <div className="line" style={{ color: 'var(--mn)' }}>
-            <span>Reel discount</span>
-            <span>−₹{Math.round(s * 0.1)}</span>
+            <span>Reel discount ({rules.reelDiscountPercent}%)</span>
+            <span>−₹{Math.round(s * ((rules.reelDiscountPercent ?? 10) / 100))}</span>
           </div>
         )}
-        {S.review && (
+        {S.review && s >= (rules.reviewMinBill ?? 0) && (
           <div className="line" style={{ color: 'var(--mn)' }}>
             <span>Google review</span>
-            <span>−₹50</span>
+            <span>−₹{rules.reviewDiscountInr ?? 50}</span>
+          </div>
+        )}
+        {S.shared && (rules.socialShareDiscountInr ?? 0) > 0 && (
+          <div className="line" style={{ color: 'var(--mn)' }}>
+            <span>Social share reward</span>
+            <span>−₹{rules.socialShareDiscountInr}</span>
+          </div>
+        )}
+        {S.starClaimed && (rules.starFreeValueInr ?? 0) > 0 && (
+          <div className="line" style={{ color: 'var(--mn)' }}>
+            <span>⭐ {rules.starFreeRewardLabel}</span>
+            <span>−₹{rules.starFreeValueInr}</span>
+          </div>
+        )}
+        {S.appliedCoupon && disc() > 0 && (
+          <div className="line" style={{ color: 'var(--mn)' }}>
+            <span>🎟️ Coupon ({S.appliedCoupon})</span>
+            <span>Applied</span>
           </div>
         )}
         {gstEnabled && g > 0 && (
@@ -1526,6 +1546,98 @@ export function BillTabView() {
           <span>Total</span>
           <span>₹{t}</span>
         </div>
+      </div>
+
+      {/* Coupon, Referral & Star Free Reward */}
+      <div className="card">
+        <b>🎟️ Apply Coupon / Referral Code</b>
+        {S.appliedCoupon ? (
+          <div className="row sp" style={{ marginTop: '8px' }}>
+            <span>
+              ✅ Code <b>{S.appliedCoupon}</b> applied
+            </span>
+            <button
+              className="chip"
+              onClick={() => updateState((p) => ({ ...p, appliedCoupon: '' }))}
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="row" style={{ gap: '6px', marginTop: '8px' }}>
+              <input
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                placeholder={`Try ${rules.couponCode || 'TADKA50'} or ${
+                  rules.referralCode || 'FRIEND50'
+                }`}
+                className="inp"
+                style={{ flex: 1 }}
+              />
+              <button
+                className="chip on"
+                onClick={() => {
+                  const code = couponInput.trim().toUpperCase();
+                  if (!code) {
+                    say('Enter a coupon or referral code');
+                    return;
+                  }
+                  const isPromo =
+                    rules.couponCode &&
+                    code === rules.couponCode.trim().toUpperCase();
+                  const isRef =
+                    rules.referralCode &&
+                    code === rules.referralCode.trim().toUpperCase();
+                  if (!isPromo && !isRef) {
+                    say('Invalid coupon or referral code');
+                    return;
+                  }
+                  const minRequired = isPromo
+                    ? rules.couponMinBill || 0
+                    : rules.referralMinBill || 0;
+                  if (s < minRequired) {
+                    say(`Minimum bill of ₹${minRequired} required for ${code}`);
+                    return;
+                  }
+                  updateState((p) => ({ ...p, appliedCoupon: code }));
+                  setCouponInput('');
+                  say(`Coupon ${code} applied! 🎉`);
+                }}
+              >
+                Apply
+              </button>
+            </div>
+            <p className="mu" style={{ fontSize: '11px', marginTop: '6px' }}>
+              {rules.couponCode
+                ? `Promo: ${rules.couponCode} (${
+                    rules.couponType === 'percent'
+                      ? `${rules.couponValue}% off`
+                      : `₹${rules.couponValue} off`
+                  }${rules.couponMinBill > 0 ? ` on ₹${rules.couponMinBill}+` : ''})`
+                : ''}
+              {rules.referralCode
+                ? ` · Referral: ${rules.referralCode} (₹${rules.referralDiscountInr} off${
+                    rules.referralMinBill > 0 ? ` on ₹${rules.referralMinBill}+` : ''
+                  })`
+                : ''}
+            </p>
+          </>
+        )}
+        {S.stars >= (rules.starsTarget || 5) && !S.starClaimed && (
+          <button
+            className="btn alt"
+            style={{ marginTop: '10px' }}
+            onClick={() => {
+              updateState((p) => ({ ...p, starClaimed: true }));
+              say(
+                `Claimed ${rules.starFreeRewardLabel} (−₹${rules.starFreeValueInr}) 🎉`
+              );
+            }}
+          >
+            ⭐ Claim {rules.starFreeRewardLabel} (−₹{rules.starFreeValueInr})
+          </button>
+        )}
       </div>
 
       <div className="card">

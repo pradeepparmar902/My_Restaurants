@@ -8,7 +8,7 @@ import {
   formatItemsSummary,
   getCurrentBusinessDate,
 } from '@/lib/helpers';
-import { ORDER_STATUS_LABELS } from '@/lib/constants';
+import { DEFAULT_REWARD_RULES, ORDER_STATUS_LABELS } from '@/lib/constants';
 
 export type SheetTabName =
   | 'Daily_Counters'
@@ -27,7 +27,12 @@ export function buildSheetRowsForState(
   state: AppState
 ): Record<SheetTabName, (string | number | boolean)[][]> {
   const subtotal = getSubtotal(state.menu, state.cart);
-  const discount = getDiscount(subtotal, state.reel, state.review);
+  const rewardRules = state.googleConfig?.rewardRules || DEFAULT_REWARD_RULES;
+  const discount = getDiscount(subtotal, state.reel, state.review, rewardRules, {
+    appliedCoupon: state.appliedCoupon,
+    shared: state.shared,
+    starClaimed: state.starClaimed,
+  });
   const gstEnabled = state.googleConfig?.gstEnabled !== false;
   const gstRate = state.googleConfig?.gstRate ?? 5;
   const gstMode = state.googleConfig?.gstMode === 'item' ? 'item' : 'bill';
@@ -54,6 +59,7 @@ export function buildSheetRowsForState(
     ['gst_rate', gstRate, new Date().toISOString()],
     ['gst_mode', gstMode, new Date().toISOString()],
     ['gstin', state.googleConfig?.gstin || '', new Date().toISOString()],
+    ['reward_rules_json', JSON.stringify(rewardRules), new Date().toISOString()],
     ['counter_mode', state.cmode, new Date().toISOString()],
     ['whatsapp_final_bill', state.wab, new Date().toISOString()],
     ['counter_business_date', businessDateToday, new Date().toISOString()],
@@ -682,6 +688,16 @@ export function parseConfigFromSheetRows(
       cfg.gstMode = val;
     }
     if (key === 'gstin' && val) cfg.gstin = val;
+    if (key === 'reward_rules_json' && val) {
+      try {
+        const parsed = JSON.parse(val);
+        if (parsed && typeof parsed === 'object') {
+          cfg.rewardRules = { ...DEFAULT_REWARD_RULES, ...parsed };
+        }
+      } catch {
+        // ignore invalid JSON
+      }
+    }
   }
   return Object.keys(cfg).length > 0 ? cfg : null;
 }

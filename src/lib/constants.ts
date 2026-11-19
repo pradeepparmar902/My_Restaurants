@@ -1,4 +1,26 @@
-import { AppState, Dish, StaffMember, Permission, StaffRoleName, DiningTable } from '@/types/tadka';
+import { AppState, Dish, StaffMember, Permission, StaffRoleName, DiningTable, RewardRulesConfig } from '@/types/tadka';
+
+export const DEFAULT_REWARD_RULES: RewardRulesConfig = {
+  minBillForStar: 0,
+  starsTarget: 5,
+  starFreeRewardLabel: 'Free Dessert (Gulab Jamun)',
+  starFreeValueInr: 80,
+  couponCode: 'TADKA50',
+  couponType: 'flat',
+  couponValue: 50,
+  couponMinBill: 250,
+  referralCode: 'FRIEND50',
+  referralDiscountInr: 50,
+  referralMinBill: 199,
+  referralBonusStars: 1,
+  reviewDiscountInr: 50,
+  reviewMinBill: 0,
+  reviewBonusStars: 0,
+  reelDiscountPercent: 10,
+  socialSharePoints: 10,
+  socialShareDiscountInr: 0,
+  socialShareBonusStars: 0,
+};
 
 export const INITIAL_MENU: Dish[] = [
   {
@@ -204,6 +226,8 @@ export const INITIAL_STATE: AppState = {
     { id: 'samp-2', no: 'DEMO-2', t: 6, a: 320, s: 'In kitchen' },
   ],
   spaid: 0,
+  appliedCoupon: '',
+  starClaimed: false,
 
   cc: '+91',
   me: { mob: '' },

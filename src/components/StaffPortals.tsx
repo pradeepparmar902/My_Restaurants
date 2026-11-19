@@ -2,8 +2,12 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
-import { StaffRoleName } from '@/types/tadka';
-import { ORDER_STATUS_LABELS, ROLE_DESCRIPTIONS } from '@/lib/constants';
+import { RewardRulesConfig, StaffRoleName } from '@/types/tadka';
+import {
+  DEFAULT_REWARD_RULES,
+  ORDER_STATUS_LABELS,
+  ROLE_DESCRIPTIONS,
+} from '@/lib/constants';
 import {
   getCurrentBusinessDate,
   getDiscount,
@@ -1343,6 +1347,368 @@ function CollapsibleSection({
   );
 }
 
+export function RewardRulesMasterContent() {
+  const { S, saveGoogleConfig, syncToGoogleSheets, say } = useTadka();
+  const [rewardRulesInput, setRewardRulesInput] = useState<RewardRulesConfig>(
+    S.googleConfig.rewardRules || DEFAULT_REWARD_RULES
+  );
+
+  return (
+    <>
+      <p className="mu" style={{ margin: '0 0 10px', fontSize: '12px' }}>
+        Configure minimum bill conditions, star targets, free rewards, coupon
+        codes, referral codes, and social/review discounts.
+      </p>
+
+      <div
+        style={{
+          padding: '10px',
+          borderRadius: '10px',
+          background: 'var(--bg)',
+          border: '1px solid #382562',
+          marginBottom: '10px',
+        }}
+      >
+        <b>⭐ Stars &amp; Free Item Rules</b>
+        <div className="row" style={{ gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '130px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>
+              Min Bill ₹ for 1 Star (0 = any bill)
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={rewardRulesInput.minBillForStar}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  minBillForStar: Math.max(0, Number(e.target.value) || 0),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '130px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>
+              Stars Needed for Free Reward
+            </div>
+            <input
+              type="number"
+              min="1"
+              max="20"
+              value={rewardRulesInput.starsTarget}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  starsTarget: Math.max(1, Number(e.target.value) || 5),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+        <div className="row" style={{ gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 2, minWidth: '160px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>
+              Free Reward Name
+            </div>
+            <input
+              value={rewardRulesInput.starFreeRewardLabel}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  starFreeRewardLabel: e.target.value,
+                }))
+              }
+              placeholder="Free Dessert (Gulab Jamun)"
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '100px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>
+              Free Value (₹ Off)
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={rewardRulesInput.starFreeValueInr}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  starFreeValueInr: Math.max(0, Number(e.target.value) || 0),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          padding: '10px',
+          borderRadius: '10px',
+          background: 'var(--bg)',
+          border: '1px solid #382562',
+          marginBottom: '10px',
+        }}
+      >
+        <b>🎟️ Promo Coupon Code</b>
+        <div className="row" style={{ gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '120px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>Coupon Code</div>
+            <input
+              value={rewardRulesInput.couponCode}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  couponCode: e.target.value.toUpperCase(),
+                }))
+              }
+              placeholder="TADKA50"
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '110px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>Type</div>
+            <select
+              value={rewardRulesInput.couponType}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  couponType: e.target.value === 'percent' ? 'percent' : 'flat',
+                }))
+              }
+              className="sel-cc"
+              style={{ width: '100%' }}
+            >
+              <option value="flat">₹ Flat Off</option>
+              <option value="percent">% Off</option>
+            </select>
+          </div>
+        </div>
+        <div className="row" style={{ gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '110px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>
+              Discount ({rewardRulesInput.couponType === 'percent' ? '%' : '₹'})
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={rewardRulesInput.couponValue}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  couponValue: Math.max(0, Number(e.target.value) || 0),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '120px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>
+              Min Bill ₹ (0 = any)
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={rewardRulesInput.couponMinBill}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  couponMinBill: Math.max(0, Number(e.target.value) || 0),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          padding: '10px',
+          borderRadius: '10px',
+          background: 'var(--bg)',
+          border: '1px solid #382562',
+          marginBottom: '10px',
+        }}
+      >
+        <b>🤝 Referral Free / Discount Code</b>
+        <div className="row" style={{ gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '110px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>Referral Code</div>
+            <input
+              value={rewardRulesInput.referralCode}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  referralCode: e.target.value.toUpperCase(),
+                }))
+              }
+              placeholder="FRIEND50"
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '90px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>₹ Off</div>
+            <input
+              type="number"
+              min="0"
+              value={rewardRulesInput.referralDiscountInr}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  referralDiscountInr: Math.max(0, Number(e.target.value) || 0),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '90px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>Min Bill ₹</div>
+            <input
+              type="number"
+              min="0"
+              value={rewardRulesInput.referralMinBill}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  referralMinBill: Math.max(0, Number(e.target.value) || 0),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          padding: '10px',
+          borderRadius: '10px',
+          background: 'var(--bg)',
+          border: '1px solid #382562',
+          marginBottom: '10px',
+        }}
+      >
+        <b>📣 Social Media &amp; Google Review Rewards</b>
+        <div className="row" style={{ gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '110px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>Review ₹ Off</div>
+            <input
+              type="number"
+              min="0"
+              value={rewardRulesInput.reviewDiscountInr}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  reviewDiscountInr: Math.max(0, Number(e.target.value) || 0),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '110px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>Review Min Bill ₹</div>
+            <input
+              type="number"
+              min="0"
+              value={rewardRulesInput.reviewMinBill}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  reviewMinBill: Math.max(0, Number(e.target.value) || 0),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '110px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>Reel % Off</div>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={rewardRulesInput.reelDiscountPercent}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  reelDiscountPercent: Math.max(0, Number(e.target.value) || 0),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+        <div className="row" style={{ gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: '110px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>
+              Social Share Bonus Pts
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={rewardRulesInput.socialSharePoints}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  socialSharePoints: Math.max(0, Number(e.target.value) || 0),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: '110px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>
+              Social Share ₹ Off
+            </div>
+            <input
+              type="number"
+              min="0"
+              value={rewardRulesInput.socialShareDiscountInr}
+              onChange={(e) =>
+                setRewardRulesInput((p) => ({
+                  ...p,
+                  socialShareDiscountInr: Math.max(0, Number(e.target.value) || 0),
+                }))
+              }
+              className="inp"
+              style={{ width: '100%' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <button
+        className="btn alt"
+        onClick={async () => {
+          const nextCfg = { rewardRules: rewardRulesInput };
+          saveGoogleConfig(nextCfg);
+          await syncToGoogleSheets(nextCfg);
+          say('Reward, Coupon & Star rules saved & synced ✅');
+        }}
+      >
+        Save &amp; Sync Reward Rules
+      </button>
+    </>
+  );
+}
+
 export function OwnerPortalView() {
   const { S, sheetOrdersToday, updateState, say } = useTadka();
   const [offerMsg, setOfferMsg] = useState(
@@ -1353,6 +1719,7 @@ export function OwnerPortalView() {
     counter: false,
     openSession: false,
     rewards: false,
+    rewardMaster: false,
     bestsellers: false,
     growth: false,
     offer: false,
@@ -1368,6 +1735,7 @@ export function OwnerPortalView() {
       counter: val,
       openSession: val,
       rewards: val,
+      rewardMaster: val,
       bestsellers: val,
       growth: val,
       offer: val,
@@ -1464,6 +1832,15 @@ export function OwnerPortalView() {
             Nothing waiting. Upload a reel as a customer to see it here.
           </p>
         )}
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="🎁 Rewards, Discounts, Coupons &amp; Stars Master"
+        badge={S.googleConfig.rewardRules?.couponCode || DEFAULT_REWARD_RULES.couponCode}
+        isOpen={!!openSections.rewardMaster}
+        onToggle={() => toggleSection('rewardMaster')}
+      >
+        <RewardRulesMasterContent />
       </CollapsibleSection>
 
       <CollapsibleSection
@@ -1669,6 +2046,7 @@ export function AdminPortalView() {
     giveAccess: false,
     whatsappBill: false,
     gstSettings: false,
+    rewardMaster: false,
     loginTest: false,
     menuAdmin: false,
     tablesQr: false,
@@ -1686,6 +2064,7 @@ export function AdminPortalView() {
       giveAccess: val,
       whatsappBill: val,
       gstSettings: val,
+      rewardMaster: val,
       loginTest: val,
       menuAdmin: val,
       tablesQr: val,
@@ -1999,6 +2378,15 @@ export function AdminPortalView() {
         >
           Save &amp; Sync GST Settings
         </button>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="🎁 Rewards, Discounts, Coupons &amp; Stars Master"
+        badge={S.googleConfig.rewardRules?.couponCode || DEFAULT_REWARD_RULES.couponCode}
+        isOpen={!!openAdminSections.rewardMaster}
+        onToggle={() => toggleAdminSection('rewardMaster')}
+      >
+        <RewardRulesMasterContent />
       </CollapsibleSection>
 
       <CollapsibleSection

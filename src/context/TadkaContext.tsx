@@ -12,7 +12,7 @@ import {
   StaffRoleName,
   Dish,
 } from '@/types/tadka';
-import { INITIAL_STATE, ORDER_STATUS_LABELS } from '@/lib/constants';
+import { DEFAULT_REWARD_RULES, INITIAL_STATE, ORDER_STATUS_LABELS } from '@/lib/constants';
 import {
   cleanCounterNumber,
   extractUserSessionSnapshot,
@@ -449,13 +449,37 @@ export function TadkaProvider({
   const sub = useCallback(() => getSubtotal(S.menu, S.cart), [S.menu, S.cart]);
   const dsub = useCallback(() => getSubtotal(S.menu, S.draft), [S.menu, S.draft]);
   const cnt = useCallback(() => getDraftCount(S.draft), [S.draft]);
-  const disc = useCallback(
-    () => getDiscount(getSubtotal(S.menu, S.cart), S.reel, S.review),
-    [S.menu, S.cart, S.reel, S.review]
-  );
+  const disc = useCallback(() => {
+    const rules = S.googleConfig?.rewardRules || DEFAULT_REWARD_RULES;
+    return getDiscount(
+      getSubtotal(S.menu, S.cart),
+      S.reel,
+      S.review,
+      rules,
+      {
+        appliedCoupon: S.appliedCoupon,
+        shared: S.shared,
+        starClaimed: S.starClaimed,
+      }
+    );
+  }, [
+    S.menu,
+    S.cart,
+    S.reel,
+    S.review,
+    S.googleConfig?.rewardRules,
+    S.appliedCoupon,
+    S.shared,
+    S.starClaimed,
+  ]);
   const gst = useCallback(() => {
     const s = getSubtotal(S.menu, S.cart);
-    const d = getDiscount(s, S.reel, S.review);
+    const rules = S.googleConfig?.rewardRules || DEFAULT_REWARD_RULES;
+    const d = getDiscount(s, S.reel, S.review, rules, {
+      appliedCoupon: S.appliedCoupon,
+      shared: S.shared,
+      starClaimed: S.starClaimed,
+    });
     return getGST(
       s,
       d,
@@ -473,10 +497,19 @@ export function TadkaProvider({
     S.googleConfig?.gstEnabled,
     S.googleConfig?.gstRate,
     S.googleConfig?.gstMode,
+    S.googleConfig?.rewardRules,
+    S.appliedCoupon,
+    S.shared,
+    S.starClaimed,
   ]);
   const total = useCallback(() => {
     const s = getSubtotal(S.menu, S.cart);
-    const d = getDiscount(s, S.reel, S.review);
+    const rules = S.googleConfig?.rewardRules || DEFAULT_REWARD_RULES;
+    const d = getDiscount(s, S.reel, S.review, rules, {
+      appliedCoupon: S.appliedCoupon,
+      shared: S.shared,
+      starClaimed: S.starClaimed,
+    });
     return getTotal(
       s,
       d,
@@ -494,6 +527,10 @@ export function TadkaProvider({
     S.googleConfig?.gstEnabled,
     S.googleConfig?.gstRate,
     S.googleConfig?.gstMode,
+    S.googleConfig?.rewardRules,
+    S.appliedCoupon,
+    S.shared,
+    S.starClaimed,
   ]);
 
   const staffOf = useCallback(() => getActiveStaffMember(S.staff, S.me.mob), [S.staff, S.me.mob]);
@@ -1616,7 +1653,12 @@ export function TadkaProvider({
     (method: PaymentMethod, by: 'app' | 'owner') => {
       updateState((prev) => {
         const s = getSubtotal(prev.menu, prev.cart);
-        const d = getDiscount(s, prev.reel, prev.review);
+        const rules = prev.googleConfig?.rewardRules || DEFAULT_REWARD_RULES;
+        const d = getDiscount(s, prev.reel, prev.review, rules, {
+          appliedCoupon: prev.appliedCoupon,
+          shared: prev.shared,
+          starClaimed: prev.starClaimed,
+        });
         const gstEnabled = prev.googleConfig?.gstEnabled !== false;
         const gstRate = prev.googleConfig?.gstRate ?? 5;
         const gstMode = prev.googleConfig?.gstMode === 'item' ? 'item' : 'bill';
@@ -1670,14 +1712,22 @@ export function TadkaProvider({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ method }),
         }).catch(() => {});
+        const starsTarget = rules.starsTarget || 5;
+        const minBillForStar = rules.minBillForStar || 0;
+        const earnedStar = t >= minBillForStar ? 1 : 0;
+        const baseStars = prev.starClaimed
+          ? Math.max(0, prev.stars - starsTarget)
+          : prev.stars;
+        const nextStars = Math.min(starsTarget, baseStars + earnedStar);
+
         return {
           ...prev,
           orders: nextPaidOrders,
           pm: method,
           paid: true,
           pts: prev.pts + Math.floor(t / 10),
-          stars: Math.min(5, prev.stars + 1),
-          newStar: true,
+          stars: nextStars,
+          newStar: earnedStar > 0,
           hist: nextHist,
           dailyOrderHistory: nextDailyHistory,
           sess: prev.sess ? { ...prev.sess, status: 'paid' } : null,
@@ -1737,6 +1787,8 @@ export function TadkaProvider({
         media: null,
         shared: false,
         scratchReward: null,
+        appliedCoupon: '',
+        starClaimed: false,
         billSrc: '',
         M: {},
         cashReq: false,

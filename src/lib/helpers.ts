@@ -4,9 +4,10 @@ import {
   StaffMember,
   PortalRole,
   Permission,
+  RewardRulesConfig,
   UserSessionSnapshot,
 } from '@/types/tadka';
-import { ROLE_DEFAULT_PERMISSIONS } from '@/lib/constants';
+import { DEFAULT_REWARD_RULES, ROLE_DEFAULT_PERMISSIONS } from '@/lib/constants';
 
 export function normalizeMobile(rawInput: string, countryCode: string): string | null {
   let v = (rawInput || '').replace(/\D/g, '').replace(/^0+/, '');
@@ -34,10 +35,56 @@ export function getDraftCount(draft: Record<number, number>): number {
   return Object.values(draft).reduce((acc, qty) => acc + qty, 0);
 }
 
-export function getDiscount(subtotal: number, reel: 'wait' | 'ok' | null, review: boolean): number {
-  const reelDisc = reel === 'ok' ? Math.round(subtotal * 0.1) : 0;
-  const reviewDisc = review ? 50 : 0;
-  return Math.min(subtotal, reelDisc + reviewDisc);
+export function getDiscount(
+  subtotal: number,
+  reel: 'wait' | 'ok' | null,
+  review: boolean,
+  rules: RewardRulesConfig = DEFAULT_REWARD_RULES,
+  opts?: {
+    appliedCoupon?: string;
+    shared?: boolean;
+    starClaimed?: boolean;
+  }
+): number {
+  const reelDisc =
+    reel === 'ok'
+      ? Math.round(subtotal * ((rules.reelDiscountPercent ?? 10) / 100))
+      : 0;
+  const reviewDisc =
+    review && subtotal >= (rules.reviewMinBill ?? 0)
+      ? rules.reviewDiscountInr ?? 50
+      : 0;
+  const socialDisc =
+    opts?.shared && (rules.socialShareDiscountInr ?? 0) > 0
+      ? rules.socialShareDiscountInr
+      : 0;
+  const starFreeDisc = opts?.starClaimed ? rules.starFreeValueInr ?? 0 : 0;
+
+  let couponDisc = 0;
+  const code = (opts?.appliedCoupon || '').trim().toUpperCase();
+  if (code) {
+    if (
+      rules.couponCode &&
+      code === rules.couponCode.trim().toUpperCase() &&
+      subtotal >= (rules.couponMinBill ?? 0)
+    ) {
+      couponDisc =
+        rules.couponType === 'percent'
+          ? Math.round(subtotal * ((rules.couponValue ?? 0) / 100))
+          : rules.couponValue ?? 0;
+    } else if (
+      rules.referralCode &&
+      code === rules.referralCode.trim().toUpperCase() &&
+      subtotal >= (rules.referralMinBill ?? 0)
+    ) {
+      couponDisc = rules.referralDiscountInr ?? 0;
+    }
+  }
+
+  return Math.min(
+    subtotal,
+    reelDisc + reviewDisc + socialDisc + starFreeDisc + couponDisc
+  );
 }
 
 export function getGST(

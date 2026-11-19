@@ -136,6 +136,28 @@ export interface DiningTable {
   token: string;
 }
 
+export interface RewardRulesConfig {
+  minBillForStar: number;
+  starsTarget: number;
+  starFreeRewardLabel: string;
+  starFreeValueInr: number;
+  couponCode: string;
+  couponType: 'flat' | 'percent';
+  couponValue: number;
+  couponMinBill: number;
+  referralCode: string;
+  referralDiscountInr: number;
+  referralMinBill: number;
+  referralBonusStars: number;
+  reviewDiscountInr: number;
+  reviewMinBill: number;
+  reviewBonusStars: number;
+  reelDiscountPercent: number;
+  socialSharePoints: number;
+  socialShareDiscountInr: number;
+  socialShareBonusStars: number;
+}
+
 export interface GoogleCloudStorageConfig {
   enabled: boolean;
   appsScriptWebAppUrl: string;
@@ -151,6 +173,7 @@ export interface GoogleCloudStorageConfig {
   gstRate?: number;
   gstMode?: 'bill' | 'item';
   gstin?: string;
+  rewardRules?: RewardRulesConfig;
   lastSyncedAt?: string;
   lastSyncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
   lastSyncError?: string;
@@ -239,6 +262,8 @@ export interface AppState {
   media: 'snap' | 'reel' | null;
   shared: boolean;
   soc: Record<string, boolean>;
+  appliedCoupon?: string;
+  starClaimed?: boolean;
   scratchReward?: {
     label: string;
     code: string;
