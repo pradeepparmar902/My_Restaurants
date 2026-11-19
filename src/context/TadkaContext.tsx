@@ -12,6 +12,7 @@ import {
   StaffRoleName,
   Dish,
   SocialProofSubmission,
+  WorkspaceTenantRecord,
 } from '@/types/tadka';
 import { DEFAULT_REWARD_RULES, INITIAL_STATE, ORDER_STATUS_LABELS } from '@/lib/constants';
 import {
@@ -154,10 +155,44 @@ interface TadkaContextValue {
     caption?: string;
   }) => Promise<string | undefined>;
   saveGoogleConfig: (cfg: Partial<AppState['googleConfig']>) => void;
+  activeWorkspaceSlug: string;
+  isSuperAdmin: boolean;
+  unlockSuperAdmin: (pin: string) => boolean;
+  createAndProvisionWorkspace: (
+    payload: Omit<WorkspaceTenantRecord, 'createdAt'>
+  ) => Promise<string>;
 }
 
-const STORAGE_KEY = 'tadka_production_state_v1';
-const CHANNEL_NAME = 'tadka_realtime_channel';
+const STORAGE_KEY_BASE = 'tadka_production_state_v1';
+const CHANNEL_NAME_BASE = 'tadka_realtime_channel';
+const SUPER_ADMIN_MOBILES = ['+919800000001'];
+
+export function getActiveWorkspaceSlug(): string {
+  if (typeof window !== 'undefined') {
+    const sp = new URLSearchParams(window.location.search);
+    const w = (sp.get('w') || sp.get('workspace') || '').trim().toLowerCase();
+    if (w) return w.replace(/[^a-z0-9_-]/g, '');
+    const pathMatch = window.location.pathname.match(/\/r\/([a-z0-9_-]+)/i);
+    if (pathMatch?.[1]) return pathMatch[1].toLowerCase();
+  }
+  return (
+    process.env.NEXT_PUBLIC_DEFAULT_RESTAURANT_SLUG || 'tadka-truck'
+  ).toLowerCase();
+}
+
+function getWorkspaceStorageKey(): string {
+  const slug = getActiveWorkspaceSlug();
+  return slug === 'tadka-truck'
+    ? STORAGE_KEY_BASE
+    : `${STORAGE_KEY_BASE}__${slug}`;
+}
+
+function getWorkspaceChannelName(): string {
+  const slug = getActiveWorkspaceSlug();
+  return slug === 'tadka-truck'
+    ? CHANNEL_NAME_BASE
+    : `${CHANNEL_NAME_BASE}__${slug}`;
+}
 
 /**
  * Best-of-both-worlds browser persistence:
@@ -182,12 +217,14 @@ function saveEphemeralBrowserState(state: AppState) {
       sess: state.sess,
       googleConfig: {
         enabled: state.googleConfig?.enabled ?? true,
+        workspaceSlug:
+          state.googleConfig?.workspaceSlug || getActiveWorkspaceSlug(),
         appsScriptWebAppUrl: state.googleConfig?.appsScriptWebAppUrl || '',
         spreadsheetId: state.googleConfig?.spreadsheetId || '',
         driveFolderId: state.googleConfig?.driveFolderId || '',
       },
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
+    localStorage.setItem(getWorkspaceStorageKey(), JSON.stringify(minimal));
   } catch {
     // ignore storage quota errors
   }
@@ -223,6 +260,10 @@ export function TadkaProvider({
     Record<string, { proof: SocialProofSubmission; until: number }>
   >({});
   const appliedProofIdsRef = useRef<Set<string>>(new Set());
+  const [activeWorkspaceSlug, setActiveWorkspaceSlug] =
+    useState<string>('tadka-truck');
+  const [superAdminPinUnlocked, setSuperAdminPinUnlocked] =
+    useState<boolean>(false);
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -235,8 +276,10 @@ export function TadkaProvider({
 
   // Hydrate from localStorage + setup BroadcastChannel for cross-tab realtime sync
   useEffect(() => {
+    const currentSlug = getActiveWorkspaceSlug();
+    setActiveWorkspaceSlug(currentSlug);
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(getWorkspaceStorageKey());
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<AppState>;
         const todayBizDate = getCurrentBusinessDate();
@@ -416,7 +459,7 @@ export function TadkaProvider({
     isHydratedRef.current = true;
 
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      const bc = new BroadcastChannel(CHANNEL_NAME);
+      const bc = new BroadcastChannel(getWorkspaceChannelName());
       bc.onmessage = (ev) => {
         if (ev.data && ev.data.type === 'STATE_SYNC') {
           setS((prev) => ({
@@ -2039,14 +2082,56 @@ export function TadkaProvider({
         return;
       }
       const mob = S.lg.mob;
-      const staffMember = getActiveStaffMember(S.staff, mob);
+      const isWorkspaceOwner =
+        Boolean(S.googleConfig.ownerMobile) &&
+        S.googleConfig.ownerMobile === mob;
+      let staffMember = getActiveStaffMember(S.staff, mob);
+      if (!staffMember && isWorkspaceOwner) {
+        staffMember = {
+          id: 'st-owner',
+          n: S.googleConfig.ownerName || 'Restaurant Owner',
+          ph: mob,
+          r: 'Admin',
+          mg: true,
+          on: 1,
+        };
+      }
       const allowed = getAllowedPortals(staffMember);
-      const landingRole = allowed[1] || 'c';
+      const currentSlug = getActiveWorkspaceSlug();
+      const shouldLandOnOwnerPanel =
+        isWorkspaceOwner ||
+        (currentSlug !== 'tadka-truck' &&
+          staffMember?.r === 'Admin' &&
+          !SUPER_ADMIN_MOBILES.includes(mob));
+      const landingRole: PortalRole =
+        shouldLandOnOwnerPanel && allowed.includes('o')
+          ? 'o'
+          : allowed[1] || 'c';
       const hasExistingOrder = Boolean(
         S.sessionsByUser?.[mob]?.sess || (S.sess && S.sess.mob === mob)
       );
 
-      updateState((prev) => switchUserSessionInState(prev, mob, landingRole));
+      updateState((prev) => {
+        const nextStaff =
+          isWorkspaceOwner && !getActiveStaffMember(prev.staff, mob)
+            ? [
+                {
+                  id: 'st-owner',
+                  n: prev.googleConfig.ownerName || 'Restaurant Owner',
+                  ph: mob,
+                  r: 'Admin' as StaffRoleName,
+                  mg: true,
+                  on: 1,
+                },
+                ...prev.staff,
+              ]
+            : prev.staff;
+        return switchUserSessionInState(
+          { ...prev, staff: nextStaff },
+          mob,
+          landingRole
+        );
+      });
       // Also pull latest counter sequence from Google Sheet so a second browser/incognito tab never reuses a counter number
       pullFromGoogleSheetsRef.current?.(undefined, true);
 
@@ -2311,7 +2396,7 @@ export function TadkaProvider({
 
   const resetDemoState = useCallback(() => {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(getWorkspaceStorageKey());
     }
     setS(INITIAL_STATE);
     say('Reset to fresh demo state ✅');
@@ -3012,16 +3097,150 @@ export function TadkaProvider({
 
   pullFromGoogleSheetsRef.current = pullFromGoogleSheets;
 
+  const isSuperAdmin =
+    superAdminPinUnlocked ||
+    SUPER_ADMIN_MOBILES.includes(S.me.mob) ||
+    (activeWorkspaceSlug === 'tadka-truck' &&
+      getActiveStaffMember(S.staff, S.me.mob)?.r === 'Admin' &&
+      !S.googleConfig.ownerMobile);
+
+  const unlockSuperAdmin = useCallback(
+    (pin: string) => {
+      if (pin.trim().toUpperCase() === 'SUPER123') {
+        setSuperAdminPinUnlocked(true);
+        say('Super Admin Workspace Manager unlocked ✅');
+        return true;
+      }
+      say('Invalid Super Admin PIN');
+      return false;
+    },
+    [say]
+  );
+
+  const createAndProvisionWorkspace = useCallback(
+    async (payload: Omit<WorkspaceTenantRecord, 'createdAt'>) => {
+      const cleanSlug = payload.slug
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '-');
+      const record: WorkspaceTenantRecord = {
+        ...payload,
+        slug: cleanSlug,
+        createdAt: new Date().toISOString(),
+      };
+
+      // 1. Save in Master Workspace Registry & sync Master Sheet
+      const existingRegistry = S.googleConfig.workspacesRegistry || [];
+      const nextRegistry = [
+        record,
+        ...existingRegistry.filter((w) => w.slug !== cleanSlug),
+      ];
+      saveGoogleConfig({ workspacesRegistry: nextRegistry });
+      await syncToGoogleSheets({ workspacesRegistry: nextRegistry });
+
+      // 2. Provision the new Client Google Sheet (all 9 tabs + Owner in Staff_Master)
+      if (
+        record.appsScriptWebAppUrl?.startsWith('https://script.google.com/') &&
+        record.spreadsheetId
+      ) {
+        const ownerStaffList = [
+          ...(record.ownerMobile
+            ? [
+                {
+                  id: 'st-owner',
+                  n: record.ownerName || 'Owner',
+                  ph: record.ownerMobile,
+                  r: 'Admin' as StaffRoleName,
+                  mg: true,
+                  on: 1,
+                },
+              ]
+            : []),
+          ...INITIAL_STATE.staff,
+        ];
+        const clientInitialState: AppState = {
+          ...INITIAL_STATE,
+          staff: ownerStaffList,
+          googleConfig: {
+            ...INITIAL_STATE.googleConfig,
+            enabled: true,
+            workspaceSlug: cleanSlug,
+            restaurantName: record.restaurantName || cleanSlug,
+            ownerName: record.ownerName,
+            ownerMobile: record.ownerMobile,
+            spreadsheetId: record.spreadsheetId,
+            driveFolderId: record.driveFolderId,
+            appsScriptWebAppUrl: record.appsScriptWebAppUrl,
+          },
+        };
+        const sheetsPayload = buildSheetRowsForState(clientInitialState);
+        try {
+          await fetch(record.appsScriptWebAppUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'SYNC_ALL_SHEETS',
+              spreadsheetId: record.spreadsheetId,
+              driveFolderId: record.driveFolderId,
+              sheets: sheetsPayload,
+              timestamp: new Date().toISOString(),
+            }),
+          });
+        } catch {
+          // ignore network error
+        }
+      }
+
+      const baseUrl =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}${
+              window.location.pathname.includes('/My_Restaurants')
+                ? '/My_Restaurants'
+                : ''
+            }`
+          : 'https://pradeepparmar902.github.io/My_Restaurants';
+      const handoverUrl = `${baseUrl}/?w=${encodeURIComponent(cleanSlug)}${
+        record.spreadsheetId
+          ? `&s=${encodeURIComponent(record.spreadsheetId)}`
+          : ''
+      }`;
+      say(`Workspace "${record.restaurantName}" provisioned & ready ✅`);
+      return handoverUrl;
+    },
+    [S.googleConfig.workspacesRegistry, saveGoogleConfig, say, syncToGoogleSheets]
+  );
+
   // Commercial Multi-Tenant Startup Loader:
-  // On any new browser/device, load config from /config/restaurants.json (or NEXT_PUBLIC_REMOTE_CONFIG_JSON_URL),
-  // then auto-pull Menu, Staff & Restaurant_Config from that restaurant's Google Sheet!
+  // Resolves active workspace (?w=<slug>&s=<sheetId>), loads config from URL / restaurants.json / Master Sheet registry,
+  // then auto-pulls Menu, Staff & Restaurant_Config from that restaurant's isolated Google Sheet!
   useEffect(() => {
     let cancelled = false;
     async function bootstrapTenantConfig() {
       let tenantCfg: Partial<AppState['googleConfig']> = {};
-      const slug =
-        process.env.NEXT_PUBLIC_DEFAULT_RESTAURANT_SLUG || 'tadka-truck';
+      const slug = getActiveWorkspaceSlug();
+      setActiveWorkspaceSlug(slug);
 
+      let urlSheetId = '';
+      let urlDriveId = '';
+      let urlScript = '';
+      if (typeof window !== 'undefined') {
+        const sp = new URLSearchParams(window.location.search);
+        urlSheetId = (sp.get('s') || sp.get('sheet') || '').trim();
+        urlDriveId = (sp.get('d') || '').trim();
+        urlScript = (sp.get('u') || '').trim();
+      }
+
+      if (urlSheetId) {
+        tenantCfg = {
+          workspaceSlug: slug,
+          spreadsheetId: urlSheetId,
+          ...(urlDriveId ? { driveFolderId: urlDriveId } : {}),
+          ...(urlScript ? { appsScriptWebAppUrl: urlScript } : {}),
+        };
+      }
+
+      let masterDefaultSheetId = '';
       // Check both root path and GitHub Pages basePath
       const candidateUrls = [
         process.env.NEXT_PUBLIC_REMOTE_CONFIG_JSON_URL || '',
@@ -3036,12 +3255,17 @@ export function TadkaProvider({
           });
           if (res.ok) {
             const data = await res.json();
+            const defaultEntry =
+              data?.restaurants?.[data?.defaultRestaurant || 'tadka-truck'];
+            if (defaultEntry?.spreadsheetId) {
+              masterDefaultSheetId = defaultEntry.spreadsheetId;
+            }
             const entry =
               data?.restaurants?.[slug] ||
-              data?.restaurants?.[data?.defaultRestaurant] ||
-              data;
-            if (entry) {
+              (slug === 'tadka-truck' ? defaultEntry || data : null);
+            if (entry && !tenantCfg.spreadsheetId) {
               tenantCfg = {
+                workspaceSlug: slug,
                 appsScriptWebAppUrl: entry.appsScriptWebAppUrl || '',
                 spreadsheetId: entry.spreadsheetId || '',
                 driveFolderId: entry.driveFolderId || '',
@@ -3054,40 +3278,110 @@ export function TadkaProvider({
         }
       }
 
+      // If this is a dynamic client workspace (?w=client-slug) without &s= in URL, look up its Sheet ID from Master Sheet's workspaces_registry_json
+      if (
+        !tenantCfg.spreadsheetId &&
+        slug !== 'tadka-truck' &&
+        masterDefaultSheetId
+      ) {
+        try {
+          const gvizUrl = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(
+            masterDefaultSheetId
+          )}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(
+            'Restaurant_Config'
+          )}&headers=0&_=${Date.now()}`;
+          const res = await fetch(gvizUrl, { cache: 'no-store' });
+          if (res.ok) {
+            const txt = await res.text();
+            const start = txt.indexOf('{');
+            const end = txt.lastIndexOf('}');
+            if (start !== -1 && end !== -1) {
+              const json = JSON.parse(txt.slice(start, end + 1));
+              const rows: unknown[][] = (json?.table?.rows || []).map(
+                (r: { c?: ({ v?: unknown } | null)[] }) =>
+                  (r.c || []).map((cell) =>
+                    cell && cell.v !== undefined && cell.v !== null
+                      ? cell.v
+                      : ''
+                  )
+              );
+              const parsedMasterCfg = parseConfigFromSheetRows(rows);
+              const foundWs = parsedMasterCfg?.workspacesRegistry?.find(
+                (w) => w.slug.toLowerCase() === slug
+              );
+              if (foundWs) {
+                tenantCfg = {
+                  workspaceSlug: slug,
+                  restaurantName: foundWs.restaurantName,
+                  ownerName: foundWs.ownerName,
+                  ownerMobile: foundWs.ownerMobile,
+                  spreadsheetId: foundWs.spreadsheetId,
+                  driveFolderId: foundWs.driveFolderId,
+                  appsScriptWebAppUrl: foundWs.appsScriptWebAppUrl,
+                };
+              }
+            }
+          }
+        } catch {
+          // ignore master registry lookup error
+        }
+      }
+
       if (cancelled) return;
 
-      // Merge non-empty config fields from restaurants.json if current browser has blank fields
+      // Merge config fields for this isolated workspace
       setS((prev) => {
+        const isDifferentWorkspace =
+          prev.googleConfig.workspaceSlug &&
+          prev.googleConfig.workspaceSlug !== slug;
         const mergedCfg = {
           ...prev.googleConfig,
+          workspaceSlug: slug,
+          ...(tenantCfg.restaurantName
+            ? { restaurantName: tenantCfg.restaurantName }
+            : {}),
+          ...(tenantCfg.ownerName ? { ownerName: tenantCfg.ownerName } : {}),
+          ...(tenantCfg.ownerMobile
+            ? { ownerMobile: tenantCfg.ownerMobile }
+            : {}),
           appsScriptWebAppUrl:
-            prev.googleConfig.appsScriptWebAppUrl ||
             tenantCfg.appsScriptWebAppUrl ||
+            (!isDifferentWorkspace ? prev.googleConfig.appsScriptWebAppUrl : '') ||
             '',
           spreadsheetId:
-            prev.googleConfig.spreadsheetId || tenantCfg.spreadsheetId || '',
+            tenantCfg.spreadsheetId ||
+            (!isDifferentWorkspace ? prev.googleConfig.spreadsheetId : '') ||
+            '',
           driveFolderId:
-            prev.googleConfig.driveFolderId || tenantCfg.driveFolderId || '',
+            tenantCfg.driveFolderId ||
+            (!isDifferentWorkspace ? prev.googleConfig.driveFolderId : '') ||
+            '',
         };
         const next = { ...prev, googleConfig: mergedCfg };
         saveEphemeralBrowserState(next);
         return next;
       });
 
-      // Now auto-pull live Menu, Staff, and Restaurant_Config from the Google Sheet
-      await pullFromGoogleSheets(
-        {
-          appsScriptWebAppUrl:
-            S.googleConfig.appsScriptWebAppUrl ||
-            tenantCfg.appsScriptWebAppUrl ||
-            '',
-          spreadsheetId:
-            S.googleConfig.spreadsheetId || tenantCfg.spreadsheetId || '',
-          driveFolderId:
-            S.googleConfig.driveFolderId || tenantCfg.driveFolderId || '',
-        },
-        true
-      );
+      const targetSheetId =
+        tenantCfg.spreadsheetId || S.googleConfig.spreadsheetId || '';
+      const targetScriptUrl =
+        tenantCfg.appsScriptWebAppUrl ||
+        S.googleConfig.appsScriptWebAppUrl ||
+        '';
+      const targetDriveId =
+        tenantCfg.driveFolderId || S.googleConfig.driveFolderId || '';
+
+      if (targetSheetId || targetScriptUrl) {
+        await pullFromGoogleSheets(
+          {
+            workspaceSlug: slug,
+            appsScriptWebAppUrl: targetScriptUrl,
+            spreadsheetId: targetSheetId,
+            driveFolderId: targetDriveId,
+          },
+          true
+        );
+      }
     }
 
     bootstrapTenantConfig();
@@ -3164,6 +3458,10 @@ export function TadkaProvider({
         pullFromGoogleSheets,
         uploadMediaToDrive,
         saveGoogleConfig,
+        activeWorkspaceSlug,
+        isSuperAdmin,
+        unlockSuperAdmin,
+        createAndProvisionWorkspace,
       }}
     >
       {children}

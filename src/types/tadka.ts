@@ -173,8 +173,23 @@ export interface DietaryFilterOption {
   enabled: boolean;
 }
 
+export interface WorkspaceTenantRecord {
+  slug: string;
+  restaurantName: string;
+  ownerName: string;
+  ownerMobile: string;
+  spreadsheetId: string;
+  driveFolderId: string;
+  appsScriptWebAppUrl: string;
+  createdAt: string;
+}
+
 export interface GoogleCloudStorageConfig {
   enabled: boolean;
+  workspaceSlug?: string;
+  ownerName?: string;
+  ownerMobile?: string;
+  workspacesRegistry?: WorkspaceTenantRecord[];
   restaurantName?: string;
   restaurantTagline?: string;
   enabledLanguages?: Language[];

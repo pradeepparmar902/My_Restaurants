@@ -2186,9 +2186,413 @@ export function OwnerPortalView() {
   );
 }
 
+function extractGoogleIdFromUrl(raw: string, kind: 'sheet' | 'folder'): string {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  if (kind === 'sheet') {
+    const m = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (m?.[1]) return m[1];
+  } else {
+    const m = s.match(/\/folders\/([a-zA-Z0-9-_]+)/);
+    if (m?.[1]) return m[1];
+  }
+  return s;
+}
+
+function SuperAdminWorkspaceManagerSection({
+  isOpen,
+  onToggle,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  const {
+    S,
+    activeWorkspaceSlug,
+    isSuperAdmin,
+    unlockSuperAdmin,
+    createAndProvisionWorkspace,
+    say,
+  } = useTadka();
+
+  const [pinInput, setPinInput] = useState('');
+  const [wsName, setWsName] = useState('');
+  const [wsSlug, setWsSlug] = useState('');
+  const [wsOwnerName, setWsOwnerName] = useState('');
+  const [wsOwnerMob, setWsOwnerMob] = useState('');
+  const [wsSheetRaw, setWsSheetRaw] = useState('');
+  const [wsDriveRaw, setWsDriveRaw] = useState('');
+  const [wsScriptUrl, setWsScriptUrl] = useState(
+    S.googleConfig.appsScriptWebAppUrl || ''
+  );
+  const [provisioning, setProvisioning] = useState(false);
+  const [lastHandoverUrl, setLastHandoverUrl] = useState('');
+
+  // In any client workspace (?w=client-slug), completely hide Super Admin from the Restaurant Owner
+  if (!isSuperAdmin && activeWorkspaceSlug !== 'tadka-truck') {
+    return null;
+  }
+
+  const registry = S.googleConfig.workspacesRegistry || [];
+  const baseUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}${
+          window.location.pathname.includes('/My_Restaurants')
+            ? '/My_Restaurants'
+            : ''
+        }`
+      : 'https://pradeepparmar902.github.io/My_Restaurants';
+
+  return (
+    <CollapsibleSection
+      title="🏢 Super Admin — Multi-Workspace &amp; Client Handover"
+      badge={`${registry.length} clients`}
+      isOpen={isOpen}
+      onToggle={onToggle}
+    >
+      {!isSuperAdmin ? (
+        <div>
+          <p className="mu" style={{ margin: '0 0 8px', fontSize: '12px' }}>
+            Enter Super Admin Master PIN (<code>SUPER123</code>) or log in with
+            Super Admin mobile (<code>+919800000001</code>) to create &amp;
+            hand over isolated restaurant workspaces.
+          </p>
+          <div className="row" style={{ gap: '6px' }}>
+            <input
+              type="password"
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              placeholder="Super Admin PIN (SUPER123)"
+              className="inp"
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="chip on"
+              onClick={() => unlockSuperAdmin(pinInput)}
+            >
+              🔓 Unlock Super Admin
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div
+            style={{
+              padding: '8px 10px',
+              borderRadius: '8px',
+              background: 'rgba(92,242,192,0.1)',
+              border: '1px solid rgba(92,242,192,0.3)',
+              fontSize: '12px',
+            }}
+          >
+            🟢 <b>Super Admin Active</b> · Current Workspace:{' '}
+            <code>{activeWorkspaceSlug}</code>
+            <div className="mu" style={{ fontSize: '11px', marginTop: '3px' }}>
+              Each workspace has 100% isolated Google Sheet, Drive folder, Menu,
+              GST, Brand Profile &amp; Orders. When the Restaurant Owner logs in
+              with their mobile number, they land directly on their{' '}
+              <b>Owner Panel</b>.
+            </div>
+          </div>
+
+          <div className="mu" style={{ fontSize: '11px' }}>
+            🏪 Client Restaurant / Brand Name
+          </div>
+          <input
+            value={wsName}
+            onChange={(e) => {
+              const v = e.target.value;
+              setWsName(v);
+              setWsSlug(
+                v
+                  .toLowerCase()
+                  .trim()
+                  .replace(/[^a-z0-9]+/g, '-')
+                  .replace(/^-|-$/g, '')
+              );
+            }}
+            placeholder="e.g. Royal Dhaba"
+            className="inp"
+          />
+
+          <div className="mu" style={{ fontSize: '11px' }}>
+            🔗 Workspace Slug (URL identifier: <code>?w={wsSlug || 'royal-dhaba'}</code>)
+          </div>
+          <input
+            value={wsSlug}
+            onChange={(e) =>
+              setWsSlug(
+                e.target.value
+                  .toLowerCase()
+                  .replace(/[^a-z0-9_-]/g, '-')
+              )
+            }
+            placeholder="e.g. royal-dhaba"
+            className="inp"
+          />
+
+          <div className="row" style={{ gap: '6px' }}>
+            <div style={{ flex: 1 }}>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                👤 Owner Name
+              </div>
+              <input
+                value={wsOwnerName}
+                onChange={(e) => setWsOwnerName(e.target.value)}
+                placeholder="e.g. Rajesh Patel"
+                className="inp"
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                📱 Owner Login Mobile (lands on Owner Panel)
+              </div>
+              <CountryCodeMobileInput
+                id="ws-owner-mob"
+                value={wsOwnerMob}
+                onChange={setWsOwnerMob}
+              />
+            </div>
+          </div>
+
+          <div className="mu" style={{ fontSize: '11px' }}>
+            📊 Client&apos;s Google Sheet URL or Spreadsheet ID (Set Share → Anyone with link → Editor)
+          </div>
+          <input
+            value={wsSheetRaw}
+            onChange={(e) => setWsSheetRaw(e.target.value)}
+            placeholder="Paste new Google Sheet link or ID"
+            className="inp"
+          />
+
+          <div className="mu" style={{ fontSize: '11px' }}>
+            📁 Client&apos;s Google Drive Folder URL or ID (optional, for Reels/Screenshots)
+          </div>
+          <input
+            value={wsDriveRaw}
+            onChange={(e) => setWsDriveRaw(e.target.value)}
+            placeholder="Paste Google Drive folder link or ID"
+            className="inp"
+          />
+
+          <div className="row sp">
+            <span className="mu" style={{ fontSize: '11px' }}>
+              ⚙️ Apps Script Web App URL (writes to client&apos;s Sheet ID)
+            </span>
+            {S.googleConfig.appsScriptWebAppUrl && (
+              <button
+                type="button"
+                className="chip"
+                style={{ fontSize: '10px', padding: '2px 7px' }}
+                onClick={() =>
+                  setWsScriptUrl(S.googleConfig.appsScriptWebAppUrl)
+                }
+              >
+                ⚡ Use Master Script URL
+              </button>
+            )}
+          </div>
+          <input
+            value={wsScriptUrl}
+            onChange={(e) => setWsScriptUrl(e.target.value)}
+            placeholder="https://script.google.com/macros/s/.../exec"
+            className="inp"
+          />
+
+          <button
+            type="button"
+            className="btn alt"
+            disabled={provisioning}
+            onClick={async () => {
+              const cleanName = wsName.trim();
+              const cleanSlug = wsSlug
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9_-]/g, '-');
+              const cleanSheetId = extractGoogleIdFromUrl(wsSheetRaw, 'sheet');
+              const cleanDriveId = extractGoogleIdFromUrl(wsDriveRaw, 'folder');
+              if (!cleanName || !cleanSlug) {
+                say('Enter Restaurant Name and Workspace Slug');
+                return;
+              }
+              if (!cleanSheetId) {
+                say('Paste a dedicated Google Sheet URL or ID for this workspace');
+                return;
+              }
+              const normOwnerMob = wsOwnerMob.trim()
+                ? `${S.cc}${wsOwnerMob.replace(/\D/g, '')}`
+                : '';
+              setProvisioning(true);
+              try {
+                const url = await createAndProvisionWorkspace({
+                  slug: cleanSlug,
+                  restaurantName: cleanName,
+                  ownerName: wsOwnerName.trim() || 'Owner',
+                  ownerMobile: normOwnerMob,
+                  spreadsheetId: cleanSheetId,
+                  driveFolderId: cleanDriveId,
+                  appsScriptWebAppUrl:
+                    wsScriptUrl.trim() ||
+                    S.googleConfig.appsScriptWebAppUrl ||
+                    '',
+                });
+                setLastHandoverUrl(url);
+                setWsName('');
+                setWsSlug('');
+                setWsOwnerName('');
+                setWsOwnerMob('');
+                setWsSheetRaw('');
+                setWsDriveRaw('');
+              } finally {
+                setProvisioning(false);
+              }
+            }}
+          >
+            {provisioning
+              ? '⏳ Provisioning Client Sheet & Creating Workspace...'
+              : '🚀 Create, Provision Sheet & Generate Owner Handover Link'}
+          </button>
+
+          {lastHandoverUrl && (
+            <div
+              style={{
+                padding: '10px',
+                borderRadius: '10px',
+                background: 'rgba(92,242,192,0.12)',
+                border: '1px solid rgba(92,242,192,0.35)',
+                fontSize: '12px',
+              }}
+            >
+              <b>✅ Workspace Provisioned! Handover Link:</b>
+              <div
+                style={{
+                  wordBreak: 'break-all',
+                  margin: '4px 0 8px',
+                  color: '#93c5fd',
+                }}
+              >
+                {lastHandoverUrl}
+              </div>
+              <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="chip on"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(lastHandoverUrl);
+                    say('Owner Handover Link copied ✅');
+                  }}
+                >
+                  📋 Copy Handover Link
+                </button>
+                <a
+                  href={lastHandoverUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="chip"
+                  style={{ textDecoration: 'none' }}
+                >
+                  ↗️ Open Client Workspace
+                </a>
+              </div>
+            </div>
+          )}
+
+          {registry.length > 0 && (
+            <div style={{ marginTop: '6px' }}>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '6px' }}>
+                📋 Provisioned Client Workspaces ({registry.length})
+              </div>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {registry.map((w) => {
+                  const link = `${baseUrl}/?w=${encodeURIComponent(w.slug)}${
+                    w.spreadsheetId
+                      ? `&s=${encodeURIComponent(w.spreadsheetId)}`
+                      : ''
+                  }`;
+                  const waText =
+                    `🏪 *Welcome to ${w.restaurantName} Digital QR Ordering & Growth Platform!*\n\n` +
+                    `🔗 *Your Dedicated Workspace Link:*\n${link}\n\n` +
+                    `👤 *Owner Login Mobile:* ${w.ownerMobile || 'Your registered mobile'}\n` +
+                    `🔑 *Demo OTP:* 1234\n\n` +
+                    `Log in with your mobile number to open your *Owner Panel* & *Admin Settings* (Menu, GST, Brand Profile, Table QR Codes & Rewards).`;
+                  const waHref = `https://wa.me/${(w.ownerMobile || '').replace(
+                    /\D/g,
+                    ''
+                  )}?text=${encodeURIComponent(waText)}`;
+                  return (
+                    <div
+                      key={w.slug}
+                      style={{
+                        padding: '10px',
+                        borderRadius: '10px',
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        fontSize: '12px',
+                      }}
+                    >
+                      <div className="row sp" style={{ marginBottom: '4px' }}>
+                        <strong>
+                          🏪 {w.restaurantName}{' '}
+                          <span className="mu" style={{ fontWeight: 400 }}>
+                            (<code>?w={w.slug}</code>)
+                          </span>
+                        </strong>
+                        <span className="mu" style={{ fontSize: '11px' }}>
+                          Owner: {w.ownerName || '—'} ({w.ownerMobile || '—'})
+                        </span>
+                      </div>
+                      <div
+                        className="row"
+                        style={{ gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}
+                      >
+                        <button
+                          type="button"
+                          className="chip on"
+                          style={{ fontSize: '11px' }}
+                          onClick={() => {
+                            navigator.clipboard?.writeText(link);
+                            say(`Copied handover link for ${w.restaurantName} ✅`);
+                          }}
+                        >
+                          📋 Copy Owner Link
+                        </button>
+                        <a
+                          href={waHref}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="chip"
+                          style={{ fontSize: '11px', textDecoration: 'none' }}
+                        >
+                          📲 WhatsApp Handover to Owner
+                        </a>
+                        <a
+                          href={link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="chip"
+                          style={{ fontSize: '11px', textDecoration: 'none' }}
+                        >
+                          ↗️ Open Workspace
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </CollapsibleSection>
+  );
+}
+
 export function AdminPortalView() {
   const {
     S,
+    activeWorkspaceSlug,
     updateState,
     addStaff,
     toggleManagerAccess,
@@ -2399,6 +2803,11 @@ export function AdminPortalView() {
           </button>
         </div>
       </div>
+
+      <SuperAdminWorkspaceManagerSection
+        isOpen={!!openAdminSections.superAdmin}
+        onToggle={() => toggleAdminSection('superAdmin')}
+      />
 
       <CollapsibleSection
         title="👥 Team"
@@ -3377,7 +3786,13 @@ export function AdminPortalView() {
                         : ''
                     }`
                   : 'https://pradeepparmar902.github.io/My_Restaurants';
-              const qrTargetUrl = `${baseUrl}/?t=${encodeURIComponent(
+              const qrTargetUrl = `${baseUrl}/?w=${encodeURIComponent(
+                activeWorkspaceSlug
+              )}${
+                S.googleConfig.spreadsheetId
+                  ? `&s=${encodeURIComponent(S.googleConfig.spreadsheetId)}`
+                  : ''
+              }&t=${encodeURIComponent(
                 t.token
               )}&table=${t.id}&label=${encodeURIComponent(t.label)}`;
               const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(

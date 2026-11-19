@@ -64,8 +64,13 @@ export function buildSheetRowsForState(
 
   const Restaurant_Config: (string | number | boolean)[][] = [
     ['Config_Key', 'Config_Value', 'Updated_At'],
-    ['restaurant_slug', 'tadka-truck', new Date().toISOString()],
+    ['restaurant_slug', (state.googleConfig?.workspaceSlug || '').trim() || 'tadka-truck', new Date().toISOString()],
     ['restaurant_name', (state.googleConfig?.restaurantName || '').trim() || 'Tadka Truck', new Date().toISOString()],
+    ['owner_name', (state.googleConfig?.ownerName || '').trim(), new Date().toISOString()],
+    ['owner_mobile', (state.googleConfig?.ownerMobile || '').trim(), new Date().toISOString()],
+    ...(state.googleConfig?.workspacesRegistry && state.googleConfig.workspacesRegistry.length > 0
+      ? [['workspaces_registry_json', JSON.stringify(state.googleConfig.workspacesRegistry), new Date().toISOString()] as [string, string, string]]
+      : []),
     ['restaurant_tagline', (state.googleConfig?.restaurantTagline || '').trim(), new Date().toISOString()],
     ['enabled_languages', (state.googleConfig?.enabledLanguages?.length ? state.googleConfig.enabledLanguages : ['en', 'hi', 'gu']).join(','), new Date().toISOString()],
     ['menu_languages_json', JSON.stringify(state.googleConfig?.menuLanguages?.length ? state.googleConfig.menuLanguages : DEFAULT_MENU_LANGUAGES), new Date().toISOString()],
@@ -689,7 +694,20 @@ export function parseConfigFromSheetRows(
     if (!r || !r[0]) continue;
     const key = String(r[0]).trim();
     const val = String(r[1] ?? '').trim();
+    if (key === 'restaurant_slug' && val) cfg.workspaceSlug = val;
     if (key === 'restaurant_name' && val) cfg.restaurantName = val;
+    if (key === 'owner_name' && val) cfg.ownerName = val;
+    if (key === 'owner_mobile' && val) cfg.ownerMobile = val;
+    if (key === 'workspaces_registry_json' && val) {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) {
+          cfg.workspacesRegistry = parsed;
+        }
+      } catch {
+        // ignore invalid JSON
+      }
+    }
     if (key === 'restaurant_tagline') cfg.restaurantTagline = val;
     if (key === 'enabled_languages' && val) {
       const langs = val
