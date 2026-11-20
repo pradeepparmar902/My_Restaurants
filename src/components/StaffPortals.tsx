@@ -2468,13 +2468,14 @@ function CustomerGuideNotesContent() {
 }
 
 export function OwnerPortalView() {
-  const { S, sheetOrdersToday, updateState, say } = useTadka();
+  const { S, sheetOrdersToday, saveGoogleConfig, syncToGoogleSheets, updateState, say } = useTadka();
   const [offerMsg, setOfferMsg] = useState(
     '🔥 We miss you at Tadka Truck! Show this WhatsApp message today for 15% OFF your order + a free Gulab Jamun! 🍮'
   );
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     ownerGuide: false,
     customerGuide: false,
+    billingWorkflow: false,
     prepaidQueue: true,
     bills: true,
     counter: false,
@@ -2494,6 +2495,7 @@ export function OwnerPortalView() {
     setOpenSections({
       ownerGuide: val,
       customerGuide: val,
+      billingWorkflow: val,
       bills: val,
       counter: val,
       openSession: val,
@@ -2587,6 +2589,59 @@ export function OwnerPortalView() {
         onToggle={() => toggleSection('customerGuide')}
       >
         <CustomerGuideNotesContent />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="⚡ Restaurant Billing Model (Prepaid vs Postpaid)"
+        badge={S.googleConfig.billingModel === 'prepaid' ? '⚡ Prepaid (Pay First)' : '🍽️ Postpaid (Dine-in)'}
+        isOpen={!!openSections.billingWorkflow}
+        onToggle={() => toggleSection('billingWorkflow')}
+      >
+        <p className="mu" style={{ margin: '0 0 10px', fontSize: '12px' }}>
+          Switch between <b>Postpaid</b> (cook first, collect bill after eating) and <b>Prepaid</b> (verify &amp; collect payment before food enters kitchen).
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+          <button
+            type="button"
+            className={`chip ${S.googleConfig.billingModel !== 'prepaid' ? 'on' : ''}`}
+            style={{
+              padding: '10px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+              borderRadius: '10px',
+            }}
+            onClick={async () => {
+              saveGoogleConfig({ billingModel: 'postpaid' });
+              await syncToGoogleSheets({ billingModel: 'postpaid' });
+              say('Billing model set to Postpaid (Dine-in) ✅');
+            }}
+          >
+            <span style={{ fontWeight: 'bold' }}>🍽️ Postpaid</span>
+            <span style={{ fontSize: '10px', opacity: 0.8 }}>Pay after eating</span>
+          </button>
+          <button
+            type="button"
+            className={`chip ${S.googleConfig.billingModel === 'prepaid' ? 'on' : ''}`}
+            style={{
+              padding: '10px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+              borderRadius: '10px',
+            }}
+            onClick={async () => {
+              saveGoogleConfig({ billingModel: 'prepaid' });
+              await syncToGoogleSheets({ billingModel: 'prepaid' });
+              say('Billing model set to Prepaid (Pay First) ✅');
+            }}
+          >
+            <span style={{ fontWeight: 'bold' }}>⚡ Prepaid</span>
+            <span style={{ fontSize: '10px', opacity: 0.8 }}>Pay before cooking</span>
+          </button>
+        </div>
       </CollapsibleSection>
 
       <CollapsibleSection
@@ -4356,6 +4411,7 @@ export function AdminPortalView() {
     team: true,
     giveAccess: false,
     whatsappBill: false,
+    billingWorkflow: true,
     gstSettings: false,
     rewardMaster: false,
     loginTest: false,
@@ -4377,6 +4433,7 @@ export function AdminPortalView() {
       giveAccess: val,
       whatsappBill: val,
       brandProfile: val,
+      billingWorkflow: val,
       gstSettings: val,
       rewardMaster: val,
       loginTest: val,
@@ -5179,6 +5236,82 @@ export function AdminPortalView() {
           }}
         >
           Save &amp; Sync Brand Profile
+        </button>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="⚡ Billing Workflow Mode (Prepaid vs Postpaid)"
+        badge={billingModelInput === 'prepaid' ? '⚡ Prepaid (Pay First)' : '🍽️ Postpaid (Dine-in)'}
+        isOpen={!!openAdminSections.billingWorkflow}
+        onToggle={() => toggleAdminSection('billingWorkflow')}
+      >
+        <p className="mu" style={{ margin: '0 0 10px', fontSize: '12px' }}>
+          Choose whether customer &amp; waiter orders must be paid upfront before the chef starts cooking, or paid after dining.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+          <button
+            type="button"
+            className={`chip ${billingModelInput === 'postpaid' ? 'on' : ''}`}
+            style={{
+              padding: '12px 10px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              border: billingModelInput === 'postpaid' ? '2px solid #10b981' : '1px solid #444',
+              background: billingModelInput === 'postpaid' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.03)',
+            }}
+            onClick={() => setBillingModelInput('postpaid')}
+          >
+            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>🍽️ Postpaid (Dine-in)</span>
+            <span style={{ fontSize: '11px', opacity: 0.85, textAlign: 'center' }}>
+              Order &rarr; Cook &amp; Serve &rarr; Pay at exit
+            </span>
+            <span style={{ fontSize: '10px', color: '#10b981', marginTop: '2px' }}>
+              Standard for restaurants &amp; dhabas
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={`chip ${billingModelInput === 'prepaid' ? 'on' : ''}`}
+            style={{
+              padding: '12px 10px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              border: billingModelInput === 'prepaid' ? '2px solid #f59e0b' : '1px solid #444',
+              background: billingModelInput === 'prepaid' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.03)',
+            }}
+            onClick={() => setBillingModelInput('prepaid')}
+          >
+            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>⚡ Prepaid (Pay First)</span>
+            <span style={{ fontSize: '11px', opacity: 0.85, textAlign: 'center' }}>
+              Order &rarr; Pay &amp; Verify &rarr; Chef cooks
+            </span>
+            <span style={{ fontSize: '10px', color: '#f59e0b', marginTop: '2px' }}>
+              Ideal for food trucks, QSRs &amp; food courts
+            </span>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          className="btn alt"
+          onClick={async () => {
+            const nextCfg = { billingModel: billingModelInput };
+            saveGoogleConfig(nextCfg);
+            await syncToGoogleSheets(nextCfg);
+            say(`Billing workflow updated to ${billingModelInput.toUpperCase()} & synced ✅`);
+          }}
+        >
+          💾 Save &amp; Sync Billing Workflow
         </button>
       </CollapsibleSection>
 
