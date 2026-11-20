@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import {
   DietaryFilterOption,
+  PaymentMethod,
   Dish,
   Language,
   MenuLanguageOption,
@@ -23,6 +24,7 @@ import {
 } from '@/lib/constants';
 import {
   getCurrentBusinessDate,
+  formatIndianDateTime,
   getDiscount,
   getSessionRowStatus,
   getSubtotal,
@@ -70,10 +72,12 @@ export function ChefPortalView() {
         st: 1 | 2 | 3 | 4 | 5;
         vip: boolean;
         rush: boolean;
+        prepaid?: boolean;
       }
     >();
 
     sheetOrdersToday.forEach((po) => {
+      if (po.paymentPending) return;
       map.set(po.id, {
         id: po.id,
         counterNo: po.counterNo || 'Pending',
@@ -84,10 +88,12 @@ export function ChefPortalView() {
         st: po.st,
         vip: po.vip,
         rush: po.rush,
+        prepaid: Boolean(po.prepaid),
       });
     });
 
     S.orders.forEach((o) => {
+      if (o.paymentPending) return;
       if (!map.has(o.id)) {
         map.set(o.id, {
           id: o.id,
@@ -99,6 +105,7 @@ export function ChefPortalView() {
           st: o.st,
           vip: Boolean(o.vip),
           rush: Boolean(o.rush),
+          prepaid: Boolean(o.prepaid),
         });
       }
     });
@@ -179,6 +186,16 @@ export function ChefPortalView() {
               {o.counterNo} · Table {o.table}
             </h3>
             <span className="row">
+              {o.prepaid && (
+                <span className="tag" style={{ background: '#10b981', color: '#fff', fontWeight: 'bold' }}>
+                  🟢 PREPAID
+                </span>
+              )}
+              {!o.prepaid && (
+                <span className="tag" style={{ background: '#3b82f6', color: '#fff' }}>
+                  🍽️ POSTPAID
+                </span>
+              )}
               {o.vip && <span className="tag vip">VIP</span>}
               {o.rush && <span className="tag hot">RUSH</span>}
               <span className="tag">{o.st === 1 ? 'NEW' : 'COOKING'}</span>
@@ -326,6 +343,17 @@ export function WaiterPortalView() {
   })();
   const readyCount = readyList.length;
 
+  const pendingPrepaidCount = (() => {
+    let count = 0;
+    sheetOrdersToday.forEach((po) => {
+      if (po.paymentPending && po.st !== 5) count++;
+    });
+    S.orders.forEach((o) => {
+      if (o.paymentPending && o.st !== 5 && !sheetOrdersToday.some((po) => po.id === o.id)) count++;
+    });
+    return count;
+  })();
+
   const waiterItemCount = Object.values(S.WD).reduce((a, b) => a + b, 0);
   const waiterDraftTotal = S.menu.reduce(
     (a, m) => a + (S.WD[m.id] || 0) * m.p,
@@ -343,6 +371,28 @@ export function WaiterPortalView() {
           🛎️ Ready to serve{readyCount ? ` (${readyCount})` : ''}
         </button>
         <button
+          className={`chip ${S.wtab === 'prepaid' ? 'on' : ''}`}
+          style={{ flex: 1, position: 'relative' }}
+          onClick={() => setWTab('prepaid')}
+        >
+          💳 Prepaid Orders
+          {pendingPrepaidCount > 0 && (
+            <span
+              style={{
+                marginLeft: '6px',
+                background: '#ef4444',
+                color: '#fff',
+                borderRadius: '10px',
+                padding: '1px 6px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+              }}
+            >
+              {pendingPrepaidCount}
+            </span>
+          )}
+        </button>
+        <button
           className={`chip ${S.wtab === 'book' ? 'on' : ''}`}
           style={{ flex: 1 }}
           onClick={() => setWTab('book')}
@@ -350,6 +400,24 @@ export function WaiterPortalView() {
           📝 Book order
         </button>
       </div>
+
+      {pendingPrepaidCount > 0 && S.wtab !== 'prepaid' && (
+        <div
+          className="wa"
+          style={{
+            margin: '0 0 12px',
+            background: 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(239,68,68,0.15))',
+            border: '1px solid #f59e0b',
+            cursor: 'pointer',
+          }}
+          onClick={() => setWTab('prepaid')}
+        >
+          <b>⚡ {pendingPrepaidCount} Prepaid Order(s) Awaiting Payment Verification</b>
+          <p className="mu" style={{ margin: '4px 0 0', fontSize: '12px' }}>
+            Tap here to verify payment by counter number and release to kitchen.
+          </p>
+        </div>
+      )}
 
       <details
         className="card"
@@ -395,7 +463,9 @@ export function WaiterPortalView() {
         </ol>
       </details>
 
-      {S.wtab === 'serve' ? (
+      {S.wtab === 'prepaid' ? (
+        <PendingPrepaidOrdersQueue />
+      ) : S.wtab === 'serve' ? (
         <>
           <div
             className="hero"
@@ -1076,6 +1146,323 @@ export function WaiterPortalView() {
         })()
       )}
     </>
+  );
+}
+
+
+export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders' }: { title?: string }) {
+  const {
+    S,
+    sheetOrdersToday,
+    confirmPrepaidOrder,
+    pullFromGoogleSheets,
+    say,
+  } = useTadka();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeQrId, setActiveQrId] = useState<string | null>(null);
+  const [methodMap, setMethodMap] = useState<Record<string, PaymentMethod>>({});
+
+  const pendingOrders = (() => {
+    const map = new Map<
+      string,
+      {
+        id: string;
+        counterNo: string;
+        table: number;
+        round: number;
+        mob: string;
+        it: Record<number, number>;
+        prices?: Record<number, number>;
+        time: string;
+        source: string;
+      }
+    >();
+
+    sheetOrdersToday.forEach((po) => {
+      if (po.paymentPending && po.st !== 5) {
+        map.set(po.id, {
+          id: po.id,
+          counterNo: po.counterNo || 'Pending',
+          table: po.table || 1,
+          round: po.round || 1,
+          mob: po.orderedByMob || po.principalMob || 'Guest',
+          it: po.it,
+          time: po.timeFormatted || po.receivedTime || '',
+          source: po.orderSourceRaw || 'app',
+        });
+      }
+    });
+
+    S.orders.forEach((o) => {
+      if (o.paymentPending && o.st !== 5 && !map.has(o.id)) {
+        map.set(o.id, {
+          id: o.id,
+          counterNo: S.sess?.no || 'Pending',
+          table: S.activeTable,
+          round: o.k,
+          mob: o.orderedByMob || S.sess?.mob || 'Guest',
+          it: o.it,
+          prices: o.prices,
+          time: o.createdAt ? formatIndianDateTime(o.createdAt).timeFormatted : '',
+          source: o.src,
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  })();
+
+  const filteredOrders = pendingOrders.filter((o) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.trim().toLowerCase();
+    return (
+      o.counterNo.toLowerCase().includes(q) ||
+      o.id.toLowerCase().includes(q) ||
+      o.mob.toLowerCase().includes(q) ||
+      `table ${o.table}`.toLowerCase().includes(q) ||
+      String(o.table).includes(q)
+    );
+  });
+
+  const upiId = S.googleConfig.upiId || 'tadkatruck@okicici';
+  const upiName = S.googleConfig.upiName || S.googleConfig.restaurantName || 'Tadka Truck';
+  const gstEnabled = S.googleConfig?.gstEnabled !== false;
+  const gstRate = S.googleConfig?.gstRate ?? 5;
+
+  return (
+    <div className="card" style={{ padding: '14px', borderRadius: '14px', marginBottom: '14px' }}>
+      <div className="row sp" style={{ marginBottom: '10px' }}>
+        <div>
+          <h3 style={{ margin: 0 }}>{title}</h3>
+          <p className="mu" style={{ margin: '2px 0 0', fontSize: '12px' }}>
+            {pendingOrders.length} order(s) waiting for payment verification
+          </p>
+        </div>
+        <button
+          className="chip"
+          style={{ fontSize: '11px' }}
+          onClick={() => pullFromGoogleSheets()}
+        >
+          🔄 Refresh
+        </button>
+      </div>
+
+      <div style={{ marginBottom: '12px' }}>
+        <input
+          type="text"
+          className="inp"
+          placeholder="🔍 Search Counter # (e.g. C1), Table, or Mobile..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ width: '100%', fontSize: '13px' }}
+        />
+      </div>
+
+      {filteredOrders.length === 0 ? (
+        <div
+          style={{
+            padding: '24px 16px',
+            textAlign: 'center',
+            background: 'rgba(16, 185, 129, 0.08)',
+            borderRadius: '12px',
+            border: '1px dashed rgba(16, 185, 129, 0.3)',
+          }}
+        >
+          <div style={{ fontSize: '28px', marginBottom: '6px' }}>✅</div>
+          <b style={{ color: '#10b981' }}>All Prepaid Orders Verified!</b>
+          <p className="mu" style={{ fontSize: '12px', margin: '4px 0 0' }}>
+            {searchQuery
+              ? `No pending prepaid orders match "${searchQuery}".`
+              : 'New customer prepaid orders will appear here for verification before entering the kitchen.'}
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {filteredOrders.map((o) => {
+            let subtotal = 0;
+            S.menu.forEach((m) => {
+              const q = o.it[m.id] || 0;
+              if (q > 0) subtotal += (o.prices?.[m.id] ?? m.p) * q;
+            });
+            const gst = gstEnabled ? Math.round((subtotal * gstRate) / 100) : 0;
+            const total = subtotal + gst;
+
+            const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${total}&tn=${encodeURIComponent(`Counter ${o.counterNo} Round ${o.round}`)}&cu=INR`;
+            const waText = encodeURIComponent(
+              `Hello! Your order for Counter ${o.counterNo} (Table ${o.table}) at ${upiName} is ready for payment.\n\nTotal Payable: ₹${total}\n\nPay via UPI: ${upiUri}\n\nOnce paid, your order goes straight to the chef for cooking!`
+            );
+            const waLink = `https://wa.me/${o.mob.replace(/[^0-9]/g, '')}?text=${waText}`;
+            const currentMethod = methodMap[o.id] || 'UPI';
+
+            return (
+              <div
+                key={o.id}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid #f59e0b',
+                  borderRadius: '12px',
+                  padding: '12px',
+                }}
+              >
+                <div className="row sp" style={{ alignItems: 'flex-start' }}>
+                  <div>
+                    <div className="row" style={{ gap: '6px', marginBottom: '4px' }}>
+                      <span
+                        className="tag"
+                        style={{
+                          background: '#f59e0b',
+                          color: '#000',
+                          fontWeight: 'bold',
+                          fontSize: '12px',
+                        }}
+                      >
+                        Counter {o.counterNo}
+                      </span>
+                      <span className="tag" style={{ fontSize: '11px' }}>
+                        Table {o.table}
+                      </span>
+                      <span className="tag" style={{ fontSize: '11px' }}>
+                        Round {o.round}
+                      </span>
+                    </div>
+                    <div className="mu" style={{ fontSize: '12px' }}>
+                      📱 {o.mob} {o.time ? `· ⏰ ${o.time}` : ''} · via {o.source}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '17px', fontWeight: 'bold', color: '#10b981' }}>
+                      ₹{total}
+                    </div>
+                    {gstEnabled && (
+                      <div className="mu" style={{ fontSize: '10px' }}>
+                        (Sub ₹{subtotal} + GST ₹{gst})
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    margin: '10px 0',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    background: 'rgba(0,0,0,0.2)',
+                    fontSize: '12px',
+                  }}
+                >
+                  <b style={{ display: 'block', marginBottom: '4px', opacity: 0.9 }}>
+                    📋 Order Items to Verify:
+                  </b>
+                  {S.menu
+                    .filter((m) => o.it[m.id])
+                    .map((m) => (
+                      <div key={m.id} className="row sp" style={{ margin: '2px 0' }}>
+                        <span>
+                          {m.e} {m.n[S.lang]} × {o.it[m.id]}
+                        </span>
+                        <span className="mu">₹{(o.prices?.[m.id] ?? m.p) * o.it[m.id]}</span>
+                      </div>
+                    ))}
+                </div>
+
+                {activeQrId === o.id && (
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      background: '#fff',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      margin: '10px 0',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                    }}
+                  >
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}`}
+                      alt="Scan to Pay QR"
+                      style={{ width: '180px', height: '180px', margin: '0 auto', display: 'block' }}
+                    />
+                    <div style={{ color: '#111', fontSize: '12px', fontWeight: 600, marginTop: '6px' }}>
+                      Ask Customer to Scan &amp; Pay ₹{total}
+                    </div>
+                    <div style={{ color: '#666', fontSize: '11px', marginTop: '2px' }}>
+                      GPay / PhonePe / Paytm / BHIM
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+                  <button
+                    type="button"
+                    className="chip"
+                    style={{
+                      background: activeQrId === o.id ? 'var(--pk)' : 'rgba(255,255,255,0.08)',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }}
+                    onClick={() => setActiveQrId(activeQrId === o.id ? null : o.id)}
+                  >
+                    📱 {activeQrId === o.id ? 'Hide QR' : 'Show QR to Customer'}
+                  </button>
+
+                  <a
+                    href={waLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="chip"
+                    style={{
+                      background: 'rgba(37, 211, 102, 0.2)',
+                      color: '#25D366',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '12px',
+                    }}
+                  >
+                    💬 WhatsApp Pay Link
+                  </a>
+
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <select
+                      className="inp"
+                      style={{ padding: '4px 6px', fontSize: '11px', width: 'auto' }}
+                      value={currentMethod}
+                      onChange={(e) =>
+                        setMethodMap((prev) => ({
+                          ...prev,
+                          [o.id]: e.target.value as PaymentMethod,
+                        }))
+                      }
+                    >
+                      <option value="UPI">UPI</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Card">Card</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                        padding: '6px 14px',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                      }}
+                      onClick={() => {
+                        confirmPrepaidOrder(o.id, currentMethod);
+                        say(`Verified payment for Counter ${o.counterNo} via ${currentMethod} ✅`);
+                      }}
+                    >
+                      ✅ Tag as Paid &amp; Send to Kitchen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2085,6 +2472,7 @@ export function OwnerPortalView() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     ownerGuide: false,
     customerGuide: false,
+    prepaidQueue: true,
     bills: true,
     counter: false,
     openSession: false,
@@ -2196,6 +2584,15 @@ export function OwnerPortalView() {
         onToggle={() => toggleSection('customerGuide')}
       >
         <CustomerGuideNotesContent />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="⚡ Prepaid Payment Verification Queue"
+        isOpen={!!openSections.prepaidQueue}
+        onToggle={() => toggleSection('prepaidQueue')}
+        wrapInCard={false}
+      >
+        <PendingPrepaidOrdersQueue />
       </CollapsibleSection>
 
       <CollapsibleSection
@@ -3832,6 +4229,9 @@ export function AdminPortalView() {
     S.googleConfig.gstMode === 'item' ? 'item' : 'bill'
   );
   const [gstinInput, setGstinInput] = useState(S.googleConfig.gstin || '');
+  const [billingModelInput, setBillingModelInput] = useState<'prepaid' | 'postpaid'>(
+    S.googleConfig.billingModel || 'postpaid'
+  );
 
   // Keep Admin form inputs synced when Google Sheets finishes pulling S.googleConfig
   useEffect(() => {
@@ -6180,6 +6580,66 @@ export function AdminPortalView() {
               style={{ width: '100%' }}
             />
           </div>
+          <div
+            style={{
+              marginTop: '12px',
+              padding: '12px',
+              background: 'rgba(255,255,255,0.04)',
+              borderRadius: '12px',
+              border: '1px solid #382562',
+            }}
+          >
+            <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>
+              ⚡ Restaurant Billing Model (Prepaid vs Postpaid)
+            </div>
+            <p className="mu" style={{ fontSize: '11px', margin: '0 0 10px' }}>
+              Choose whether customer &amp; waiter orders must be paid upfront before the chef starts cooking, or paid after dining.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <button
+                type="button"
+                className={`chip ${billingModelInput === 'postpaid' ? 'on' : ''}`}
+                style={{
+                  padding: '10px 8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  border: billingModelInput === 'postpaid' ? '2px solid #10b981' : '1px solid #444',
+                }}
+                onClick={() => setBillingModelInput('postpaid')}
+              >
+                <span style={{ fontSize: '13px', fontWeight: 'bold' }}>🍽️ Postpaid (Dine-in)</span>
+                <span style={{ fontSize: '10px', opacity: 0.8, textAlign: 'center' }}>
+                  Order &rarr; Cook &amp; Serve &rarr; Pay at exit
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className={`chip ${billingModelInput === 'prepaid' ? 'on' : ''}`}
+                style={{
+                  padding: '10px 8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  border: billingModelInput === 'prepaid' ? '2px solid #f59e0b' : '1px solid #444',
+                }}
+                onClick={() => setBillingModelInput('prepaid')}
+              >
+                <span style={{ fontSize: '13px', fontWeight: 'bold' }}>⚡ Prepaid (QSR / Fast Food)</span>
+                <span style={{ fontSize: '10px', opacity: 0.8, textAlign: 'center' }}>
+                  Order &rarr; Pay &amp; Verify &rarr; Send to Chef
+                </span>
+              </button>
+            </div>
+          </div>
+
           <button
             className="btn alt"
             onClick={async () => {
@@ -6190,13 +6650,14 @@ export function AdminPortalView() {
                 socialTag: socTagInput.trim(),
                 upiId: upiIdInput.trim(),
                 upiName: upiNameInput.trim() || 'Tadka Truck',
+                billingModel: billingModelInput,
               };
               saveGoogleConfig(nextSocial);
               await syncToGoogleSheets(nextSocial);
-              say('Social, Review & UPI settings saved & synced ✅');
+              say('Social, Review, UPI & Billing model settings saved & synced ✅');
             }}
           >
-            Save &amp; Sync Social &amp; UPI Settings
+            Save &amp; Sync Social, UPI &amp; Billing Settings
           </button>
 
           <details

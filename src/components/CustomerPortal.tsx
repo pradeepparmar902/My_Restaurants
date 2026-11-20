@@ -1733,6 +1733,28 @@ export function OrderTabView() {
     S.tables.find((t) => t.id === S.activeTable)?.label ||
     `Table ${S.activeTable}`;
 
+  const pendingPrepaidOrders = S.orders.filter(
+    (o) => o.paymentPending && o.st !== 5
+  );
+  const hasPrepaidPending = pendingPrepaidOrders.length > 0;
+  const totalPayablePrepaid = (() => {
+    let sub = 0;
+    pendingPrepaidOrders.forEach((o) => {
+      S.menu.forEach((m) => {
+        const q = o.it[m.id] || 0;
+        if (q > 0) sub += (o.prices?.[m.id] ?? m.p) * q;
+      });
+    });
+    const gstEnabled = S.googleConfig?.gstEnabled !== false;
+    const gstRate = S.googleConfig?.gstRate ?? 5;
+    const gstAmt = gstEnabled ? Math.round((sub * gstRate) / 100) : 0;
+    return sub + gstAmt;
+  })();
+
+  const upiId = S.googleConfig?.upiId || 'tadkatruck@okicici';
+  const upiName = S.googleConfig?.upiName || S.googleConfig?.restaurantName || 'Tadka Truck';
+  const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${totalPayablePrepaid}&tn=${encodeURIComponent(`Counter ${S.sess?.no || 'C1'} Tadka`)}&cu=INR`;
+
   return (
     <>
       {S.sess.pend ? (
@@ -1757,6 +1779,112 @@ export function OrderTabView() {
             Orders you place here will be added to Counter {S.sess.no} and billed
             to {S.sess.mob}.
           </p>
+        </div>
+      )}
+
+      {hasPrepaidPending && (
+        <div
+          className="card"
+          style={{
+            border: '2px solid #f59e0b',
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(239, 68, 68, 0.1))',
+            padding: '16px',
+            borderRadius: '16px',
+            marginBottom: '14px',
+            boxShadow: '0 4px 16px rgba(245, 158, 11, 0.2)',
+          }}
+        >
+          <div className="row sp" style={{ alignItems: 'flex-start' }}>
+            <div>
+              <span
+                className="tag"
+                style={{
+                  background: '#f59e0b',
+                  color: '#000',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  padding: '3px 8px',
+                }}
+              >
+                ⚡ PREPAID ORDER · PAYMENT REQUIRED
+              </span>
+              <h3 style={{ margin: '8px 0 3px', fontSize: '18px' }}>
+                Complete Payment to Send to Kitchen
+              </h3>
+              <p className="mu" style={{ margin: 0, fontSize: '13px' }}>
+                Total Payable: <strong style={{ color: '#10b981', fontSize: '16px' }}>₹{totalPayablePrepaid}</strong> · Counter {S.sess.no}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '14px', textAlign: 'center' }}>
+            <div
+              style={{
+                display: 'inline-block',
+                padding: '10px',
+                background: '#ffffff',
+                borderRadius: '12px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              }}
+            >
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiUri)}`}
+                alt="UPI Scan & Pay QR"
+                style={{ width: '160px', height: '160px', display: 'block', margin: '0 auto' }}
+              />
+              <span style={{ color: '#111827', fontSize: '11px', fontWeight: 600, display: 'block', marginTop: '6px' }}>
+                Scan with GPay / PhonePe / Paytm / BHIM
+              </span>
+            </div>
+
+            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <a
+                href={upiUri}
+                className="btn"
+                style={{
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  color: '#ffffff',
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  fontWeight: 'bold',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  fontSize: '14px',
+                }}
+              >
+                🚀 Tap to Pay via UPI App (GPay / PhonePe / Amazon)
+              </a>
+
+              <button
+                type="button"
+                className="btn ghost"
+                style={{ fontSize: '12px', padding: '6px 12px' }}
+                onClick={() => {
+                  navigator.clipboard?.writeText?.(upiUri);
+                  say('UPI Payment Link copied to clipboard! 📋');
+                }}
+              >
+                📋 Copy UPI Link
+              </button>
+
+              <div
+                style={{
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  border: '1px dashed #f59e0b',
+                  borderRadius: '8px',
+                  padding: '8px 10px',
+                  fontSize: '12px',
+                  color: '#fbbf24',
+                  textAlign: 'center',
+                }}
+              >
+                ⏳ Once you make payment, counter staff/waiter verifies it and the chef starts cooking immediately!
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1823,16 +1951,47 @@ export function OrderTabView() {
                       Order {o.k}
                       {o.src === 'waiter' ? ' · by waiter' : ''}
                     </h3>
-                    <span className="tag hot">{ORDER_STATUS_LABELS[o.st]}</span>
+                    <span
+                      className="tag hot"
+                      style={
+                        o.paymentPending
+                          ? { background: '#f59e0b', color: '#000', fontWeight: 'bold' }
+                          : o.prepaid
+                            ? { background: '#10b981', color: '#fff', fontWeight: 'bold' }
+                            : {}
+                      }
+                    >
+                      {o.paymentPending
+                        ? '⏳ PENDING PAYMENT'
+                        : o.prepaid
+                          ? '🟢 PAID · PREPARING'
+                          : ORDER_STATUS_LABELS[o.st]}
+                    </span>
                   </div>
-                  <div className="steps" style={{ margin: '10px 0 6px' }}>
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className={`step ${o.st >= i ? 'on' : ''}`}>
-                        <i>{stepIcons[i - 1]}</i>
-                        {ORDER_STATUS_LABELS[i]}
-                      </div>
-                    ))}
-                  </div>
+                  {o.paymentPending ? (
+                    <div
+                      style={{
+                        margin: '10px 0 8px',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        background: 'rgba(245, 158, 11, 0.12)',
+                        border: '1px dashed #f59e0b',
+                        fontSize: '12px',
+                        color: '#fbbf24',
+                      }}
+                    >
+                      💳 Order placed! Complete payment above so chef can start cooking.
+                    </div>
+                  ) : (
+                    <div className="steps" style={{ margin: '10px 0 6px' }}>
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className={`step ${o.st >= i ? 'on' : ''}`}>
+                          <i>{stepIcons[i - 1]}</i>
+                          {ORDER_STATUS_LABELS[i]}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {S.menu
                     .filter((m) => o.it[m.id])
                     .map((m) => (

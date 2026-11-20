@@ -13,6 +13,7 @@ import {
   Dish,
   SocialProofSubmission,
   WorkspaceTenantRecord,
+  OrderRound,
 } from '@/types/tadka';
 import { DEFAULT_REWARD_RULES, INITIAL_STATE, ORDER_STATUS_LABELS } from '@/lib/constants';
 import {
@@ -103,6 +104,7 @@ interface TadkaContextValue {
   pushWaiter: (rawMob?: string) => void;
   cancelWaiter: () => void;
   doPay: (method: PaymentMethod, by: 'app' | 'owner') => void;
+  confirmPrepaidOrder: (counterNoOrOrderId: string, paymentMethod?: PaymentMethod) => void;
   paySamp: (index: number) => void;
   sendBill: (rawMob: string) => void;
   startNewOrder: () => void;
@@ -909,6 +911,7 @@ export function TadkaProvider({
         const nowIso = new Date().toISOString();
         const orderSeq = baseOrders.length + 1;
         const orderId = `ord-${Date.now()}-${orderSeq}`;
+        const isPrepaid = prev.googleConfig?.billingModel === 'prepaid';
 
         const newOrder = {
           id: orderId,
@@ -921,6 +924,8 @@ export function TadkaProvider({
           vip: prev.pts >= 100,
           rush: false,
           createdAt: nowIso,
+          paymentPending: isPrepaid,
+          prepaid: isPrepaid,
         };
 
         const { dateFormatted, timeFormatted } = formatIndianDateTime(nowIso);
@@ -950,9 +955,9 @@ export function TadkaProvider({
             itemsDetailed: summary,
             totalItemsQty: totalQty,
             orderSubtotal: ordSub,
-            orderStatus: 'Received',
+            orderStatus: isPrepaid ? 'Pending Payment' : 'Received',
             billStatus: 'UNPAID' as const,
-            paymentMethod: 'Pending',
+            paymentMethod: isPrepaid ? 'Pending (Prepaid)' : 'Pending',
             createdAt: nowIso,
           },
           ...(prev.dailyOrderHistory || []),
@@ -1853,6 +1858,8 @@ export function TadkaProvider({
         const orderSeq = baseOrders.length + 1;
         const orderId = `ord-${Date.now()}-${orderSeq}`;
 
+        const isPrepaid = prev.googleConfig?.billingModel === 'prepaid';
+
         const newOrder = {
           id: orderId,
           k: orderSeq,
@@ -1864,6 +1871,8 @@ export function TadkaProvider({
           vip: prev.pts >= 100,
           rush: false,
           createdAt: nowIso,
+          paymentPending: isPrepaid,
+          prepaid: isPrepaid,
         };
 
         const { dateFormatted, timeFormatted } = formatIndianDateTime(nowIso);
@@ -1887,9 +1896,9 @@ export function TadkaProvider({
             itemsDetailed: summary,
             totalItemsQty: totalQty,
             orderSubtotal: ordSub,
-            orderStatus: 'Received',
+            orderStatus: isPrepaid ? 'Pending Payment' : 'Received',
             billStatus: 'UNPAID' as const,
-            paymentMethod: 'Pending',
+            paymentMethod: isPrepaid ? 'Pending (Prepaid)' : 'Pending',
             createdAt: nowIso,
           },
           ...(prev.dailyOrderHistory || []),
@@ -2060,6 +2069,94 @@ export function TadkaProvider({
     },
     [updateState]
   );
+  const confirmPrepaidOrder = useCallback(
+    (counterNoOrOrderId: string, paymentMethod: PaymentMethod = 'UPI') => {
+      const targetQuery = counterNoOrOrderId.trim().toLowerCase();
+      if (!targetQuery) return;
+      const nowIso = new Date().toISOString();
+      const punchTime = formatIndianDateTime(nowIso).timeFormatted;
+
+      let matchedCount = 0;
+      const updatedSheetOrders = sheetOrdersTodayRef.current.map((po) => {
+        const matches =
+          po.id.toLowerCase() === targetQuery ||
+          po.counterNo.toLowerCase() === targetQuery ||
+          `table ${po.table}`.toLowerCase() === targetQuery ||
+          String(po.table).toLowerCase() === targetQuery;
+        if (matches && (po.paymentPending || po.billStatus !== 'PAID')) {
+          matchedCount++;
+          const updatedPo: PulledSheetOrder = {
+            ...po,
+            paymentPending: false,
+            billStatus: 'PAID',
+            paymentMethod: `${paymentMethod} (Prepaid Verified)`,
+            paidTime: po.paidTime || punchTime,
+          };
+          pendingOrderOverridesRef.current[po.id] = {
+            ...pendingOrderOverridesRef.current[po.id],
+            until: Date.now() + 20000,
+          };
+          pushUpdatedSheetOrder(updatedPo);
+          return updatedPo;
+        }
+        return po;
+      });
+
+      if (matchedCount > 0) {
+        sheetOrdersTodayRef.current = updatedSheetOrders;
+        setSheetOrdersToday(updatedSheetOrders);
+      }
+
+      updateState((prev) => {
+        const matchesOrder = (o: OrderRound) =>
+          o.id.toLowerCase() === targetQuery ||
+          (prev.sess?.no && prev.sess.no.toLowerCase() === targetQuery);
+
+        const nextOrders = prev.orders.map((o) =>
+          matchesOrder(o)
+            ? {
+                ...o,
+                paymentPending: false,
+                paidAt: o.paidAt || nowIso,
+              }
+            : o
+        );
+
+        const nextDailyHistory = (prev.dailyOrderHistory || []).map((h) => {
+          const matchesHist =
+            h.id.toLowerCase() === targetQuery ||
+            h.counterNo.toLowerCase() === targetQuery ||
+            `table ${h.tableNo}`.toLowerCase() === targetQuery ||
+            String(h.tableNo).toLowerCase() === targetQuery;
+          if (matchesHist && (h.billStatus !== 'PAID' || h.orderStatus === 'Pending Payment')) {
+            return {
+              ...h,
+              billStatus: 'PAID' as const,
+              paymentMethod: `${paymentMethod} (Prepaid Verified)`,
+              orderStatus: 'Received',
+            };
+          }
+          return h;
+        });
+
+        const isCurrentSess =
+          (prev.sess?.no && prev.sess.no.toLowerCase() === targetQuery) ||
+          prev.orders.some((o) => o.id.toLowerCase() === targetQuery);
+
+        return {
+          ...prev,
+          orders: nextOrders,
+          paid: isCurrentSess ? true : prev.paid,
+          dailyOrderHistory: nextDailyHistory,
+        };
+      });
+
+      say('Prepaid payment verified & confirmed! Order sent to kitchen ✅');
+    },
+    [pushUpdatedSheetOrder, say, updateState]
+  );
+
+
 
   const paySamp = useCallback(
     (index: number) => {
@@ -3568,6 +3665,7 @@ export function TadkaProvider({
         pushWaiter,
         cancelWaiter,
         doPay,
+        confirmPrepaidOrder,
         paySamp,
         sendBill,
         startNewOrder,

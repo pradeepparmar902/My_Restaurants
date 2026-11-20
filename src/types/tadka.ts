@@ -2,7 +2,7 @@ export type Language = 'en' | 'hi' | 'gu' | (string & {});
 export type PortalRole = 'c' | 'k' | 'w' | 'o' | 'a' | 'sa';
 export type StaffRoleName = 'Admin' | 'Manager' | 'Chef' | 'Waiter' | 'Reception';
 export type CustomerTab = 'menu' | 'order' | 'reward' | 'bill';
-export type WaiterTab = 'serve' | 'book';
+export type WaiterTab = 'serve' | 'book' | 'prepaid';
 export type CounterMode = 'auto' | 'manual';
 export type PaymentMethod = 'UPI' | 'Card' | 'Net banking' | 'Cash at counter' | 'Cash' | 'Card machine' | 'UPI at counter';
 
@@ -58,6 +58,8 @@ export interface OrderRound {
   deliveredAt?: string;
   paidAt?: string;
   deliveredBy?: string;
+  paymentPending?: boolean; // In prepaid mode: true until marked as paid
+  prepaid?: boolean; // true if placed in prepaid mode
 }
 
 export interface SessionData {
@@ -217,6 +219,7 @@ export interface GoogleCloudStorageConfig {
   socialTag?: string;
   upiId?: string;
   upiName?: string;
+  billingModel?: 'prepaid' | 'postpaid'; // 'prepaid' = QSR / Food Court pay first, 'postpaid' = Dine-in pay later
   gstEnabled?: boolean;
   gstRate?: number;
   gstMode?: 'bill' | 'item';

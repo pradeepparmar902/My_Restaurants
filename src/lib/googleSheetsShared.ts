@@ -87,6 +87,7 @@ export function buildSheetRowsForState(
     ['socialTag', state.googleConfig?.socialTag || '', new Date().toISOString()],
     ['upiId', state.googleConfig?.upiId || '', new Date().toISOString()],
     ['upiName', state.googleConfig?.upiName || '', new Date().toISOString()],
+    ['billing_model', state.googleConfig?.billingModel || 'postpaid', new Date().toISOString()],
     ['gst_enabled', gstEnabled, new Date().toISOString()],
     ['gst_rate', gstRate, new Date().toISOString()],
     ['gst_mode', gstMode, new Date().toISOString()],
@@ -831,6 +832,9 @@ export function parseConfigFromSheetRows(
     if (key === 'socialTag' && val) cfg.socialTag = val;
     if (key === 'upiId' && val) cfg.upiId = val;
     if (key === 'upiName' && val) cfg.upiName = val;
+    if (key === 'billing_model' && (val === 'prepaid' || val === 'postpaid')) {
+      cfg.billingModel = val;
+    }
     if (key === 'gst_enabled' && val !== '') {
       cfg.gstEnabled = val.toUpperCase() !== 'FALSE' && val !== '0';
     }
@@ -988,6 +992,8 @@ export interface PulledSheetOrder {
   st: 1 | 2 | 3 | 4 | 5;
   billStatus: string;
   paymentMethod: string;
+  paymentPending?: boolean;
+  prepaid?: boolean;
   vip: boolean;
   rush: boolean;
   receivedTime?: string;
@@ -1207,6 +1213,10 @@ export function parseOrdersFromSheetRows(
     };
 
     if (Object.keys(it).length > 0) {
+      const isPrepaidOrder =
+        paymentMethod.toLowerCase().includes('prepaid') ||
+        ks === 'pending payment';
+      const isPaymentPending = isPrepaidOrder && billStatus !== 'PAID';
       out.push({
         id: orderId,
         businessDate,
@@ -1228,6 +1238,8 @@ export function parseOrdersFromSheetRows(
         st,
         billStatus,
         paymentMethod,
+        paymentPending: isPaymentPending,
+        prepaid: isPrepaidOrder,
         vip,
         rush,
         receivedTime: normPunch(r[17]) || String(r[2] || '').trim(),
