@@ -118,6 +118,7 @@ interface TadkaContextValue {
 
   // Menu & Table Admin
   saveMenuDish: (dish: Partial<Dish> & { id?: number }) => void;
+  deleteMenuDish: (dishId: number) => void;
   addTable: (label: string, manualId?: number) => void;
   updateTable: (oldId: number, newLabel: string, newId?: number) => void;
   removeTable: (tableId: number) => void;
@@ -2317,7 +2318,20 @@ export function TadkaProvider({
       updateState((prev) => {
         let nextMenu = [...prev.menu];
         if (dish.id) {
-          nextMenu = nextMenu.map((m) => (m.id === dish.id ? { ...m, ...dish } : m));
+          nextMenu = nextMenu.map((m) =>
+            m.id === dish.id
+              ? {
+                  ...m,
+                  ...dish,
+                  img: dish.img !== undefined ? dish.img : m.img,
+                  badge: dish.badge !== undefined ? dish.badge : m.badge,
+                  rating: dish.rating !== undefined ? dish.rating : m.rating,
+                  prepTime: dish.prepTime !== undefined ? dish.prepTime : m.prepTime,
+                  desc: dish.desc !== undefined ? dish.desc : m.desc,
+                  category: dish.category !== undefined ? dish.category : m.category,
+                }
+              : m
+          );
         } else if (dish.n && typeof dish.p === 'number') {
           const nextId = Math.max(0, ...nextMenu.map((m) => m.id)) + 1;
           nextMenu.push({
@@ -2328,12 +2342,30 @@ export function TadkaProvider({
             jain: dish.jain ?? false,
             available: dish.available ?? true,
             ...(typeof dish.gstRate === 'number' ? { gstRate: dish.gstRate } : {}),
+            ...(dish.dietaryTags ? { dietaryTags: dish.dietaryTags } : {}),
+            ...(dish.img ? { img: dish.img } : {}),
+            ...(dish.badge ? { badge: dish.badge } : {}),
+            ...(typeof dish.rating === 'number' ? { rating: dish.rating } : {}),
+            ...(dish.prepTime ? { prepTime: dish.prepTime } : {}),
+            ...(dish.desc ? { desc: dish.desc } : {}),
+            ...(dish.category ? { category: dish.category } : {}),
             n: dish.n,
           });
         }
         return { ...prev, menu: nextMenu };
       });
       say('Menu updated ✅');
+    },
+    [say, updateState]
+  );
+
+  const deleteMenuDish = useCallback(
+    (dishId: number) => {
+      updateState((prev) => ({
+        ...prev,
+        menu: prev.menu.filter((m) => m.id !== dishId),
+      }));
+      say('Dish removed from menu 🗑️');
     },
     [say, updateState]
   );
@@ -3537,6 +3569,7 @@ export function TadkaProvider({
         toggleStaffActive,
         checkLogin,
         saveMenuDish,
+        deleteMenuDish,
         addTable,
         updateTable,
         removeTable,

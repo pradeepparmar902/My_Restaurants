@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import {
   DietaryFilterOption,
+  Dish,
   Language,
   MenuLanguageOption,
   RewardRulesConfig,
@@ -3696,6 +3697,39 @@ function SuperAdminWorkspaceManagerSection({
   );
 }
 
+const FOOD_IMAGE_PRESETS: { label: string; emoji: string; url: string }[] = [
+  { label: 'Roll / Wrap', emoji: '🌯', url: 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=400&auto=format&fit=crop&q=75' },
+  { label: 'Burger', emoji: '🍔', url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&auto=format&fit=crop&q=75' },
+  { label: 'Noodles', emoji: '🍜', url: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&auto=format&fit=crop&q=75' },
+  { label: 'Pasta', emoji: '🍝', url: 'https://images.unsplash.com/photo-1621996346565-e3d5d6281699?w=400&auto=format&fit=crop&q=75' },
+  { label: 'Pizza', emoji: '🍕', url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&auto=format&fit=crop&q=75' },
+  { label: 'Fries', emoji: '🍟', url: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=400&auto=format&fit=crop&q=75' },
+  { label: 'Cooler / Drink', emoji: '🥤', url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400&auto=format&fit=crop&q=75' },
+  { label: 'Dessert / Sweet', emoji: '🍮', url: 'https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=400&auto=format&fit=crop&q=75' },
+  { label: 'Curry / Thali', emoji: '🍛', url: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400&auto=format&fit=crop&q=75' },
+  { label: 'Chaat / Bhel', emoji: '🍲', url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=400&auto=format&fit=crop&q=75' },
+  { label: 'Sandwich', emoji: '🥪', url: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=400&auto=format&fit=crop&q=75' },
+  { label: 'Coffee / Chai', emoji: '☕', url: 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?w=400&auto=format&fit=crop&q=75' },
+];
+
+const MENU_CATEGORY_PRESETS = [
+  { id: '', label: 'Auto Detect (by item name / emoji)' },
+  { id: 'rolls', label: '🌯 Rolls & Wraps' },
+  { id: 'burgers', label: '🍔 Burgers & Snacks' },
+  { id: 'mains', label: '🍜 Noodles & Bowls' },
+  { id: 'drinks', label: '🥤 Drinks & Sweets' },
+  { id: 'under100', label: '🏷️ Under ₹100' },
+];
+
+const BADGE_PRESETS = [
+  '🏷️ Pocket Friendly',
+  '🔥 Bestseller',
+  '✨ Chef Special',
+  '⭐ Must Try',
+  '🌶️ Spicy Hot',
+  '🎉 Today\'s Special',
+];
+
 export function AdminPortalView() {
   const {
     S,
@@ -3707,6 +3741,7 @@ export function AdminPortalView() {
     toggleStaffActive,
     checkLogin,
     saveMenuDish,
+    deleteMenuDish,
     addTable,
     updateTable,
     removeTable,
@@ -3891,6 +3926,70 @@ export function AdminPortalView() {
   const [newDishEmoji, setNewDishEmoji] = useState('🍲');
   const [newDishDietaryId, setNewDishDietaryId] = useState('veg');
   const [newDishGst, setNewDishGst] = useState('');
+  const [newDishImg, setNewDishImg] = useState('');
+  const [newDishCategory, setNewDishCategory] = useState('');
+  const [newDishBadge, setNewDishBadge] = useState('');
+  const [newDishRating, setNewDishRating] = useState('');
+  const [newDishPrepTime, setNewDishPrepTime] = useState('');
+  const [newDishDesc, setNewDishDesc] = useState('');
+
+  // Editing existing dish state
+  const [editingDishId, setEditingDishId] = useState<number | null>(null);
+  const [editDishEn, setEditDishEn] = useState('');
+  const [editDishTranslations, setEditDishTranslations] = useState<Record<string, string>>({});
+  const [editDishLangCode, setEditDishLangCode] = useState('hi');
+  const [editDishPrice, setEditDishPrice] = useState('100');
+  const [editDishEmoji, setEditDishEmoji] = useState('🍲');
+  const [editDishDietaryId, setEditDishDietaryId] = useState('veg');
+  const [editDishGst, setEditDishGst] = useState('');
+  const [editDishImg, setEditDishImg] = useState('');
+  const [editDishCategory, setEditDishCategory] = useState('');
+  const [editDishBadge, setEditDishBadge] = useState('');
+  const [editDishRating, setEditDishRating] = useState('');
+  const [editDishPrepTime, setEditDishPrepTime] = useState('');
+  const [editDishDesc, setEditDishDesc] = useState('');
+  const [editDishAvailable, setEditDishAvailable] = useState(true);
+
+  const handleCompressAndSetImage = (
+    file: File,
+    onSuccess: (dataUrl: string) => void
+  ) => {
+    if (!file || !file.type.startsWith('image/')) {
+      say('Please select an image file (PNG, JPG, WebP)');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const src = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 480;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          onSuccess(dataUrl);
+          say('Photo loaded & compressed ✅');
+        }
+      };
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const [showQrAdmin, setShowQrAdmin] = useState(false);
   const [newTableNo, setNewTableNo] = useState('');
@@ -4747,91 +4846,751 @@ export function AdminPortalView() {
 
       <div className="card">
         <div className="row sp">
-          <h3>🍽️ Menu Admin</h3>
+          <div>
+            <h3>🍽️ Menu Studio &amp; Dishes ({S.menu.length})</h3>
+            <div className="mu" style={{ fontSize: '11px', marginTop: '2px' }}>
+              Add live photos, prices, categories, ribbons, ratings &amp; prep times
+            </div>
+          </div>
           <button
             className="chip"
             onClick={() => setShowMenuAdmin((prev) => !prev)}
           >
-            {showMenuAdmin ? 'Close' : 'Manage dishes'}
+            {showMenuAdmin ? 'Close' : 'Manage Dishes & Photos'}
           </button>
         </div>
         {showMenuAdmin && (
-          <div style={{ marginTop: '10px' }}>
-            {S.menu.map((m) => (
-              <div
-                key={m.id}
-                className="line"
-                style={{ alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}
-              >
-                <span>
-                  {m.e} {m.n.en} (₹{m.p})
-                  <span className="mu" style={{ fontSize: '11px', marginLeft: '4px' }}>
-                    · GST{' '}
-                    {typeof m.gstRate === 'number'
-                      ? `${m.gstRate}%`
-                      : `Default (${S.googleConfig.gstRate ?? 5}%)`}
-                  </span>
-                </span>
-                <div className="row" style={{ gap: '4px' }}>
-                  <select
-                    aria-label={`GST % for ${m.n.en}`}
-                    value={typeof m.gstRate === 'number' ? String(m.gstRate) : ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      saveMenuDish({
-                        id: m.id,
-                        gstRate: val === '' ? undefined : Number(val),
-                      });
+          <div style={{ marginTop: '12px' }}>
+            {/* List of current dishes */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {S.menu.map((m) => {
+                const isEditing = editingDishId === m.id;
+                return (
+                  <div
+                    key={m.id}
+                    style={{
+                      border: isEditing ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '10px',
+                      background: isEditing ? '#f8fafc' : '#ffffff',
+                      transition: 'all 0.15s ease',
                     }}
-                    className="sel-cc"
-                    style={{ fontSize: '11px', padding: '4px 6px' }}
                   >
-                    <option value="">Default GST</option>
-                    <option value="0">0% GST</option>
-                    <option value="5">5% GST</option>
-                    <option value="12">12% GST</option>
-                    <option value="18">18% GST</option>
-                  </select>
-                  <button
-                    className="chip"
-                    onClick={() =>
-                      saveMenuDish({ id: m.id, p: Math.max(10, m.p - 10) })
-                    }
-                  >
-                    −₹10
-                  </button>
-                  <button
-                    className="chip"
-                    onClick={() => saveMenuDish({ id: m.id, p: m.p + 10 })}
-                  >
-                    +₹10
-                  </button>
-                </div>
-              </div>
-            ))}
+                    {/* Dish Summary Row */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      {/* Left: Thumbnail & Details */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '180px' }}>
+                        <div
+                          style={{
+                            width: '46px',
+                            height: '46px',
+                            borderRadius: '10px',
+                            overflow: 'hidden',
+                            background: m.img ? '#0f172a' : '#f1f5f9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '24px',
+                            flexShrink: 0,
+                            boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                          }}
+                        >
+                          {m.img ? (
+                            <img
+                              src={m.img}
+                              alt={m.n.en}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <span>{m.e || '🍲'}</span>
+                          )}
+                        </div>
+
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span style={{ fontSize: '11px' }}>{m.v === 0 ? '🔴' : '🟢'}</span>
+                            <span style={{ fontWeight: 800, fontSize: '13.5px', color: '#0f172a' }}>
+                              {m.n.en}
+                            </span>
+                            {m.jain && (
+                              <span style={{ fontSize: '9px', background: '#dcfce7', color: '#15803d', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                                Jain
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '2px' }}>
+                            <b style={{ color: '#0f172a' }}>₹{m.p}</b> · GST{' '}
+                            {typeof m.gstRate === 'number'
+                              ? `${m.gstRate}%`
+                              : `${S.googleConfig.gstRate ?? 5}%`}
+                            {m.badge && (
+                              <span style={{ marginLeft: '4px', color: '#ea580c', fontWeight: 700 }}>
+                                · {m.badge}
+                              </span>
+                            )}
+                            {m.category && (
+                              <span style={{ marginLeft: '4px', color: '#2563eb' }}>
+                                · {m.category}
+                              </span>
+                            )}
+                            {typeof m.rating === 'number' && (
+                              <span style={{ marginLeft: '4px', color: '#15803d', fontWeight: 700 }}>
+                                · ★ {m.rating}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Quick Actions */}
+                      <div className="row" style={{ gap: '5px', alignItems: 'center' }}>
+                        <button
+                          className="chip"
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '4px 8px',
+                            borderColor: m.available ? '#bbf7d0' : '#fecaca',
+                            background: m.available ? '#f0fdf4' : '#fef2f2',
+                            color: m.available ? '#16a34a' : '#dc2626',
+                          }}
+                          title="Toggle In Stock / Out of Stock"
+                          onClick={() => saveMenuDish({ id: m.id, available: !m.available })}
+                        >
+                          {m.available ? '🟢 In Stock' : '🔴 Out'}
+                        </button>
+                        <button
+                          className="chip"
+                          style={{ fontSize: '11px', padding: '4px 8px' }}
+                          onClick={() =>
+                            saveMenuDish({ id: m.id, p: Math.max(10, m.p - 10) })
+                          }
+                          title="Decrease price by ₹10"
+                        >
+                          −₹10
+                        </button>
+                        <button
+                          className="chip"
+                          style={{ fontSize: '11px', padding: '4px 8px' }}
+                          onClick={() => saveMenuDish({ id: m.id, p: m.p + 10 })}
+                          title="Increase price by ₹10"
+                        >
+                          +₹10
+                        </button>
+                        <button
+                          className="chip"
+                          style={{
+                            fontSize: '11px',
+                            padding: '4px 8px',
+                            background: isEditing ? '#3b82f6' : undefined,
+                            color: isEditing ? '#ffffff' : undefined,
+                            fontWeight: 700,
+                          }}
+                          onClick={() => {
+                            if (isEditing) {
+                              setEditingDishId(null);
+                            } else {
+                              setEditingDishId(m.id);
+                              setEditDishEn(m.n.en);
+                              setEditDishTranslations({ ...m.n });
+                              setEditDishPrice(String(m.p));
+                              setEditDishEmoji(m.e || '🍲');
+                              setEditDishGst(
+                                typeof m.gstRate === 'number' ? String(m.gstRate) : ''
+                              );
+                              setEditDishDietaryId(
+                                m.dietaryTags?.[0] ||
+                                  (m.v === 0 ? 'nonveg' : m.jain ? 'jain' : 'veg')
+                              );
+                              setEditDishImg(m.img || '');
+                              setEditDishCategory(m.category || '');
+                              setEditDishBadge(m.badge || '');
+                              setEditDishRating(
+                                typeof m.rating === 'number' ? String(m.rating) : ''
+                              );
+                              setEditDishPrepTime(m.prepTime || '');
+                              setEditDishDesc(m.desc || '');
+                              setEditDishAvailable(m.available !== false);
+                            }
+                          }}
+                        >
+                          {isEditing ? '✕ Close' : '✏️ Edit'}
+                        </button>
+                        <button
+                          className="chip"
+                          style={{ fontSize: '11px', color: '#dc2626', padding: '4px 6px' }}
+                          title="Delete dish from menu"
+                          onClick={() => {
+                            if (window.confirm(`Delete "${m.n.en}" from menu?`)) {
+                              deleteMenuDish(m.id);
+                            }
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Inline Dish Editor Panel */}
+                    {isEditing && (
+                      <div
+                        style={{
+                          marginTop: '12px',
+                          paddingTop: '12px',
+                          borderTop: '1px solid #e2e8f0',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                        }}
+                      >
+                        <div style={{ fontWeight: 800, fontSize: '12.5px', color: '#1e293b' }}>
+                          ✏️ Edit Details &amp; Live Photo for &ldquo;{m.n.en}&rdquo;
+                        </div>
+
+                        {/* 1. Live Image & Photo Controls */}
+                        <div
+                          style={{
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '10px',
+                            padding: '10px',
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, fontSize: '11.5px', marginBottom: '6px' }}>
+                            🖼️ Dish Photo / Live Image
+                          </div>
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {/* Photo Preview Box */}
+                            <div
+                              style={{
+                                width: '64px',
+                                height: '64px',
+                                borderRadius: '10px',
+                                overflow: 'hidden',
+                                background: editDishImg ? '#0f172a' : '#f1f5f9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '32px',
+                                flexShrink: 0,
+                                border: '1px solid #cbd5e1',
+                              }}
+                            >
+                              {editDishImg ? (
+                                <img
+                                  src={editDishImg}
+                                  alt="Preview"
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <span>{editDishEmoji || '🍲'}</span>
+                              )}
+                            </div>
+
+                            <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              <div className="row" style={{ gap: '6px' }}>
+                                <label
+                                  className="chip"
+                                  style={{
+                                    cursor: 'pointer',
+                                    background: '#16a34a',
+                                    color: '#ffffff',
+                                    fontWeight: 700,
+                                    fontSize: '11px',
+                                    border: 'none',
+                                    padding: '5px 10px',
+                                  }}
+                                >
+                                  📷 Upload Photo
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    hidden
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleCompressAndSetImage(file, setEditDishImg);
+                                    }}
+                                  />
+                                </label>
+                                {editDishImg && (
+                                  <button
+                                    className="chip"
+                                    style={{ fontSize: '11px', color: '#dc2626' }}
+                                    onClick={() => setEditDishImg('')}
+                                  >
+                                    ❌ Clear Photo
+                                  </button>
+                                )}
+                              </div>
+                              <input
+                                value={editDishImg}
+                                onChange={(e) => setEditDishImg(e.target.value)}
+                                placeholder="Or paste live image URL (https://... or Google Drive)"
+                                className="inp"
+                                style={{ width: '100%', fontSize: '11.5px' }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Quick Photo Presets */}
+                          <div style={{ marginTop: '8px' }}>
+                            <div className="mu" style={{ fontSize: '10px', marginBottom: '4px' }}>
+                              ⚡ Quick Preset Photos (click to apply):
+                            </div>
+                            <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px' }}>
+                              {FOOD_IMAGE_PRESETS.map((p) => (
+                                <button
+                                  key={p.label}
+                                  type="button"
+                                  className="chip"
+                                  style={{ fontSize: '10.5px', padding: '2px 6px', whiteSpace: 'nowrap' }}
+                                  onClick={() => setEditDishImg(p.url)}
+                                >
+                                  {p.emoji} {p.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Names & Multi-Language */}
+                        <div className="row" style={{ gap: '6px' }}>
+                          <input
+                            value={editDishEmoji}
+                            onChange={(e) => setEditDishEmoji(e.target.value)}
+                            placeholder="🍲"
+                            className="inp"
+                            style={{ maxWidth: '54px', textAlign: 'center', fontSize: '18px' }}
+                            title="Fallback Emoji"
+                          />
+                          <input
+                            value={editDishEn}
+                            onChange={(e) => setEditDishEn(e.target.value)}
+                            placeholder="Dish name (Default / English)"
+                            className="inp"
+                            style={{ flex: 1 }}
+                          />
+                        </div>
+
+                        {/* Translations row */}
+                        {(() => {
+                          const langOptions = menuLanguagesInput.length
+                            ? menuLanguagesInput
+                            : DEFAULT_MENU_LANGUAGES;
+                          const activeLangCode = langOptions.some(
+                            (l) => l.code === editDishLangCode
+                          )
+                            ? editDishLangCode
+                            : langOptions[0]?.code || 'en';
+                          const activeLangObj = langOptions.find(
+                            (l) => l.code === activeLangCode
+                          );
+                          return (
+                            <div className="row" style={{ gap: '6px' }}>
+                              <select
+                                aria-label="Edit translation language"
+                                value={activeLangCode}
+                                onChange={(e) => setEditDishLangCode(e.target.value)}
+                                className="sel-cc"
+                                style={{ minWidth: '120px', fontSize: '11px' }}
+                              >
+                                {langOptions.map((l) => (
+                                  <option key={l.code} value={l.code}>
+                                    🌐 {l.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                value={editDishTranslations[activeLangCode] || ''}
+                                onChange={(e) =>
+                                  setEditDishTranslations((prev) => ({
+                                    ...prev,
+                                    [activeLangCode]: e.target.value,
+                                  }))
+                                }
+                                placeholder={`${activeLangObj?.label || 'Translated'} name`}
+                                className="inp"
+                                style={{ flex: 1, fontSize: '11px' }}
+                              />
+                            </div>
+                          );
+                        })()}
+
+                        {/* 3. Pricing, GST & Category */}
+                        <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                          <div style={{ flex: 1, minWidth: '85px' }}>
+                            <div className="mu" style={{ fontSize: '10px' }}>Price (₹):</div>
+                            <input
+                              value={editDishPrice}
+                              onChange={(e) => setEditDishPrice(e.target.value)}
+                              placeholder="Price ₹"
+                              inputMode="numeric"
+                              className="inp"
+                              style={{ width: '100%', fontWeight: 700 }}
+                            />
+                          </div>
+
+                          <div style={{ flex: 1, minWidth: '100px' }}>
+                            <div className="mu" style={{ fontSize: '10px' }}>GST %:</div>
+                            <select
+                              aria-label="Edit dish GST %"
+                              value={editDishGst}
+                              onChange={(e) => setEditDishGst(e.target.value)}
+                              className="sel-cc"
+                              style={{ width: '100%' }}
+                            >
+                              <option value="">Default ({S.googleConfig.gstRate ?? 5}%)</option>
+                              <option value="0">0% GST</option>
+                              <option value="5">5% GST</option>
+                              <option value="12">12% GST</option>
+                              <option value="18">18% GST</option>
+                            </select>
+                          </div>
+
+                          <div style={{ flex: 1, minWidth: '110px' }}>
+                            <div className="mu" style={{ fontSize: '10px' }}>Category Tab:</div>
+                            <select
+                              aria-label="Edit dish category"
+                              value={editDishCategory}
+                              onChange={(e) => setEditDishCategory(e.target.value)}
+                              className="sel-cc"
+                              style={{ width: '100%' }}
+                            >
+                              {MENU_CATEGORY_PRESETS.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div style={{ flex: 1, minWidth: '110px' }}>
+                            <div className="mu" style={{ fontSize: '10px' }}>Dietary Filter:</div>
+                            {(() => {
+                              const dietaryOpts = dietaryFiltersInput.length
+                                ? dietaryFiltersInput
+                                : DEFAULT_DIETARY_FILTERS;
+                              return (
+                                <select
+                                  aria-label="Edit dish dietary"
+                                  value={editDishDietaryId}
+                                  onChange={(e) => setEditDishDietaryId(e.target.value)}
+                                  className="sel-cc"
+                                  style={{ width: '100%' }}
+                                >
+                                  {dietaryOpts.map((d) => (
+                                    <option key={d.id} value={d.id}>
+                                      {d.emoji ? `${d.emoji} ` : ''}
+                                      {d.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              );
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* 4. Ribbon Badge, Rating & Prep Time */}
+                        <div
+                          style={{
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            padding: '8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, fontSize: '11px', color: '#475569' }}>
+                            ✨ Customer Card Highlights (Ribbon, Rating &amp; Prep Time)
+                          </div>
+
+                          <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                            <div style={{ flex: 2, minWidth: '140px' }}>
+                              <div className="mu" style={{ fontSize: '10px' }}>Ribbon Badge (e.g. Pocket Friendly):</div>
+                              <input
+                                value={editDishBadge}
+                                onChange={(e) => setEditDishBadge(e.target.value)}
+                                placeholder="Custom ribbon or leave blank for auto"
+                                className="inp"
+                                style={{ width: '100%', fontSize: '11px' }}
+                              />
+                            </div>
+
+                            <div style={{ flex: 1, minWidth: '80px' }}>
+                              <div className="mu" style={{ fontSize: '10px' }}>Rating (★):</div>
+                              <input
+                                value={editDishRating}
+                                onChange={(e) => setEditDishRating(e.target.value)}
+                                placeholder="e.g. 4.8"
+                                className="inp"
+                                style={{ width: '100%', fontSize: '11px' }}
+                              />
+                            </div>
+
+                            <div style={{ flex: 1.5, minWidth: '110px' }}>
+                              <div className="mu" style={{ fontSize: '10px' }}>Prep Time:</div>
+                              <input
+                                value={editDishPrepTime}
+                                onChange={(e) => setEditDishPrepTime(e.target.value)}
+                                placeholder="e.g. 8-12 mins"
+                                className="inp"
+                                style={{ width: '100%', fontSize: '11px' }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Quick Badge Presets */}
+                          <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingTop: '2px' }}>
+                            {BADGE_PRESETS.map((b) => (
+                              <button
+                                key={b}
+                                type="button"
+                                className="chip"
+                                style={{ fontSize: '10px', padding: '1px 5px', whiteSpace: 'nowrap' }}
+                                onClick={() => setEditDishBadge(b)}
+                              >
+                                {b}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Save / Cancel Row */}
+                        <div className="row sp" style={{ marginTop: '4px' }}>
+                          <button
+                            className="chip"
+                            onClick={() => setEditingDishId(null)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            className="btn alt"
+                            style={{ padding: '8px 16px', fontWeight: 800 }}
+                            onClick={() => {
+                              const baseName = editDishEn.trim();
+                              if (!baseName) {
+                                say('Please enter a dish name');
+                                return;
+                              }
+                              const dietaryOpts = dietaryFiltersInput.length
+                                ? dietaryFiltersInput
+                                : DEFAULT_DIETARY_FILTERS;
+                              const activeDietObj = dietaryOpts.find(
+                                (d) => d.id === editDishDietaryId
+                              );
+                              const dietLabel = (
+                                activeDietObj?.label || editDishDietaryId
+                              ).toLowerCase();
+                              const isNonVeg =
+                                editDishDietaryId === 'nonveg' ||
+                                dietLabel.includes('non-veg') ||
+                                dietLabel.includes('non veg');
+                              const isJain =
+                                editDishDietaryId === 'jain' ||
+                                dietLabel.includes('jain');
+
+                              const translatedMap: Record<string, string> = {
+                                en: baseName,
+                                hi: (editDishTranslations.hi || '').trim() || baseName,
+                                gu: (editDishTranslations.gu || '').trim() || baseName,
+                              };
+                              Object.entries(editDishTranslations).forEach(([code, val]) => {
+                                if (val.trim()) translatedMap[code] = val.trim();
+                              });
+
+                              saveMenuDish({
+                                id: m.id,
+                                e: editDishEmoji || '🍲',
+                                p: Number(editDishPrice) || m.p,
+                                v: isNonVeg ? 0 : 1,
+                                jain: isJain,
+                                dietaryTags: [editDishDietaryId],
+                                available: editDishAvailable,
+                                gstRate: editDishGst !== '' ? Number(editDishGst) : undefined,
+                                img: editDishImg.trim() || undefined,
+                                category: editDishCategory.trim() || undefined,
+                                badge: editDishBadge.trim() || undefined,
+                                rating: editDishRating !== '' ? Number(editDishRating) : undefined,
+                                prepTime: editDishPrepTime.trim() || undefined,
+                                desc: editDishDesc.trim() || undefined,
+                                n: translatedMap as Dish['n'],
+                              });
+
+                              setEditingDishId(null);
+                              say(`Updated "${baseName}" ✅`);
+                            }}
+                          >
+                            💾 Save Changes for &ldquo;{m.n.en}&rdquo;
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Add New Dish Section */}
             <div
               style={{
-                borderTop: '1px dashed #5a4690',
-                marginTop: '10px',
-                paddingTop: '10px',
+                borderTop: '2px dashed #94a3b8',
+                marginTop: '16px',
+                paddingTop: '14px',
               }}
             >
-              <b>Add new dish</b>
-              <div className="row" style={{ marginTop: '6px' }}>
+              <div style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', marginBottom: '8px' }}>
+                ➕ Add New Dish to Menu
+              </div>
+
+              {/* Live Photo Upload for New Dish */}
+              <div
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '10px',
+                  padding: '10px',
+                  marginBottom: '10px',
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: '11.5px', marginBottom: '6px' }}>
+                  🖼️ Dish Live Photo (Optional)
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      background: newDishImg ? '#0f172a' : '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '32px',
+                      flexShrink: 0,
+                      border: '1px solid #cbd5e1',
+                    }}
+                  >
+                    {newDishImg ? (
+                      <img
+                        src={newDishImg}
+                        alt="New dish preview"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <span>{newDishEmoji || '🍲'}</span>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div className="row" style={{ gap: '6px' }}>
+                      <label
+                        className="chip"
+                        style={{
+                          cursor: 'pointer',
+                          background: '#16a34a',
+                          color: '#ffffff',
+                          fontWeight: 700,
+                          fontSize: '11px',
+                          border: 'none',
+                          padding: '5px 10px',
+                        }}
+                      >
+                        📷 Upload Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleCompressAndSetImage(file, setNewDishImg);
+                          }}
+                        />
+                      </label>
+                      {newDishImg && (
+                        <button
+                          className="chip"
+                          style={{ fontSize: '11px', color: '#dc2626' }}
+                          onClick={() => setNewDishImg('')}
+                        >
+                          ❌ Clear Photo
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      value={newDishImg}
+                      onChange={(e) => setNewDishImg(e.target.value)}
+                      placeholder="Or paste live image link (https://... or Google Drive)"
+                      className="inp"
+                      style={{ width: '100%', fontSize: '11.5px' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Quick Presets for New Dish */}
+                <div style={{ marginTop: '8px' }}>
+                  <div className="mu" style={{ fontSize: '10px', marginBottom: '4px' }}>
+                    ⚡ Popular Food Photo Presets:
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px' }}>
+                    {FOOD_IMAGE_PRESETS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        className="chip"
+                        style={{ fontSize: '10.5px', padding: '2px 6px', whiteSpace: 'nowrap' }}
+                        onClick={() => {
+                          setNewDishImg(p.url);
+                          setNewDishEmoji(p.emoji);
+                          if (!newDishEn) setNewDishEn(p.label);
+                        }}
+                      >
+                        {p.emoji} {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Names & Emoji */}
+              <div className="row" style={{ marginTop: '6px', gap: '6px' }}>
                 <input
                   value={newDishEmoji}
                   onChange={(e) => setNewDishEmoji(e.target.value)}
                   placeholder="🍲"
                   className="inp"
-                  style={{ maxWidth: '58px' }}
+                  style={{ maxWidth: '54px', textAlign: 'center', fontSize: '18px' }}
+                  title="Emoji icon"
                 />
                 <input
                   value={newDishEn}
                   onChange={(e) => setNewDishEn(e.target.value)}
                   placeholder="Dish name (Default / English)"
                   className="inp"
+                  style={{ flex: 1 }}
                 />
               </div>
+
+              {/* Translation */}
               {(() => {
                 const langOptions = menuLanguagesInput.length
                   ? menuLanguagesInput
@@ -4851,7 +5610,7 @@ export function AdminPortalView() {
                       value={activeLangCode}
                       onChange={(e) => setNewDishLangCode(e.target.value)}
                       className="sel-cc"
-                      style={{ minWidth: '120px' }}
+                      style={{ minWidth: '120px', fontSize: '11px' }}
                     >
                       {langOptions.map((l) => (
                         <option key={l.code} value={l.code}>
@@ -4869,11 +5628,13 @@ export function AdminPortalView() {
                       }
                       placeholder={`${activeLangObj?.label || 'Translated'} name (optional)`}
                       className="inp"
-                      style={{ flex: 1 }}
+                      style={{ flex: 1, fontSize: '11px' }}
                     />
                   </div>
                 );
               })()}
+
+              {/* Pricing, GST, Category & Dietary */}
               <div className="row" style={{ marginTop: '6px', flexWrap: 'wrap', gap: '6px' }}>
                 <input
                   value={newDishPrice}
@@ -4881,20 +5642,36 @@ export function AdminPortalView() {
                   placeholder="Price ₹"
                   inputMode="numeric"
                   className="inp"
-                  style={{ flex: 1, minWidth: '80px' }}
+                  style={{ flex: 1, minWidth: '80px', fontWeight: 700 }}
                 />
                 <select
                   aria-label="New dish GST %"
                   value={newDishGst}
                   onChange={(e) => setNewDishGst(e.target.value)}
                   className="sel-cc"
+                  style={{ flex: 1, minWidth: '100px' }}
                 >
-                  <option value="">Default GST</option>
+                  <option value="">Default GST ({S.googleConfig.gstRate ?? 5}%)</option>
                   <option value="0">0% GST</option>
                   <option value="5">5% GST</option>
                   <option value="12">12% GST</option>
                   <option value="18">18% GST</option>
                 </select>
+
+                <select
+                  aria-label="New dish category"
+                  value={newDishCategory}
+                  onChange={(e) => setNewDishCategory(e.target.value)}
+                  className="sel-cc"
+                  style={{ flex: 1, minWidth: '110px' }}
+                >
+                  {MENU_CATEGORY_PRESETS.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+
                 {(() => {
                   const dietaryOpts = dietaryFiltersInput.length
                     ? dietaryFiltersInput
@@ -4910,6 +5687,7 @@ export function AdminPortalView() {
                       value={activeDietId}
                       onChange={(e) => setNewDishDietaryId(e.target.value)}
                       className="sel-cc"
+                      style={{ flex: 1, minWidth: '110px' }}
                     >
                       {dietaryOpts.map((d) => (
                         <option key={d.id} value={d.id}>
@@ -4921,8 +5699,65 @@ export function AdminPortalView() {
                   );
                 })()}
               </div>
+
+              {/* Ribbon Badge, Rating, Prep Time */}
+              <div
+                style={{
+                  marginTop: '8px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: '11px', color: '#475569' }}>
+                  ✨ Customer Card Highlights (Optional)
+                </div>
+                <div className="row" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                  <input
+                    value={newDishBadge}
+                    onChange={(e) => setNewDishBadge(e.target.value)}
+                    placeholder="Ribbon (e.g. Pocket Friendly, Bestseller)"
+                    className="inp"
+                    style={{ flex: 2, minWidth: '140px', fontSize: '11px' }}
+                  />
+                  <input
+                    value={newDishRating}
+                    onChange={(e) => setNewDishRating(e.target.value)}
+                    placeholder="Rating ★ (e.g. 4.8)"
+                    className="inp"
+                    style={{ flex: 1, minWidth: '70px', fontSize: '11px' }}
+                  />
+                  <input
+                    value={newDishPrepTime}
+                    onChange={(e) => setNewDishPrepTime(e.target.value)}
+                    placeholder="Prep Time (e.g. 8-12 mins)"
+                    className="inp"
+                    style={{ flex: 1.5, minWidth: '110px', fontSize: '11px' }}
+                  />
+                </div>
+                {/* Badge Presets for New Dish */}
+                <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' }}>
+                  {BADGE_PRESETS.map((b) => (
+                    <button
+                      key={b}
+                      type="button"
+                      className="chip"
+                      style={{ fontSize: '10px', padding: '1px 5px', whiteSpace: 'nowrap' }}
+                      onClick={() => setNewDishBadge(b)}
+                    >
+                      {b}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <button
                 className="btn alt"
+                style={{ marginTop: '10px', width: '100%', padding: '10px', fontWeight: 800 }}
                 disabled={!newDishEn.trim()}
                 onClick={() => {
                   const baseName = newDishEn.trim();
@@ -4947,12 +5782,7 @@ export function AdminPortalView() {
                   const isJain =
                     activeDietId === 'jain' || dietLabel.includes('jain');
 
-                  const translatedMap: {
-                    en: string;
-                    hi: string;
-                    gu: string;
-                    [lang: string]: string;
-                  } = {
+                  const translatedMap: Record<string, string> = {
                     en: baseName,
                     hi: (newDishTranslations.hi || '').trim() || baseName,
                     gu: (newDishTranslations.gu || '').trim() || baseName,
@@ -4965,15 +5795,28 @@ export function AdminPortalView() {
                     e: newDishEmoji || '🍲',
                     p: Number(newDishPrice) || 100,
                     v: isNonVeg ? 0 : 1,
-                    ...(isJain ? { jain: true } : {}),
+                    jain: isJain,
                     dietaryTags: [activeDietId],
                     available: true,
-                    ...(newDishGst !== '' ? { gstRate: Number(newDishGst) } : {}),
-                    n: translatedMap,
+                    gstRate: newDishGst !== '' ? Number(newDishGst) : undefined,
+                    img: newDishImg.trim() || undefined,
+                    category: newDishCategory.trim() || undefined,
+                    badge: newDishBadge.trim() || undefined,
+                    rating: newDishRating !== '' ? Number(newDishRating) : undefined,
+                    prepTime: newDishPrepTime.trim() || undefined,
+                    desc: newDishDesc.trim() || undefined,
+                    n: translatedMap as Dish['n'],
                   });
+
                   setNewDishEn('');
                   setNewDishTranslations({});
                   setNewDishGst('');
+                  setNewDishImg('');
+                  setNewDishBadge('');
+                  setNewDishRating('');
+                  setNewDishPrepTime('');
+                  setNewDishCategory('');
+                  say(`Added "${baseName}" to menu ✅`);
                 }}
               >
                 + Add Dish to Menu

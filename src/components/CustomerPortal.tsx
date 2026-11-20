@@ -142,6 +142,7 @@ export function MenuTabView() {
   })();
 
   const getDishCategory = (m: (typeof S.menu)[number]): string => {
+    if (m.category) return m.category;
     const en = (m.n.en || '').toLowerCase();
     const em = m.e || '';
     if (
@@ -1218,19 +1219,46 @@ export function MenuTabView() {
                   : 'none',
               }}
             >
-              {/* Visual Food Plate Header */}
+              {/* Visual Food Plate Header with Live Photo or Emoji Illustration */}
               <div
                 style={{
-                  background: bgGrad,
+                  background: m.img ? '#0f172a' : bgGrad,
                   height: '112px',
                   position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '50px',
+                  overflow: 'hidden',
                 }}
               >
-                {/* Top-Left Offer / Trending Badge (like Images 1, 3, 13) */}
+                {m.img ? (
+                  <img
+                    src={m.img}
+                    alt={m.n[S.lang] || m.n.en}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block',
+                    }}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = 'none';
+                      const fallbackEl = e.currentTarget.parentElement?.querySelector(
+                        '.dish-emoji-fallback'
+                      ) as HTMLElement | null;
+                      if (fallbackEl) fallbackEl.style.display = 'block';
+                    }}
+                  />
+                ) : null}
+                <span
+                  className="dish-emoji-fallback"
+                  style={{ display: m.img ? 'none' : 'block' }}
+                >
+                  {m.e || '🍲'}
+                </span>
+
+                {/* Top-Left Offer / Trending / Custom Badge */}
                 <span
                   style={{
                     position: 'absolute',
@@ -1245,20 +1273,23 @@ export function MenuTabView() {
                     padding: '3px 7px',
                     borderRadius: '6px',
                     backdropFilter: 'blur(4px)',
+                    maxWidth: '120px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  {isTop
-                    ? `⭐ #1 Trending (${todayOrderedCount})`
-                    : todayOrderedCount > 0
-                      ? `🔥 ${todayOrderedCount} ordered`
-                      : m.p <= 100
-                        ? '🏷️ Pocket Friendly'
-                        : '✨ Chef Special'}
+                  {m.badge ||
+                    (isTop
+                      ? `⭐ #1 Trending (${todayOrderedCount})`
+                      : todayOrderedCount > 0
+                        ? `🔥 ${todayOrderedCount} ordered`
+                        : m.p <= 100
+                          ? '🏷️ Pocket Friendly'
+                          : '✨ Chef Special')}
                 </span>
 
-                <span>{m.e}</span>
-
-                {/* Bottom-Left Green Star Pill (like Images 1, 3, 13) */}
+                {/* Bottom-Left Green Star Pill */}
                 <span
                   style={{
                     position: 'absolute',
@@ -1273,7 +1304,7 @@ export function MenuTabView() {
                     boxShadow: '0 2px 4px rgba(0,0,0,0.18)',
                   }}
                 >
-                  ★ {ratingVal}
+                  ★ {typeof m.rating === 'number' ? m.rating.toFixed(1) : ratingVal}
                 </span>
 
                 {m.jain && (
@@ -1345,7 +1376,11 @@ export function MenuTabView() {
                       ₹{m.p}
                     </div>
                     <div style={{ fontSize: '9.5px', color: textMuted }}>
-                      ⏱️ Fresh · 8-12 mins
+                      {m.prepTime
+                        ? `⏱️ ${m.prepTime}`
+                        : m.desc
+                          ? m.desc
+                          : '⏱️ Fresh · 8-12 mins'}
                     </div>
                   </div>
                   {addControl}

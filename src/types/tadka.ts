@@ -28,6 +28,12 @@ export interface Dish {
   available: boolean;
   gstRate?: number; // per-item GST % (optional, falls back to default gstRate)
   dietaryTags?: string[]; // optional custom dietary filter IDs
+  img?: string; // Live image URL or base64 data URI
+  badge?: string; // Custom ribbon badge e.g. "Pocket Friendly", "Bestseller", "Chef Special"
+  rating?: number; // Custom rating e.g. 4.6
+  prepTime?: string; // Custom preparation time / tagline e.g. "8-12 mins"
+  desc?: string; // Optional short description or ingredients
+  category?: string; // Category ID e.g. 'rolls' | 'burgers' | 'mains' | 'drinks'
   n: {
     en: string;
     hi: string;

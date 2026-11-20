@@ -112,6 +112,13 @@ export function buildSheetRowsForState(
       'Is_Jain',
       'Available',
       'GST_Percent',
+      'Image_URL',
+      'Category',
+      'Badge',
+      'Rating',
+      'Prep_Time',
+      'Dietary_Tags',
+      'Description',
     ],
     ...state.menu.map((m) => [
       m.id,
@@ -125,6 +132,13 @@ export function buildSheetRowsForState(
       !!m.jain,
       m.available,
       typeof m.gstRate === 'number' ? m.gstRate : '',
+      m.img || '',
+      m.category || '',
+      m.badge || '',
+      typeof m.rating === 'number' ? m.rating : '',
+      m.prepTime || '',
+      (m.dietaryTags || []).join(','),
+      m.desc || '',
     ]),
   ];
 
@@ -680,6 +694,19 @@ export function parseMenuFromSheetRows(rows: unknown[][]): Dish[] | null {
       gstRaw !== '' && !Number.isNaN(Number(gstRaw)) && Number(gstRaw) >= 0
         ? Number(gstRaw)
         : undefined;
+
+    const img = String(r[11] || '').trim();
+    const category = String(r[12] || '').trim();
+    const badge = String(r[13] || '').trim();
+    const ratingRaw = Number(r[14]);
+    const rating = !Number.isNaN(ratingRaw) && ratingRaw > 0 ? ratingRaw : undefined;
+    const prepTime = String(r[15] || '').trim();
+    const dietaryTagsRaw = String(r[16] || '').trim();
+    const dietaryTags = dietaryTagsRaw
+      ? dietaryTagsRaw.split(',').map((x) => x.trim()).filter(Boolean)
+      : undefined;
+    const desc = String(r[17] || '').trim();
+
     dishes.push({
       id,
       e,
@@ -688,6 +715,13 @@ export function parseMenuFromSheetRows(rows: unknown[][]): Dish[] | null {
       jain,
       available,
       ...(typeof parsedGst === 'number' ? { gstRate: parsedGst } : {}),
+      ...(img ? { img } : {}),
+      ...(category ? { category } : {}),
+      ...(badge ? { badge } : {}),
+      ...(typeof rating === 'number' ? { rating } : {}),
+      ...(prepTime ? { prepTime } : {}),
+      ...(dietaryTags && dietaryTags.length ? { dietaryTags } : {}),
+      ...(desc ? { desc } : {}),
       n: { en, hi, gu },
     });
   }
