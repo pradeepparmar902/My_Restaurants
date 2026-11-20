@@ -2394,6 +2394,7 @@ function extractGoogleIdFromUrl(raw: string, kind: 'sheet' | 'folder'): string {
 export function SuperAdminPortalView() {
   const {
     S,
+    activeWorkspaceSlug,
     isSuperAdmin,
     unlockSuperAdmin,
     createAndProvisionWorkspace,
@@ -2482,6 +2483,17 @@ export function SuperAdminPortalView() {
   const masterSheetUrl = S.googleConfig.spreadsheetId
     ? `https://docs.google.com/spreadsheets/d/${S.googleConfig.spreadsheetId}/edit`
     : '';
+
+  if (activeWorkspaceSlug !== 'tadka-truck') {
+    return (
+      <div className="card">
+        <h3>🏢 Super Admin Not Available</h3>
+        <p className="mu" style={{ margin: '6px 0 10px' }}>
+          Super Admin is only accessible on the Master SaaS Platform, not inside individual client restaurant workspaces.
+        </p>
+      </div>
+    );
+  }
 
   if (!isSuperAdmin) {
     return (
@@ -3308,8 +3320,8 @@ function SuperAdminWorkspaceManagerSection({
   const [provisioning, setProvisioning] = useState(false);
   const [lastHandoverUrl, setLastHandoverUrl] = useState('');
 
-  // In any client workspace (?w=client-slug), completely hide Super Admin from the Restaurant Owner
-  if (!isSuperAdmin && activeWorkspaceSlug !== 'tadka-truck') {
+  // In any client workspace (?w=client-slug), completely hide Super Admin
+  if (activeWorkspaceSlug !== 'tadka-truck') {
     return null;
   }
 

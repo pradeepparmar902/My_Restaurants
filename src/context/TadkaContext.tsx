@@ -268,8 +268,9 @@ export function TadkaProvider({
     Record<string, { proof: SocialProofSubmission; until: number }>
   >({});
   const appliedProofIdsRef = useRef<Set<string>>(new Set());
-  const [activeWorkspaceSlug, setActiveWorkspaceSlug] =
-    useState<string>('tadka-truck');
+  const [activeWorkspaceSlug, setActiveWorkspaceSlug] = useState<string>(() =>
+    typeof window !== 'undefined' ? getActiveWorkspaceSlug() : 'tadka-truck'
+  );
   const [isStandaloneMode, setIsStandaloneMode] = useState<boolean>(
     process.env.NEXT_PUBLIC_STANDALONE_MODE === 'true'
   );
@@ -406,7 +407,10 @@ export function TadkaProvider({
         setS((prev) => ({
           ...prev,
           me: parsed.me || prev.me,
-          role: parsed.role || prev.role,
+          role:
+            currentSlug !== 'tadka-truck' && parsed.role === 'sa'
+              ? 'c'
+              : parsed.role || prev.role,
           tab: parsed.tab || prev.tab,
           wtab: parsed.wtab || prev.wtab,
           lang: parsed.lang || prev.lang,
@@ -516,13 +520,14 @@ export function TadkaProvider({
       const urlStandalone =
         typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).get('standalone') === '1';
-      const isSuper =
+      const isMasterWorkspace =
         !isStandaloneMode &&
         !urlStandalone &&
+        getActiveWorkspaceSlug() === 'tadka-truck';
+      const isSuper =
+        isMasterWorkspace &&
         (SUPER_ADMIN_MOBILES.includes(next.me.mob) ||
-          (getActiveWorkspaceSlug() === 'tadka-truck' &&
-            staffMember?.r === 'Admin' &&
-            !next.googleConfig.ownerMobile));
+          (staffMember?.r === 'Admin' && !next.googleConfig.ownerMobile));
       const allowed: PortalRole[] = [
         ...getAllowedPortals(staffMember),
         ...(isSuper ? (['sa'] as PortalRole[]) : []),
@@ -702,14 +707,15 @@ export function TadkaProvider({
     const urlStandalone =
       typeof window !== 'undefined' &&
       new URLSearchParams(window.location.search).get('standalone') === '1';
-    const isSuper =
+    const isMasterWorkspace =
       !isStandaloneMode &&
       !urlStandalone &&
+      getActiveWorkspaceSlug() === 'tadka-truck';
+    const isSuper =
+      isMasterWorkspace &&
       (superAdminPinUnlocked ||
         SUPER_ADMIN_MOBILES.includes(S.me.mob) ||
-        (getActiveWorkspaceSlug() === 'tadka-truck' &&
-          staffOf()?.r === 'Admin' &&
-          !S.googleConfig.ownerMobile));
+        (staffOf()?.r === 'Admin' && !S.googleConfig.ownerMobile));
     return isSuper ? ([...base, 'sa'] as PortalRole[]) : base;
   }, [
     S.googleConfig.ownerMobile,
@@ -3193,14 +3199,18 @@ export function TadkaProvider({
 
   const isSuperAdmin =
     !isStandaloneMode &&
+    activeWorkspaceSlug === 'tadka-truck' &&
     (superAdminPinUnlocked ||
       SUPER_ADMIN_MOBILES.includes(S.me.mob) ||
-      (activeWorkspaceSlug === 'tadka-truck' &&
-        getActiveStaffMember(S.staff, S.me.mob)?.r === 'Admin' &&
+      (getActiveStaffMember(S.staff, S.me.mob)?.r === 'Admin' &&
         !S.googleConfig.ownerMobile));
 
   const unlockSuperAdmin = useCallback(
     (pin: string) => {
+      if (getActiveWorkspaceSlug() !== 'tadka-truck') {
+        say('Super Admin is only available on the Master Platform');
+        return false;
+      }
       if (pin.trim().toUpperCase() === 'SUPER123') {
         setSuperAdminPinUnlocked(true);
         say('Super Admin Workspace Manager unlocked ✅');
