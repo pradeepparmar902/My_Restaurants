@@ -29,6 +29,7 @@ export function MenuTabView() {
     staffOf,
     sheetOrdersToday,
     saveGoogleConfig,
+    setTab,
   } = useTadka();
   const [optMob, setOptMob] = useState('');
   const [showOptMob, setShowOptMob] = useState(false);
@@ -1491,13 +1492,16 @@ export function MenuTabView() {
         </div>
       )}
 
-      {/* Floating Swiggy / Zomato Style Bottom View Cart & Place Order Bar (Images 1-6, 13) */}
-      {cnt() > 0 ? (
+      {/* Floating Frozen Bottom View Cart & Place Order Bar when items are selected */}
+      {cnt() > 0 && (
         <div
           style={{
-            position: 'sticky',
-            bottom: '10px',
-            marginTop: '14px',
+            position: 'fixed',
+            bottom: 'calc(62px + env(safe-area-inset-bottom, 0px))',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'calc(100% - 24px)',
+            maxWidth: '406px',
             background: '#ffffff',
             color: '#0f172a',
             borderRadius: '16px',
@@ -1506,12 +1510,22 @@ export function MenuTabView() {
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '10px',
-            boxShadow: '0 10px 28px rgba(15, 23, 42, 0.25)',
-            border: '1.5px solid #16a34a',
-            zIndex: 20,
+            boxShadow: '0 8px 30px rgba(15, 23, 42, 0.28)',
+            border: '2px solid #16a34a',
+            zIndex: 40,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div
+            onClick={() => setTab('order')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              cursor: 'pointer',
+              flex: 1,
+            }}
+            title="Click to view &amp; review order"
+          >
             <div
               style={{
                 width: '38px',
@@ -1522,15 +1536,30 @@ export function MenuTabView() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '19px',
+                flexShrink: 0,
               }}
             >
               🛒
             </div>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>
+              <div
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  lineHeight: 1.2,
+                }}
+              >
                 {brandName}
               </div>
-              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#15803d' }}>
+              <div
+                style={{
+                  fontSize: '12.5px',
+                  fontWeight: 800,
+                  color: '#15803d',
+                  marginTop: '1px',
+                }}
+              >
                 {cnt()} {cnt() === 1 ? 'item' : 'items'} · ₹{dsub()}
               </div>
             </div>
@@ -1562,7 +1591,10 @@ export function MenuTabView() {
                 : 'Place Order ▸'}
           </button>
         </div>
-      ) : (
+      )}
+
+      {/* When no order is selected: keep current status with NO freeze */}
+      {cnt() === 0 ? (
         <button
           className="btn"
           disabled
@@ -1570,6 +1602,9 @@ export function MenuTabView() {
         >
           Pick dishes above to place order · ₹0
         </button>
+      ) : (
+        /* Bottom spacer so all menu dishes can scroll cleanly above the frozen bar */
+        <div style={{ height: '70px' }} />
       )}
     </div>
   );
