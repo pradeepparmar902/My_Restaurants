@@ -16,7 +16,10 @@ import {
   DEFAULT_DIETARY_FILTERS,
   DEFAULT_MENU_LANGUAGES,
 } from '@/lib/googleSheetsShared';
-import { downloadStandaloneRestaurantZip } from '@/lib/standalonePackBuilder';
+import {
+  downloadStandaloneRestaurantZip,
+  downloadStandaloneHtmlFile,
+} from '@/lib/standalonePackBuilder';
 import {
   DEFAULT_REWARD_RULES,
   ORDER_STATUS_LABELS,
@@ -3209,6 +3212,17 @@ export function SuperAdminPortalView() {
                     <button
                       type="button"
                       className="chip on"
+                      style={{ fontSize: '11px', background: '#3b82f6' }}
+                      onClick={() => {
+                        downloadStandaloneHtmlFile(w, baseUrl);
+                        say(`Downloaded ${w.slug}-standalone.html 📄`);
+                      }}
+                    >
+                      📄 Download HTML
+                    </button>
+                    <button
+                      type="button"
+                      className="chip on"
                       style={{ fontSize: '11px' }}
                       onClick={() => {
                         downloadStandaloneRestaurantZip(w, baseUrl);
@@ -3593,19 +3607,66 @@ export function SuperAdminPortalView() {
                 ))}
               </select>
 
-              <button
-                type="button"
-                className="btn alt"
-                onClick={() => {
-                  if (!selectedClient) return;
-                  downloadStandaloneRestaurantZip(selectedClient, baseUrl);
-                  say(
-                    `Saved ${selectedClient.slug}-standalone-app-pack.zip to your Downloads folder 📦`
-                  );
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                  onClick={() => {
+                    if (!selectedClient) return;
+                    downloadStandaloneHtmlFile(selectedClient, baseUrl);
+                    say(
+                      `Saved ${selectedClient.slug}-standalone.html (Zero-Cost Free Deploy / Local Machine) 📄`
+                    );
+                  }}
+                >
+                  📄 Download Standalone HTML (Zero-Cost / Local Run)
+                </button>
+
+                <button
+                  type="button"
+                  className="btn alt"
+                  onClick={() => {
+                    if (!selectedClient) return;
+                    downloadStandaloneRestaurantZip(selectedClient, baseUrl);
+                    say(
+                      `Saved ${selectedClient.slug}-standalone-app-pack.zip to your Downloads folder 📦`
+                    );
+                  }}
+                >
+                  📦 Extract &amp; Download Standalone App ZIP
+                </button>
+              </div>
+
+              <div
+                style={{
+                  marginTop: '10px',
+                  padding: '10px 12px',
+                  borderRadius: '10px',
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  border: '1px dashed #3b82f6',
+                  fontSize: '12px',
                 }}
               >
-                📦 Extract &amp; Download Standalone App ZIP
-              </button>
+                <b>💡 How Owner Deploys with ₹0 Hosting Cost / Locally:</b>
+                <ul style={{ margin: '6px 0 0', paddingLeft: '18px', lineHeight: 1.5 }}>
+                  <li>
+                    <b>Run on Local Machine (PC / Laptop / Tablet):</b> Just double-click the <code>.html</code> file on any computer, POS terminal, or tablet — it opens immediately in Chrome/Edge without installing Node.js or any server!
+                  </li>
+                  <li>
+                    <b>100% Free Cloudflare Pages / GitHub Pages / Netlify Drop:</b> Drag &amp; drop the HTML file to any free static host &rarr; live website with free SSL certificate at ₹0/month.
+                  </li>
+                  <li>
+                    <b>Custom Domain on cPanel / Hostinger:</b> Upload the single <code>index.html</code> file into <code>public_html</code> on any basic shared hosting.
+                  </li>
+                </ul>
+              </div>
             </div>
           );
         })()}
