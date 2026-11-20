@@ -425,7 +425,9 @@ export function switchUserSessionInState(
  *    resulting in "beneficiary UPI ID incorrect" or "cannot pay with this QR code".
  * 2. Amount (`am`) formatted with 2 decimal places.
  * 3. Currency (`cu=INR`).
- * 4. `pn` (Payee Name) and `tn` (Transaction Note) encoded safely with spaces as %20.
+ * 4. Payee Name (`pn`) encoded safely without underscores or illegal characters.
+ * 5. Do NOT pass complex transaction notes (`tn`) with spaces or special characters,
+ *    as buggy Android UPI handlers (like BHIM) fail with "beneficiary UPI ID incorrect".
  */
 export function buildUpiUri(params: {
   upiId: string;
@@ -445,12 +447,83 @@ export function buildUpiUri(params: {
     .replace(/[^\w\s-]/g, '')
     .trim();
   const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
-
-  const cleanNote = encodeURIComponent((params.note || 'Order Payment').replace(/[_]+/g, ' ').trim());
   const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
 
-  // Standard NPCI format with literal '@'
-  return `upi://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&tn=${cleanNote}`;
+  // Minimal standard NPCI format with literal '@' and no problematic tn spaces
+  return `upi://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
+}
+
+/**
+ * Direct Android Intent to launch Google Pay (GPay) specifically,
+ * bypassing Android's default UPI handler (which may hijack upi:// with BHIM).
+ */
+export function buildGPayIntentUri(params: {
+  upiId: string;
+  payeeName?: string;
+  amount: number;
+}): string {
+  const rawId = (params.upiId || '').trim();
+  const cleanId = rawId.replace(/\s+/g, '');
+  if (!cleanId || !cleanId.includes('@')) return '';
+
+  const sanitizedName = (params.payeeName || 'Restaurant')
+    .replace(/[_]+/g, ' ')
+    .replace(/[^\w\s-]/g, '')
+    .trim();
+  const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
+  const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+
+  // On iOS devices, intent:// isn't supported; tez:// or upi:// works
+  if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    return `tez://upi/pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
+  }
+
+  // Official Android Intent targeting Google Pay package directly
+  return `intent://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+}
+
+/**
+ * Direct URL scheme to launch PhonePe specifically.
+ */
+export function buildPhonePeIntentUri(params: {
+  upiId: string;
+  payeeName?: string;
+  amount: number;
+}): string {
+  const rawId = (params.upiId || '').trim();
+  const cleanId = rawId.replace(/\s+/g, '');
+  if (!cleanId || !cleanId.includes('@')) return '';
+
+  const sanitizedName = (params.payeeName || 'Restaurant')
+    .replace(/[_]+/g, ' ')
+    .replace(/[^\w\s-]/g, '')
+    .trim();
+  const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
+  const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+
+  return `phonepe://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
+}
+
+/**
+ * Direct URL scheme to launch Paytm specifically.
+ */
+export function buildPaytmIntentUri(params: {
+  upiId: string;
+  payeeName?: string;
+  amount: number;
+}): string {
+  const rawId = (params.upiId || '').trim();
+  const cleanId = rawId.replace(/\s+/g, '');
+  if (!cleanId || !cleanId.includes('@')) return '';
+
+  const sanitizedName = (params.payeeName || 'Restaurant')
+    .replace(/[_]+/g, ' ')
+    .replace(/[^\w\s-]/g, '')
+    .trim();
+  const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
+  const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+
+  return `paytmmp://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
 }
 
 export function isValidUpiId(id?: string | null): boolean {

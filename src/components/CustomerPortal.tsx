@@ -8,7 +8,14 @@ import {
   DEFAULT_DIETARY_FILTERS,
   DEFAULT_MENU_LANGUAGES,
 } from '@/lib/googleSheetsShared';
-import { normalizeMobile, buildUpiUri, isValidUpiId } from '@/lib/helpers';
+import {
+  normalizeMobile,
+  buildUpiUri,
+  buildGPayIntentUri,
+  buildPhonePeIntentUri,
+  buildPaytmIntentUri,
+  isValidUpiId,
+} from '@/lib/helpers';
 import {
   ConnectedAccountsCard,
   CountryCodeMobileInput,
@@ -1761,7 +1768,27 @@ export function OrderTabView() {
         upiId,
         payeeName: upiName,
         amount: totalPayablePrepaid,
-        note: `Counter ${S.sess?.no || 'C1'} Order`,
+      })
+    : '';
+  const gpayUri = hasValidUpi
+    ? buildGPayIntentUri({
+        upiId,
+        payeeName: upiName,
+        amount: totalPayablePrepaid,
+      })
+    : '';
+  const phonePeUri = hasValidUpi
+    ? buildPhonePeIntentUri({
+        upiId,
+        payeeName: upiName,
+        amount: totalPayablePrepaid,
+      })
+    : '';
+  const paytmUri = hasValidUpi
+    ? buildPaytmIntentUri({
+        upiId,
+        payeeName: upiName,
+        amount: totalPayablePrepaid,
       })
     : '';
 
@@ -1853,11 +1880,12 @@ export function OrderTabView() {
                 </div>
 
                 <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Primary 1-Tap Google Pay Button */}
                   <a
-                    href={upiUri}
+                    href={gpayUri}
                     className="btn"
                     style={{
-                      background: 'linear-gradient(135deg, #10b981, #059669)',
+                      background: '#0f9d58',
                       color: '#ffffff',
                       textDecoration: 'none',
                       display: 'flex',
@@ -1868,9 +1896,70 @@ export function OrderTabView() {
                       padding: '12px',
                       borderRadius: '10px',
                       fontSize: '14px',
+                      boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                     }}
                   >
-                    🚀 Tap to Pay via UPI App (GPay / PhonePe / Paytm)
+                    🟢 Open Google Pay (GPay) · ₹{totalPayablePrepaid}
+                  </a>
+
+                  {/* PhonePe & Paytm Quick Launch Buttons */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <a
+                      href={phonePeUri}
+                      className="btn"
+                      style={{
+                        background: '#5f259f',
+                        color: '#ffffff',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        padding: '10px 6px',
+                        borderRadius: '8px',
+                      }}
+                    >
+                      🟣 PhonePe
+                    </a>
+                    <a
+                      href={paytmUri}
+                      className="btn"
+                      style={{
+                        background: '#00baf2',
+                        color: '#002e6e',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        padding: '10px 6px',
+                        borderRadius: '8px',
+                      }}
+                    >
+                      🔵 Paytm
+                    </a>
+                  </div>
+
+                  {/* Other UPI Apps (Generic Chooser / BHIM) */}
+                  <a
+                    href={upiUri}
+                    className="btn ghost"
+                    style={{
+                      fontSize: '12px',
+                      padding: '8px 12px',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                    }}
+                  >
+                    📱 Other UPI App (BHIM / CRED / Any)
                   </a>
 
                   <button
@@ -3269,12 +3358,25 @@ export function BillTabView() {
           const upiId = (S.googleConfig.upiId || '').trim();
           const upiName =
             (S.googleConfig.upiName || '').trim() || 'Restaurant';
-          const upiNote = `Order ${S.sess?.no || 'C1'} T${S.activeTable}`;
           const upiUri = buildUpiUri({
             upiId,
             payeeName: upiName,
             amount: per,
-            note: upiNote,
+          });
+          const gpayUri = buildGPayIntentUri({
+            upiId,
+            payeeName: upiName,
+            amount: per,
+          });
+          const phonePeUri = buildPhonePeIntentUri({
+            upiId,
+            payeeName: upiName,
+            amount: per,
+          });
+          const paytmUri = buildPaytmIntentUri({
+            upiId,
+            payeeName: upiName,
+            amount: per,
           });
           const upiQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=190x190&data=${encodeURIComponent(
             upiUri
@@ -3303,17 +3405,90 @@ export function BillTabView() {
                   style={{ display: 'block' }}
                 />
               </div>
-              <a
-                href={upiUri}
-                className="btn alt"
-                style={{
-                  display: 'block',
-                  textDecoration: 'none',
-                  marginTop: '10px',
-                }}
-              >
-                📱 Open GPay / PhonePe / Paytm (₹{per})
-              </a>
+
+              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Primary 1-Tap Google Pay Button */}
+                <a
+                  href={gpayUri}
+                  className="btn"
+                  style={{
+                    background: '#0f9d58',
+                    color: '#ffffff',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontWeight: 'bold',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
+                  }}
+                >
+                  🟢 Open Google Pay (GPay) · ₹{per}
+                </a>
+
+                {/* PhonePe & Paytm Quick Launch Buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <a
+                    href={phonePeUri}
+                    className="btn"
+                    style={{
+                      background: '#5f259f',
+                      color: '#ffffff',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      padding: '10px 6px',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    🟣 PhonePe
+                  </a>
+                  <a
+                    href={paytmUri}
+                    className="btn"
+                    style={{
+                      background: '#00baf2',
+                      color: '#002e6e',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      padding: '10px 6px',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    🔵 Paytm
+                  </a>
+                </div>
+
+                {/* Other UPI Apps (Generic Chooser / BHIM) */}
+                <a
+                  href={upiUri}
+                  className="btn ghost"
+                  style={{
+                    fontSize: '12px',
+                    padding: '8px 12px',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                  }}
+                >
+                  📱 Other UPI App (BHIM / CRED / Any)
+                </a>
+              </div>
               <button
                 className="btn"
                 style={{ marginTop: '8px' }}
