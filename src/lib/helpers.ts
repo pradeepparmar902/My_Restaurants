@@ -439,12 +439,18 @@ export function buildUpiUri(params: {
     return '';
   }
 
-  const cleanName = encodeURIComponent((params.payeeName || 'Restaurant').trim());
-  const formattedAmount = Number(params.amount || 0).toFixed(2);
-  const cleanNote = encodeURIComponent((params.note || 'Restaurant Order').trim());
+  // Replace underscores and illegal characters in Payee Name with clean spaces for NPCI bank switch compliance
+  const sanitizedName = (params.payeeName || 'Restaurant')
+    .replace(/[_]+/g, ' ')
+    .replace(/[^\w\s-]/g, '')
+    .trim();
+  const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
 
-  // Note: cleanId is kept with literal '@'
-  return `upi://pay?pa=${cleanId}&pn=${cleanName}&am=${formattedAmount}&cu=INR&tn=${cleanNote}`;
+  const cleanNote = encodeURIComponent((params.note || 'Order Payment').replace(/[_]+/g, ' ').trim());
+  const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+
+  // Standard NPCI format with literal '@'
+  return `upi://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&tn=${cleanNote}`;
 }
 
 export function isValidUpiId(id?: string | null): boolean {

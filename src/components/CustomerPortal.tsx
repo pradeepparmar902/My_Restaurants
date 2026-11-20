@@ -1845,7 +1845,7 @@ export function OrderTabView() {
                     style={{ width: '170px', height: '170px', display: 'block', margin: '0 auto' }}
                   />
                   <span style={{ color: '#111827', fontSize: '11px', fontWeight: 600, display: 'block', marginTop: '6px' }}>
-                    Pay to: <b>${upiName}</b> (${upiId})
+                    Pay to: <b>{upiName}</b> ({upiId})
                   </span>
                   <span style={{ color: '#4b5563', fontSize: '10px', display: 'block' }}>
                     Scan with GPay / PhonePe / Paytm / BHIM

@@ -87,6 +87,7 @@ export function buildSheetRowsForState(
     ['socialTag', state.googleConfig?.socialTag || '', new Date().toISOString()],
     ['upiId', state.googleConfig?.upiId || '', new Date().toISOString()],
     ['upiName', state.googleConfig?.upiName || '', new Date().toISOString()],
+    ['upiQrImageUrl', state.googleConfig?.upiQrImageUrl || '', new Date().toISOString()],
     ['billing_model', state.googleConfig?.billingModel || 'postpaid', new Date().toISOString()],
     ['gst_enabled', gstEnabled, new Date().toISOString()],
     ['gst_rate', gstRate, new Date().toISOString()],
@@ -832,6 +833,7 @@ export function parseConfigFromSheetRows(
     if (key === 'socialTag' && val) cfg.socialTag = val;
     if (key === 'upiId' && val) cfg.upiId = val;
     if (key === 'upiName' && val) cfg.upiName = val;
+    if (key === 'upiQrImageUrl' && val) cfg.upiQrImageUrl = val;
     if (key === 'billing_model' && (val === 'prepaid' || val === 'postpaid')) {
       cfg.billingModel = val;
     }

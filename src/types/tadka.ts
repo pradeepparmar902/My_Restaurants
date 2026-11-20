@@ -219,6 +219,7 @@ export interface GoogleCloudStorageConfig {
   socialTag?: string;
   upiId?: string;
   upiName?: string;
+  upiQrImageUrl?: string; // Optional custom physical standee / Soundbox QR photo
   billingModel?: 'prepaid' | 'postpaid'; // 'prepaid' = QSR / Food Court pay first, 'postpaid' = Dine-in pay later
   gstEnabled?: boolean;
   gstRate?: number;

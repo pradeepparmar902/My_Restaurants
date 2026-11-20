@@ -5337,7 +5337,7 @@ export function AdminPortalView() {
                 type="text"
                 value={upiIdInput}
                 onChange={(e) => setUpiIdInput(e.target.value.trim())}
-                placeholder="e.g. 9820012345@paytm, rajesh@okhdfcbank"
+                placeholder="e.g. 9820012345@paytm, yourname@okhdfcbank"
                 className="inp"
                 style={{ width: '100%', fontFamily: 'monospace', fontSize: '13px' }}
               />
@@ -5346,6 +5346,33 @@ export function AdminPortalView() {
                   ⚠️ UPI ID must contain "@" (e.g. name@okaxis or 9820012345@paytm)
                 </span>
               )}
+              <div
+                style={{
+                  marginTop: '6px',
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  border: '1px dashed #3b82f6',
+                  fontSize: '11px',
+                  lineHeight: 1.5,
+                }}
+              >
+                <b>🔍 Where to find your real UPI ID on your phone:</b>
+                <ul style={{ margin: '4px 0 0', paddingLeft: '16px' }}>
+                  <li>
+                    <b>Google Pay:</b> Tap your profile picture (top-right) &rarr; your real UPI ID is displayed right under your mobile number (e.g. <code>yourname@okhdfcbank</code>, <code>yourmobile@okaxis</code>, <code>name@okicici</code>, or <code>name@oksbi</code>).
+                  </li>
+                  <li>
+                    <b>PhonePe:</b> Tap profile picture &rarr; <b>UPI IDs</b> (e.g. <code>yourmobile@ybl</code> or <code>mobile@ibl</code>).
+                  </li>
+                  <li>
+                    <b>Paytm:</b> Tap profile icon &rarr; UPI ID (e.g. <code>yourmobile@paytm</code>).
+                  </li>
+                </ul>
+                <span style={{ color: '#fbbf24', display: 'block', marginTop: '4px' }}>
+                  ⚠️ <b>Important:</b> Test or dummy numbers (such as <code>8989898989@upi</code>) have no bank account linked and will be rejected by Google Pay with <i>&quot;No Payment account registered&quot;</i>. Please enter your real bank UPI ID to receive payments.
+                </span>
+              </div>
             </div>
 
             <div>
