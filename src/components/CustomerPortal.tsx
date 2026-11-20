@@ -8,7 +8,7 @@ import {
   DEFAULT_DIETARY_FILTERS,
   DEFAULT_MENU_LANGUAGES,
 } from '@/lib/googleSheetsShared';
-import { normalizeMobile } from '@/lib/helpers';
+import { normalizeMobile, buildUpiUri, isValidUpiId } from '@/lib/helpers';
 import {
   ConnectedAccountsCard,
   CountryCodeMobileInput,
@@ -1681,6 +1681,7 @@ export function OrderTabView() {
     S,
     setTab,
     say,
+    updateState,
     inviteMemberToSession,
     removeInvitedMember,
     pullFromGoogleSheets,
@@ -1751,9 +1752,18 @@ export function OrderTabView() {
     return sub + gstAmt;
   })();
 
-  const upiId = S.googleConfig?.upiId || 'tadkatruck@okicici';
-  const upiName = S.googleConfig?.upiName || S.googleConfig?.restaurantName || 'Tadka Truck';
-  const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${totalPayablePrepaid}&tn=${encodeURIComponent(`Counter ${S.sess?.no || 'C1'} Tadka`)}&cu=INR`;
+  const rawUpiId = (S.googleConfig?.upiId || '').trim();
+  const hasValidUpi = isValidUpiId(rawUpiId);
+  const upiId = hasValidUpi ? rawUpiId : '';
+  const upiName = (S.googleConfig?.upiName || S.googleConfig?.restaurantName || 'Restaurant').trim();
+  const upiUri = hasValidUpi
+    ? buildUpiUri({
+        upiId,
+        payeeName: upiName,
+        amount: totalPayablePrepaid,
+        note: `Counter ${S.sess?.no || 'C1'} Order`,
+      })
+    : '';
 
   return (
     <>
@@ -1818,72 +1828,117 @@ export function OrderTabView() {
           </div>
 
           <div style={{ marginTop: '14px', textAlign: 'center' }}>
-            <div
-              style={{
-                display: 'inline-block',
-                padding: '10px',
-                background: '#ffffff',
-                borderRadius: '12px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              }}
-            >
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiUri)}`}
-                alt="UPI Scan & Pay QR"
-                style={{ width: '160px', height: '160px', display: 'block', margin: '0 auto' }}
-              />
-              <span style={{ color: '#111827', fontSize: '11px', fontWeight: 600, display: 'block', marginTop: '6px' }}>
-                Scan with GPay / PhonePe / Paytm / BHIM
-              </span>
-            </div>
+            {hasValidUpi && upiUri ? (
+              <>
+                <div
+                  style={{
+                    display: 'inline-block',
+                    padding: '10px',
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  }}
+                >
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}`}
+                    alt="UPI Scan & Pay QR"
+                    style={{ width: '170px', height: '170px', display: 'block', margin: '0 auto' }}
+                  />
+                  <span style={{ color: '#111827', fontSize: '11px', fontWeight: 600, display: 'block', marginTop: '6px' }}>
+                    Pay to: <b>${upiName}</b> (${upiId})
+                  </span>
+                  <span style={{ color: '#4b5563', fontSize: '10px', display: 'block' }}>
+                    Scan with GPay / PhonePe / Paytm / BHIM
+                  </span>
+                </div>
 
-            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <a
-                href={upiUri}
-                className="btn"
-                style={{
-                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                  color: '#ffffff',
-                  textDecoration: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  fontWeight: 'bold',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  fontSize: '14px',
-                }}
-              >
-                🚀 Tap to Pay via UPI App (GPay / PhonePe / Amazon)
-              </a>
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <a
+                    href={upiUri}
+                    className="btn"
+                    style={{
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
+                      color: '#ffffff',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      fontWeight: 'bold',
+                      padding: '12px',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                    }}
+                  >
+                    🚀 Tap to Pay via UPI App (GPay / PhonePe / Paytm)
+                  </a>
 
-              <button
-                type="button"
-                className="btn ghost"
-                style={{ fontSize: '12px', padding: '6px 12px' }}
-                onClick={() => {
-                  navigator.clipboard?.writeText?.(upiUri);
-                  say('UPI Payment Link copied to clipboard! 📋');
-                }}
-              >
-                📋 Copy UPI Link
-              </button>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    style={{ fontSize: '12px', padding: '6px 12px' }}
+                    onClick={() => {
+                      navigator.clipboard?.writeText?.(upiUri);
+                      say('UPI Payment Link copied to clipboard! 📋');
+                    }}
+                  >
+                    📋 Copy UPI Link
+                  </button>
 
+                  <div
+                    style={{
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      border: '1px dashed #f59e0b',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      fontSize: '12px',
+                      color: '#fbbf24',
+                      textAlign: 'center',
+                    }}
+                  >
+                    ⏳ Once you make payment, counter staff/waiter verifies it and the chef starts cooking immediately!
+                  </div>
+                </div>
+              </>
+            ) : (
               <div
                 style={{
-                  background: 'rgba(245, 158, 11, 0.15)',
-                  border: '1px dashed #f59e0b',
-                  borderRadius: '8px',
-                  padding: '8px 10px',
-                  fontSize: '12px',
-                  color: '#fbbf24',
+                  padding: '16px 14px',
+                  borderRadius: '12px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px dashed #ef4444',
                   textAlign: 'center',
                 }}
               >
-                ⏳ Once you make payment, counter staff/waiter verifies it and the chef starts cooking immediately!
+                <div style={{ fontSize: '28px', marginBottom: '4px' }}>⚠️</div>
+                <b style={{ color: '#f87171', fontSize: '15px' }}>
+                  Restaurant UPI ID Not Configured Yet
+                </b>
+                <p className="mu" style={{ fontSize: '12px', margin: '6px 0 0', lineHeight: 1.5 }}>
+                  The restaurant owner has not entered their real Google Pay / PhonePe UPI ID in Admin settings.
+                </p>
+                <p style={{ fontSize: '12px', color: '#10b981', marginTop: '8px', fontWeight: 600 }}>
+                  👉 Please pay with Cash or Card at the counter for now. Staff will verify your order.
+                </p>
+                {S.role !== 'c' && (
+                  <button
+                    type="button"
+                    className="chip on"
+                    style={{
+                      marginTop: '10px',
+                      fontSize: '12px',
+                      background: '#3b82f6',
+                      padding: '8px 14px',
+                    }}
+                    onClick={() => {
+                      updateState((prev) => ({ ...prev, role: 'a' }));
+                    }}
+                  >
+                    ⚙️ Switch to Admin Tab &rarr; Set Real UPI ID
+                  </button>
+                )}
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -3213,13 +3268,14 @@ export function BillTabView() {
         (() => {
           const upiId = (S.googleConfig.upiId || '').trim();
           const upiName =
-            (S.googleConfig.upiName || '').trim() || 'Tadka Truck';
-          const upiNote = `Tadka ${S.sess?.no || 'Order'} T${S.activeTable}`;
-          const upiUri = `upi://pay?pa=${encodeURIComponent(
-            upiId
-          )}&pn=${encodeURIComponent(upiName)}&am=${per}&cu=INR&tn=${encodeURIComponent(
-            upiNote
-          )}`;
+            (S.googleConfig.upiName || '').trim() || 'Restaurant';
+          const upiNote = `Order ${S.sess?.no || 'C1'} T${S.activeTable}`;
+          const upiUri = buildUpiUri({
+            upiId,
+            payeeName: upiName,
+            amount: per,
+            note: upiNote,
+          });
           const upiQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=190x190&data=${encodeURIComponent(
             upiUri
           )}`;

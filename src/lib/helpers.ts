@@ -415,3 +415,41 @@ export function switchUserSessionInState(
     showLogin: false,
   };
 }
+
+/**
+ * Constructs a fully compliant NPCI UPI Deep Link / QR Code URI.
+ *
+ * CRITICAL UPI / GOOGLE PAY COMPATIBILITY RULES:
+ * 1. The Payee VPA (`pa`) MUST contain the literal '@' character.
+ *    Encoding '@' to '%40' breaks Google Pay and PhonePe VPA validation on Android & iOS,
+ *    resulting in "beneficiary UPI ID incorrect" or "cannot pay with this QR code".
+ * 2. Amount (`am`) formatted with 2 decimal places.
+ * 3. Currency (`cu=INR`).
+ * 4. `pn` (Payee Name) and `tn` (Transaction Note) encoded safely with spaces as %20.
+ */
+export function buildUpiUri(params: {
+  upiId: string;
+  payeeName?: string;
+  amount: number;
+  note?: string;
+}): string {
+  const rawId = (params.upiId || '').trim();
+  const cleanId = rawId.replace(/\s+/g, '');
+  if (!cleanId || !cleanId.includes('@')) {
+    return '';
+  }
+
+  const cleanName = encodeURIComponent((params.payeeName || 'Restaurant').trim());
+  const formattedAmount = Number(params.amount || 0).toFixed(2);
+  const cleanNote = encodeURIComponent((params.note || 'Restaurant Order').trim());
+
+  // Note: cleanId is kept with literal '@'
+  return `upi://pay?pa=${cleanId}&pn=${cleanName}&am=${formattedAmount}&cu=INR&tn=${cleanNote}`;
+}
+
+export function isValidUpiId(id?: string | null): boolean {
+  if (!id) return false;
+  const v = id.trim().toLowerCase();
+  return Boolean(v && v.includes('@') && v !== 'tadkatruck@okicici' && v.length >= 5);
+}
+

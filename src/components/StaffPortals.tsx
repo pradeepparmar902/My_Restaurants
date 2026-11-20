@@ -28,6 +28,8 @@ import {
 import {
   getCurrentBusinessDate,
   formatIndianDateTime,
+  buildUpiUri,
+  isValidUpiId,
   getDiscount,
   getSessionRowStatus,
   getSubtotal,
@@ -1227,8 +1229,10 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
     );
   });
 
-  const upiId = S.googleConfig.upiId || 'tadkatruck@okicici';
-  const upiName = S.googleConfig.upiName || S.googleConfig.restaurantName || 'Tadka Truck';
+  const rawUpiId = (S.googleConfig.upiId || '').trim();
+  const hasValidUpi = isValidUpiId(rawUpiId);
+  const upiId = hasValidUpi ? rawUpiId : '';
+  const upiName = (S.googleConfig.upiName || S.googleConfig.restaurantName || 'Restaurant').trim();
   const gstEnabled = S.googleConfig?.gstEnabled !== false;
   const gstRate = S.googleConfig?.gstRate ?? 5;
 
@@ -1290,7 +1294,14 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
             const gst = gstEnabled ? Math.round((subtotal * gstRate) / 100) : 0;
             const total = subtotal + gst;
 
-            const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${total}&tn=${encodeURIComponent(`Counter ${o.counterNo} Round ${o.round}`)}&cu=INR`;
+            const upiUri = hasValidUpi
+              ? buildUpiUri({
+                  upiId,
+                  payeeName: upiName,
+                  amount: total,
+                  note: `Counter ${o.counterNo} Round ${o.round}`,
+                })
+              : '';
             const waText = encodeURIComponent(
               `Hello! Your order for Counter ${o.counterNo} (Table ${o.table}) at ${upiName} is ready for payment.\n\nTotal Payable: ₹${total}\n\nPay via UPI: ${upiUri}\n\nOnce paid, your order goes straight to the chef for cooking!`
             );
@@ -5301,17 +5312,105 @@ export function AdminPortalView() {
           </button>
         </div>
 
+        <div
+          style={{
+            marginTop: '14px',
+            padding: '12px',
+            borderRadius: '12px',
+            background: 'rgba(59, 130, 246, 0.08)',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
+          }}
+        >
+          <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px', color: '#60a5fa' }}>
+            💳 Restaurant Direct UPI ID (Google Pay / PhonePe / Paytm / BHIM)
+          </div>
+          <p className="mu" style={{ fontSize: '11px', margin: '0 0 10px' }}>
+            Enter your real bank VPA. When customers scan or tap to pay in Prepaid or Bill tabs, 100% of money lands directly in your bank account with 0% fee.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                Your Real UPI ID (e.g. mobile@paytm, name@okhdfcbank, hotel@icici)
+              </div>
+              <input
+                type="text"
+                value={upiIdInput}
+                onChange={(e) => setUpiIdInput(e.target.value.trim())}
+                placeholder="e.g. 9820012345@paytm, rajesh@okhdfcbank"
+                className="inp"
+                style={{ width: '100%', fontFamily: 'monospace', fontSize: '13px' }}
+              />
+              {!upiIdInput.includes('@') && upiIdInput.length > 0 && (
+                <span style={{ color: '#f87171', fontSize: '11px', marginTop: '2px', display: 'block' }}>
+                  ⚠️ UPI ID must contain "@" (e.g. name@okaxis or 9820012345@paytm)
+                </span>
+              )}
+            </div>
+
+            <div>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                Payee Business / Account Name (Shown on customer's Google Pay screen)
+              </div>
+              <input
+                type="text"
+                value={upiNameInput}
+                onChange={(e) => setUpiNameInput(e.target.value)}
+                placeholder="e.g. Bharat Dhaba or Rajesh Patel"
+                className="inp"
+                style={{ width: '100%', fontSize: '13px' }}
+              />
+            </div>
+
+            {isValidUpiId(upiIdInput) && (
+              <div
+                style={{
+                  marginTop: '10px',
+                  padding: '10px',
+                  background: '#ffffff',
+                  borderRadius: '10px',
+                  textAlign: 'center',
+                }}
+              >
+                <span style={{ color: '#111827', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+                  🧪 Test Your Live UPI QR (Scan with your Google Pay now to verify):
+                </span>
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                    buildUpiUri({
+                      upiId: upiIdInput,
+                      payeeName: upiNameInput || 'Restaurant',
+                      amount: 1,
+                      note: 'Test Payment',
+                    })
+                  )}`}
+                  alt="Live Test QR"
+                  style={{ width: '140px', height: '140px', display: 'block', margin: '0 auto' }}
+                />
+                <span style={{ color: '#16a34a', fontSize: '11px', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
+                  ✅ Valid NPCI Format · Payee: {upiNameInput || 'Restaurant'} ({upiIdInput})
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
         <button
           type="button"
           className="btn alt"
+          style={{ marginTop: '12px' }}
           onClick={async () => {
-            const nextCfg = { billingModel: billingModelInput };
+            const nextCfg = {
+              billingModel: billingModelInput,
+              upiId: upiIdInput.trim(),
+              upiName: upiNameInput.trim() || 'Restaurant',
+            };
             saveGoogleConfig(nextCfg);
             await syncToGoogleSheets(nextCfg);
-            say(`Billing workflow updated to ${billingModelInput.toUpperCase()} & synced ✅`);
+            say(`Billing model (${billingModelInput.toUpperCase()}) & UPI ID (${upiIdInput || 'Saved'}) synced ✅`);
           }}
         >
-          💾 Save &amp; Sync Billing Workflow
+          💾 Save &amp; Sync Billing Model &amp; UPI ID
         </button>
       </CollapsibleSection>
 
