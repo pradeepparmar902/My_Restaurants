@@ -1791,6 +1791,9 @@ export function OrderTabView() {
         amount: totalPayablePrepaid,
       })
     : '';
+  const qrDisplayUrl = (S.googleConfig?.upiQrImageUrl || '').trim() || (upiUri
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}`
+    : '');
 
   return (
     <>
@@ -1867,9 +1870,9 @@ export function OrderTabView() {
                   }}
                 >
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}`}
+                    src={qrDisplayUrl}
                     alt="UPI Scan & Pay QR"
-                    style={{ width: '170px', height: '170px', display: 'block', margin: '0 auto' }}
+                    style={{ width: '170px', height: '170px', display: 'block', margin: '0 auto', objectFit: 'contain' }}
                   />
                   <span style={{ color: '#111827', fontSize: '11px', fontWeight: 600, display: 'block', marginTop: '6px' }}>
                     Pay to: <b>{upiName}</b> ({upiId})
@@ -3378,9 +3381,8 @@ export function BillTabView() {
             payeeName: upiName,
             amount: per,
           });
-          const upiQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=190x190&data=${encodeURIComponent(
-            upiUri
-          )}`;
+          const upiQrUrl = (S.googleConfig?.upiQrImageUrl || '').trim() ||
+            `https://api.qrserver.com/v1/create-qr-code/?size=190x190&data=${encodeURIComponent(upiUri)}`;
           return (
             <div className="card" style={{ textAlign: 'center' }}>
               <h3>💳 Pay ₹{per} via UPI (0% Fee)</h3>

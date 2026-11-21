@@ -4346,6 +4346,9 @@ export function AdminPortalView() {
   const [upiNameInput, setUpiNameInput] = useState(
     S.googleConfig.upiName || 'Tadka Truck'
   );
+  const [upiQrImageUrlInput, setUpiQrImageUrlInput] = useState(
+    S.googleConfig.upiQrImageUrl || ''
+  );
   const [gstEnabledInput, setGstEnabledInput] = useState(
     S.googleConfig.gstEnabled !== false
   );
@@ -5389,6 +5392,23 @@ export function AdminPortalView() {
               />
             </div>
 
+            <div>
+              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                📸 Custom Official Standee QR Image Link (Optional 100% Reliable Backup)
+              </div>
+              <input
+                type="text"
+                value={upiQrImageUrlInput}
+                onChange={(e) => setUpiQrImageUrlInput(e.target.value)}
+                placeholder="Paste link to your official Google Pay / PhonePe merchant standee photo"
+                className="inp"
+                style={{ width: '100%', fontSize: '13px' }}
+              />
+              <span className="mu" style={{ fontSize: '10px' }}>
+                If provided, customers will see your exact physical standee photo instead of the generated QR.
+              </span>
+            </div>
+
             {isValidUpiId(upiIdInput) && (
               <div
                 style={{
@@ -5455,6 +5475,7 @@ export function AdminPortalView() {
               billingModel: billingModelInput,
               upiId: upiIdInput.trim(),
               upiName: upiNameInput.trim() || 'Restaurant',
+              upiQrImageUrl: upiQrImageUrlInput.trim(),
             };
             saveGoogleConfig(nextCfg);
             await syncToGoogleSheets(nextCfg);
