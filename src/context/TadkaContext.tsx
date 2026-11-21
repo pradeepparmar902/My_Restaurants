@@ -105,6 +105,7 @@ interface TadkaContextValue {
   cancelWaiter: () => void;
   doPay: (method: PaymentMethod, by: 'app' | 'owner') => void;
   confirmPrepaidOrder: (counterNoOrOrderId: string, paymentMethod?: PaymentMethod) => void;
+  reportCustomerPrepaidPayment: (utr?: string) => void;
   paySamp: (index: number) => void;
   sendBill: (rawMob: string) => void;
   startNewOrder: () => void;
@@ -1545,7 +1546,7 @@ export function TadkaProvider({
       });
       say(`Updated ${counterNo} to Table ${newTableId} ✅`);
     },
-    [pushUpdatedSheetOrder, say, updateState]
+    [S, pushUpdatedSheetOrder, say, updateState]
   );
 
   const updateOrderItemQty = useCallback(
@@ -2153,10 +2154,60 @@ export function TadkaProvider({
 
       say('Prepaid payment verified & confirmed! Order sent to kitchen ✅');
     },
-    [pushUpdatedSheetOrder, say, updateState]
+    [S, pushUpdatedSheetOrder, say, updateState]
   );
 
 
+
+  const reportCustomerPrepaidPayment = useCallback(
+    (utr?: string) => {
+      const cleanUtr = (utr || '').trim();
+      const nowIso = new Date().toISOString();
+
+      updateState((prev) => {
+        const nextOrders = prev.orders.map((o) =>
+          o.paymentPending
+            ? {
+                ...o,
+                customerPaidReported: true,
+                customerUtr: cleanUtr,
+                paymentReportedAt: nowIso,
+              }
+            : o
+        );
+        return { ...prev, orders: nextOrders };
+      });
+
+      const currentCounter = S.sess?.no || '';
+      const currentMob = S.sess?.mob || S.me?.mob || '';
+
+      const updatedSheetOrders = sheetOrdersTodayRef.current.map((po) => {
+        const matches =
+          (currentCounter && po.counterNo.toLowerCase() === currentCounter.toLowerCase()) ||
+          (currentMob && (po.customerMobRaw === currentMob || po.orderedByMob === currentMob || po.principalMob === currentMob));
+        if (matches && (po.paymentPending || po.billStatus !== 'PAID')) {
+          const updatedPo: PulledSheetOrder = {
+            ...po,
+            customerPaidReported: true,
+            customerUtr: cleanUtr,
+            paymentReportedAt: nowIso,
+            billStatus: cleanUtr ? `PAID_CLAIMED (UTR: ${cleanUtr})` : 'PAID_CLAIMED',
+          };
+          pushUpdatedSheetOrder(updatedPo);
+          return updatedPo;
+        }
+        return po;
+      });
+
+      if (updatedSheetOrders.length > 0) {
+        sheetOrdersTodayRef.current = updatedSheetOrders;
+        setSheetOrdersToday(updatedSheetOrders);
+      }
+
+      say('Payment claim submitted! Manager and kitchen notified 🔔');
+    },
+    [S, pushUpdatedSheetOrder, say, updateState]
+  );
 
   const paySamp = useCallback(
     (index: number) => {
@@ -3666,6 +3717,7 @@ export function TadkaProvider({
         cancelWaiter,
         doPay,
         confirmPrepaidOrder,
+        reportCustomerPrepaidPayment,
         paySamp,
         sendBill,
         startNewOrder,

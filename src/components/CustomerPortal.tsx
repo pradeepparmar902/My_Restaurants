@@ -1692,8 +1692,10 @@ export function OrderTabView() {
     inviteMemberToSession,
     removeInvitedMember,
     pullFromGoogleSheets,
+    reportCustomerPrepaidPayment,
   } = useTadka();
   const [inviteMob, setInviteMob] = useState('');
+  const [utrInput, setUtrInput] = useState('');
   const stepIcons = ['📥', '🍳', '🛎️', '✅'];
   const hasInvitedMobs = (S.sess?.invitedMobs || []).length > 0;
   const hasPendingKitchenOrder = S.orders.some((o) => o.st < 4);
@@ -1979,19 +1981,89 @@ export function OrderTabView() {
                     📋 Copy UPI Link
                   </button>
 
-                  <div
-                    style={{
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      border: '1px dashed #f59e0b',
-                      borderRadius: '8px',
-                      padding: '8px 10px',
-                      fontSize: '12px',
-                      color: '#fbbf24',
-                      textAlign: 'center',
-                    }}
-                  >
-                    ⏳ Once you make payment, counter staff/waiter verifies it and the chef starts cooking immediately!
-                  </div>
+                  {pendingPrepaidOrders.some((o) => o.customerPaidReported) ? (
+                    <div
+                      style={{
+                        background: '#ecfdf5',
+                        border: '2px solid #10b981',
+                        borderRadius: '10px',
+                        padding: '12px',
+                        textAlign: 'center',
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
+                      }}
+                    >
+                      <div style={{ fontSize: '24px', marginBottom: '4px' }}>🔔</div>
+                      <b style={{ color: '#065f46', fontSize: '14px', display: 'block' }}>
+                        Payment Submitted for Counter {S.sess.no}!
+                      </b>
+                      <p style={{ color: '#047857', fontSize: '12px', margin: '4px 0 0' }}>
+                        Cashier has been alerted. As soon as verified, your order goes straight to the kitchen!
+                      </p>
+                      {pendingPrepaidOrders.find((o) => o.customerUtr)?.customerUtr && (
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            marginTop: '6px',
+                            fontSize: '11px',
+                            background: '#d1fae5',
+                            color: '#065f46',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          UTR / Ref: {pendingPrepaidOrders.find((o) => o.customerUtr)?.customerUtr}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(16, 185, 129, 0.4)',
+                        borderRadius: '10px',
+                        padding: '10px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', color: '#10b981' }}>
+                        Done paying on your UPI app?
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                        <input
+                          type="text"
+                          value={utrInput}
+                          onChange={(e) => setUtrInput(e.target.value)}
+                          placeholder="UPI Ref / UTR No. (optional)"
+                          className="inp"
+                          style={{
+                            flex: 1,
+                            fontSize: '12px',
+                            padding: '6px 8px',
+                            borderRadius: '6px',
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{
+                          width: '100%',
+                          background: 'linear-gradient(135deg, #10b981, #059669)',
+                          color: '#ffffff',
+                          fontWeight: 'bold',
+                          padding: '10px',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                        }}
+                        onClick={() => {
+                          reportCustomerPrepaidPayment(utrInput);
+                        }}
+                      >
+                        ✅ I Have Paid ₹{totalPayablePrepaid} (Alert Cashier)
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (

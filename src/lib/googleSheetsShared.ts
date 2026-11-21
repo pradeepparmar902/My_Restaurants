@@ -996,6 +996,9 @@ export interface PulledSheetOrder {
   paymentMethod: string;
   paymentPending?: boolean;
   prepaid?: boolean;
+  customerPaidReported?: boolean;
+  customerUtr?: string;
+  paymentReportedAt?: string;
   vip: boolean;
   rush: boolean;
   receivedTime?: string;
@@ -1242,6 +1245,8 @@ export function parseOrdersFromSheetRows(
         paymentMethod,
         paymentPending: isPaymentPending,
         prepaid: isPrepaidOrder,
+        customerPaidReported: billStatus.toUpperCase().includes('CLAIMED'),
+        customerUtr: (billStatus.match(/UTR[:\s]+([A-Za-z0-9]+)/i)?.[1]) || '',
         vip,
         rush,
         receivedTime: normPunch(r[17]) || String(r[2] || '').trim(),

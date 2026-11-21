@@ -60,6 +60,9 @@ export interface OrderRound {
   deliveredBy?: string;
   paymentPending?: boolean; // In prepaid mode: true until marked as paid
   prepaid?: boolean; // true if placed in prepaid mode
+  customerPaidReported?: boolean; // true once customer taps 'I Have Paid'
+  customerUtr?: string; // Optional 12-digit UPI reference number entered by customer
+  paymentReportedAt?: string; // Timestamp when customer submitted payment confirmation
 }
 
 export interface SessionData {

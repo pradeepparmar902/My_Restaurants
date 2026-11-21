@@ -1155,6 +1155,28 @@ export function WaiterPortalView() {
 }
 
 
+function playPaymentChime() {
+  if (typeof window === 'undefined') return;
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.6);
+  } catch {
+    // Ignore audio restrictions
+  }
+}
+
 export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders' }: { title?: string }) {
   const {
     S,
@@ -1166,6 +1188,7 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
   const [searchQuery, setSearchQuery] = useState('');
   const [activeQrId, setActiveQrId] = useState<string | null>(null);
   const [methodMap, setMethodMap] = useState<Record<string, PaymentMethod>>({});
+  const prevReportedCountRef = useRef(0);
 
   const pendingOrders = (() => {
     const map = new Map<
@@ -1180,6 +1203,8 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
         prices?: Record<number, number>;
         time: string;
         source: string;
+        customerPaidReported: boolean;
+        customerUtr: string;
       }
     >();
 
@@ -1194,6 +1219,8 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
           it: po.it,
           time: po.timeFormatted || po.receivedTime || '',
           source: po.orderSourceRaw || 'app',
+          customerPaidReported: Boolean(po.customerPaidReported),
+          customerUtr: po.customerUtr || '',
         });
       }
     });
@@ -1210,12 +1237,22 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
           prices: o.prices,
           time: o.createdAt ? formatIndianDateTime(o.createdAt).timeFormatted : '',
           source: o.src,
+          customerPaidReported: Boolean(o.customerPaidReported),
+          customerUtr: o.customerUtr || '',
         });
       }
     });
 
     return Array.from(map.values());
   })();
+
+  const reportedOrdersCount = pendingOrders.filter((o) => o.customerPaidReported).length;
+  useEffect(() => {
+    if (reportedOrdersCount > prevReportedCountRef.current) {
+      playPaymentChime();
+    }
+    prevReportedCountRef.current = reportedOrdersCount;
+  }, [reportedOrdersCount]);
 
   const filteredOrders = pendingOrders.filter((o) => {
     if (!searchQuery.trim()) return true;
@@ -1227,6 +1264,12 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
       `table ${o.table}`.toLowerCase().includes(q) ||
       String(o.table).includes(q)
     );
+  });
+
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    if (a.customerPaidReported && !b.customerPaidReported) return -1;
+    if (!a.customerPaidReported && b.customerPaidReported) return 1;
+    return 0;
   });
 
   const rawUpiId = (S.googleConfig.upiId || '').trim();
@@ -1285,7 +1328,7 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {filteredOrders.map((o) => {
+          {sortedOrders.map((o) => {
             let subtotal = 0;
             S.menu.forEach((m) => {
               const q = o.it[m.id] || 0;
@@ -1307,17 +1350,48 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
             );
             const waLink = `https://wa.me/${o.mob.replace(/[^0-9]/g, '')}?text=${waText}`;
             const currentMethod = methodMap[o.id] || 'UPI';
+            const isReported = o.customerPaidReported;
 
             return (
               <div
                 key={o.id}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid #f59e0b',
+                  background: isReported ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.04)',
+                  border: isReported ? '2px solid #10b981' : '1px solid #f59e0b',
                   borderRadius: '12px',
                   padding: '12px',
+                  boxShadow: isReported ? '0 4px 16px rgba(16, 185, 129, 0.25)' : 'none',
                 }}
               >
+                {isReported && (
+                  <div
+                    style={{
+                      background: '#ecfdf5',
+                      border: '1px solid #10b981',
+                      borderRadius: '8px',
+                      padding: '6px 10px',
+                      marginBottom: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '4px',
+                    }}
+                  >
+                    <span style={{ color: '#065f46', fontSize: '11px', fontWeight: 'bold' }}>
+                      🔔 CUSTOMER REPORTED PAYMENT · TAP TO APPROVE
+                    </span>
+                    {o.customerUtr ? (
+                      <span style={{ fontSize: '11px', color: '#047857', fontWeight: 600 }}>
+                        UTR: <b>{o.customerUtr}</b>
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '10px', color: '#059669' }}>
+                        Customer tapped &quot;I Have Paid&quot;
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="row sp" style={{ alignItems: 'flex-start' }}>
                   <div>
                     <div className="row" style={{ gap: '6px', marginBottom: '4px' }}>
