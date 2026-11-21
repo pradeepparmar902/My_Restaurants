@@ -1,0 +1,1 @@
+self.__SSG_MANIFEST=new Set(["\u002Fr\u002F[restaurant]\u002Ft\u002F[tableToken]"]);self.__SSG_MANIFEST_CB&&self.__SSG_MANIFEST_CB()
