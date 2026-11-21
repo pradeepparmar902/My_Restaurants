@@ -5417,6 +5417,30 @@ export function AdminPortalView() {
                 <span style={{ color: '#16a34a', fontSize: '11px', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
                   ✅ Valid NPCI Format · Payee: {upiNameInput || 'Restaurant'} ({upiIdInput})
                 </span>
+
+                <div
+                  style={{
+                    marginTop: '8px',
+                    padding: '8px 10px',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    textAlign: 'left',
+                    fontSize: '11px',
+                    color: '#334155',
+                    lineHeight: '1.4',
+                  }}
+                >
+                  <strong style={{ color: '#b45309' }}>⚠️ Testing with Google Pay:</strong>
+                  <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                    <li>
+                      <b>Typo Check:</b> Ensure the UPI ID is spelled exactly as registered in Google Pay. If misspelled, Google Pay reports <i>&quot;No payment account registered&quot;</i>.
+                    </li>
+                    <li>
+                      <b>Self-Pay Restriction:</b> Google Pay blocks scanning your own QR code from the same account. Scan from <b>another phone</b> or test with <b>PhonePe / Paytm / BHIM</b>.
+                    </li>
+                  </ul>
+                </div>
               </div>
             )}
           </div>

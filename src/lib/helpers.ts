@@ -441,10 +441,10 @@ export function buildUpiUri(params: {
     return '';
   }
 
-  // Replace underscores and illegal characters in Payee Name with clean spaces for NPCI bank switch compliance
+  // Replace underscores, hyphens and illegal characters in Payee Name with clean spaces for NPCI bank switch compliance
   const sanitizedName = (params.payeeName || 'Restaurant')
-    .replace(/[_]+/g, ' ')
-    .replace(/[^\w\s-]/g, '')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/[^\w\s]/g, '')
     .trim();
   const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
   const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
@@ -467,8 +467,8 @@ export function buildGPayIntentUri(params: {
   if (!cleanId || !cleanId.includes('@')) return '';
 
   const sanitizedName = (params.payeeName || 'Restaurant')
-    .replace(/[_]+/g, ' ')
-    .replace(/[^\w\s-]/g, '')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/[^\w\s]/g, '')
     .trim();
   const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
   const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
@@ -495,8 +495,8 @@ export function buildPhonePeIntentUri(params: {
   if (!cleanId || !cleanId.includes('@')) return '';
 
   const sanitizedName = (params.payeeName || 'Restaurant')
-    .replace(/[_]+/g, ' ')
-    .replace(/[^\w\s-]/g, '')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/[^\w\s]/g, '')
     .trim();
   const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
   const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
@@ -517,8 +517,8 @@ export function buildPaytmIntentUri(params: {
   if (!cleanId || !cleanId.includes('@')) return '';
 
   const sanitizedName = (params.payeeName || 'Restaurant')
-    .replace(/[_]+/g, ' ')
-    .replace(/[^\w\s-]/g, '')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/[^\w\s]/g, '')
     .trim();
   const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
   const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
