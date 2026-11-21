@@ -5349,6 +5349,11 @@ export function AdminPortalView() {
                   ⚠️ UPI ID must contain "@" (e.g. name@okaxis or 9820012345@paytm)
                 </span>
               )}
+              {/(.)\1\1/.test(upiIdInput) && (
+                <span style={{ color: '#f59e0b', fontSize: '11px', marginTop: '2px', display: 'block' }}>
+                  ⚠️ Typo Warning: Your UPI ID contains 3 identical letters together (&quot;{upiIdInput.match(/(.)\1\1/)?.[0]}&quot; in {upiIdInput}). Double-check your spelling!
+                </span>
+              )}
               <div
                 style={{
                   marginTop: '6px',
@@ -5404,8 +5409,13 @@ export function AdminPortalView() {
                 className="inp"
                 style={{ width: '100%', fontSize: '13px' }}
               />
+              {upiQrImageUrlInput.includes('@') && (
+                <span style={{ color: '#f87171', fontSize: '11px', marginTop: '2px', display: 'block' }}>
+                  ⚠️ This field is for an image web URL (e.g. https://.../standee.jpg), NOT a UPI ID. Leave this field empty if you want the app to auto-generate the QR code from your UPI ID above.
+                </span>
+              )}
               <span className="mu" style={{ fontSize: '10px' }}>
-                If provided, customers will see your exact physical standee photo instead of the generated QR.
+                If provided, customers will see your exact physical standee photo instead of the generated QR. Leave empty to use auto-generated QR.
               </span>
             </div>
 

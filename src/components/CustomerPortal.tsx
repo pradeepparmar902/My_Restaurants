@@ -1791,7 +1791,9 @@ export function OrderTabView() {
         amount: totalPayablePrepaid,
       })
     : '';
-  const qrDisplayUrl = (S.googleConfig?.upiQrImageUrl || '').trim() || (upiUri
+  const customStandeeImg = (S.googleConfig?.upiQrImageUrl || '').trim();
+  const isValidStandeeUrl = Boolean(customStandeeImg && /^https?:\/\/.+/i.test(customStandeeImg));
+  const qrDisplayUrl = isValidStandeeUrl ? customStandeeImg : (upiUri
     ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}`
     : '');
 
@@ -3381,8 +3383,11 @@ export function BillTabView() {
             payeeName: upiName,
             amount: per,
           });
-          const upiQrUrl = (S.googleConfig?.upiQrImageUrl || '').trim() ||
-            `https://api.qrserver.com/v1/create-qr-code/?size=190x190&data=${encodeURIComponent(upiUri)}`;
+          const customStandeeImg = (S.googleConfig?.upiQrImageUrl || '').trim();
+          const isValidStandeeUrl = Boolean(customStandeeImg && /^https?:\/\/.+/i.test(customStandeeImg));
+          const upiQrUrl = isValidStandeeUrl
+            ? customStandeeImg
+            : `https://api.qrserver.com/v1/create-qr-code/?size=190x190&data=${encodeURIComponent(upiUri)}`;
           return (
             <div className="card" style={{ textAlign: 'center' }}>
               <h3>💳 Pay ₹{per} via UPI (0% Fee)</h3>
