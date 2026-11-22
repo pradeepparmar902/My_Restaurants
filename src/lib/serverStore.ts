@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { AppState, Dish, StaffRoleName } from '@/types/tadka';
 import { INITIAL_STATE } from '@/lib/constants';
 import { cleanCounterNumber, getSubtotal, getDiscount, getTotal, filterPositiveItems } from '@/lib/helpers';
@@ -25,6 +28,12 @@ declare global {
   var __TADKA_TABLE_STATUS__: Record<string, Record<number, boolean>> | undefined;
 }
 
+function getTablesFilePath(tenant: string): string {
+  const clean = (tenant || 'default').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+  const tmpDir = process.env.TMPDIR || process.env.TEMP || os.tmpdir() || '/tmp';
+  return path.join(tmpDir, `tadka_tables_${clean}.json`);
+}
+
 export function getTableStatusMap(tenant?: string): Record<number, boolean> {
   const tKey = (tenant || 'default').trim().toLowerCase();
   if (!global.__TADKA_TABLE_STATUS__) {
@@ -32,6 +41,18 @@ export function getTableStatusMap(tenant?: string): Record<number, boolean> {
   }
   if (!global.__TADKA_TABLE_STATUS__[tKey]) {
     global.__TADKA_TABLE_STATUS__[tKey] = {};
+    try {
+      const filePath = getTablesFilePath(tKey);
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const parsed = JSON.parse(content);
+        if (parsed && typeof parsed === 'object') {
+          global.__TADKA_TABLE_STATUS__[tKey] = parsed;
+        }
+      }
+    } catch {
+      // ignore read error
+    }
   }
   return global.__TADKA_TABLE_STATUS__[tKey];
 }
@@ -39,6 +60,13 @@ export function getTableStatusMap(tenant?: string): Record<number, boolean> {
 export function setTableStatus(tableId: number, active: boolean, tenant?: string): Record<number, boolean> {
   const map = getTableStatusMap(tenant);
   map[tableId] = active;
+  const tKey = (tenant || 'default').trim().toLowerCase();
+  try {
+    const filePath = getTablesFilePath(tKey);
+    fs.writeFileSync(filePath, JSON.stringify(map), 'utf-8');
+  } catch {
+    // ignore write error
+  }
   return map;
 }
 

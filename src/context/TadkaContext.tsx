@@ -416,21 +416,6 @@ export function TadkaProvider({
               });
             }
             qrDynamicTables = tableList;
-
-            // Clean 'active' query parameter from browser address bar so it doesn't linger in history
-            if (typeof window !== 'undefined' && sp.has('active')) {
-              try {
-                const cleanParams = new URLSearchParams(window.location.search);
-                cleanParams.delete('active');
-                const cleanUrl =
-                  window.location.pathname +
-                  (cleanParams.toString() ? `?${cleanParams.toString()}` : '') +
-                  window.location.hash;
-                window.history.replaceState({}, '', cleanUrl);
-              } catch {
-                // ignore
-              }
-            }
           }
         }
 
@@ -558,6 +543,26 @@ export function TadkaProvider({
       // Ignore storage read errors
     }
     isHydratedRef.current = true;
+
+    // On mount, pull table activation status from server so customer device reflects current table state
+    fetch(`${getTablesApiBase()}?tenant=${encodeURIComponent(currentSlug)}&_=${Date.now()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.tables) {
+          setS((prev) => {
+            let hasChange = false;
+            const next = prev.tables.map((t) => {
+              if (data.tables[t.id] !== undefined && t.active !== data.tables[t.id]) {
+                hasChange = true;
+                return { ...t, active: Boolean(data.tables[t.id]) };
+              }
+              return t;
+            });
+            return hasChange ? { ...prev, tables: next } : prev;
+          });
+        }
+      })
+      .catch(() => {});
 
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       const bc = new BroadcastChannel(getWorkspaceChannelName());
@@ -899,8 +904,10 @@ export function TadkaProvider({
 
       updateState((prev) => {
         // Anti-fake order protection: Table must be activated by staff before placing any order
+        const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
+        const isUrlInactive = urlActiveParam === '0' || urlActiveParam === 'false';
         const currentTable = prev.tables.find((t) => Number(t.id) === Number(prev.activeTable));
-        if (currentTable && currentTable.active === false) {
+        if (isUrlInactive || (currentTable && currentTable.active === false)) {
           tableBlocked = true;
           blockedTableNum = prev.activeTable;
           return prev;
@@ -2663,7 +2670,7 @@ export function TadkaProvider({
       }
       updateState((prev) => {
         const nextTables = prev.tables.map((t) =>
-          t.id === oldId
+          Number(t.id) === Number(oldId)
             ? {
                 ...t,
                 id: targetId,
@@ -2678,7 +2685,7 @@ export function TadkaProvider({
         return {
           ...prev,
           tables: nextTables,
-          activeTable: prev.activeTable === oldId ? targetId : prev.activeTable,
+          activeTable: Number(prev.activeTable) === Number(oldId) ? targetId : prev.activeTable,
         };
       });
       say(`Updated Table #${targetId} ✅`);
@@ -2702,9 +2709,9 @@ export function TadkaProvider({
         return;
       }
       updateState((prev) => {
-        const nextTables = prev.tables.filter((t) => t.id !== tableId);
+        const nextTables = prev.tables.filter((t) => Number(t.id) !== Number(tableId));
         const nextActive =
-          prev.activeTable === tableId
+          Number(prev.activeTable) === Number(tableId)
             ? nextTables[0]?.id || 1
             : prev.activeTable;
         return {
@@ -2722,7 +2729,7 @@ export function TadkaProvider({
     (tableId: number) => {
       updateState((prev) => {
         const nextTables = prev.tables.map((t) =>
-          t.id === tableId
+          Number(t.id) === Number(tableId)
             ? { ...t, token: `qr-tadka-t${t.id}-${Math.random().toString(36).slice(2, 6)}` }
             : t
         );
@@ -2745,10 +2752,10 @@ export function TadkaProvider({
     (tableId: number) => {
       const currentSlug = getActiveWorkspaceSlug();
       updateState((prev) => {
-        const currentTarget = prev.tables.find((t) => t.id === tableId);
+        const currentTarget = prev.tables.find((t) => Number(t.id) === Number(tableId));
         const nextActive = currentTarget?.active === false ? true : false;
         const nextTables = prev.tables.map((t) =>
-          t.id === tableId ? { ...t, active: nextActive } : t
+          Number(t.id) === Number(tableId) ? { ...t, active: nextActive } : t
         );
         const statusLabel = nextActive ? 'Activated (Ready for Orders) 🟢' : 'Locked (Inactive) 🔒';
         say(`${currentTarget?.label || `Table ${tableId}`} is now ${statusLabel}`);
@@ -2756,7 +2763,7 @@ export function TadkaProvider({
         fetch(getTablesApiBase(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tenant: currentSlug, tableId, active: nextActive }),
+          body: JSON.stringify({ tenant: currentSlug, tableId: Number(tableId), active: nextActive }),
         }).catch(() => {});
 
         return { ...prev, tables: nextTables };
@@ -2771,12 +2778,12 @@ export function TadkaProvider({
       fetch(getTablesApiBase(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant: currentSlug, tableId, active }),
+        body: JSON.stringify({ tenant: currentSlug, tableId: Number(tableId), active }),
       }).catch(() => {});
 
       updateState((prev) => {
         const nextTables = prev.tables.map((t) =>
-          t.id === tableId ? { ...t, active } : t
+          Number(t.id) === Number(tableId) ? { ...t, active } : t
         );
         return { ...prev, tables: nextTables };
       });
@@ -2805,6 +2812,21 @@ export function TadkaProvider({
               ),
             }));
             if (isServerActive) {
+              if (typeof window !== 'undefined') {
+                try {
+                  const sp = new URLSearchParams(window.location.search);
+                  if (sp.has('active')) {
+                    sp.delete('active');
+                    const cleanUrl =
+                      window.location.pathname +
+                      (sp.toString() ? `?${sp.toString()}` : '') +
+                      window.location.hash;
+                    window.history.replaceState({}, '', cleanUrl);
+                  }
+                } catch {
+                  // ignore
+                }
+              }
               say(`🎉 Table ${targetTableId} is Activated! You can place your order now.`);
               return true;
             } else {

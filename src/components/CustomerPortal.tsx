@@ -92,7 +92,9 @@ export function MenuTabView() {
           : '#15803d';
   const currentStaff = staffOf();
   const currentTable = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
-  const isTableLocked = currentTable ? currentTable.active === false : false;
+  const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
+  const isUrlInactive = urlActiveParam === '0' || urlActiveParam === 'false';
+  const isTableLocked = isUrlInactive || (currentTable ? currentTable.active === false : false);
 
   const L: Record<string, string> = {
     en: 'RECOMMENDED FOR YOU',
@@ -1879,7 +1881,9 @@ export function OrderTabView() {
   const effectivePayable = hasPrepaidPending ? totalPayablePrepaid : totalAmount;
 
   const currentTableObj = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
-  const isTableInactive = currentTableObj ? currentTableObj.active === false : false;
+  const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
+  const isUrlInactive = urlActiveParam === '0' || urlActiveParam === 'false';
+  const isTableInactive = isUrlInactive || (currentTableObj ? currentTableObj.active === false : false);
 
   const rawUpiId = (S.googleConfig?.upiId || '').trim();
   const hasValidUpi = isValidUpiId(rawUpiId);
@@ -3575,7 +3579,9 @@ export function BillTabView() {
 
   const tierLabel = S.pts >= 200 ? '🥇 Gold' : '🥈 Silver';
   const currentTableObj = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
-  const isTableInactive = currentTableObj ? currentTableObj.active === false : false;
+  const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
+  const isUrlInactive = urlActiveParam === '0' || urlActiveParam === 'false';
+  const isTableInactive = isUrlInactive || (currentTableObj ? currentTableObj.active === false : false);
 
   const underPrepDishes: { name: string; qty: number; status: string }[] = [];
   S.orders
