@@ -37,6 +37,7 @@ export function MenuTabView() {
     sheetOrdersToday,
     saveGoogleConfig,
     setTab,
+    say,
   } = useTadka();
   const [optMob, setOptMob] = useState('');
   const [showOptMob, setShowOptMob] = useState(false);
@@ -88,6 +89,9 @@ export function MenuTabView() {
           ? '#be123c'
           : '#15803d';
   const currentStaff = staffOf();
+  const isPostpaid = S.googleConfig?.billingModel !== 'prepaid';
+  const currentTable = S.tables.find((t) => t.id === S.activeTable);
+  const isTableLocked = isPostpaid && currentTable && currentTable.active === false;
 
   const L: Record<string, string> = {
     en: 'RECOMMENDED FOR YOU',
@@ -1499,6 +1503,27 @@ export function MenuTabView() {
         </div>
       )}
 
+      {/* Anti-Fake Order Banner when Table is Inactive in Postpaid Mode */}
+      {isTableLocked && (
+        <div
+          style={{
+            background: 'rgba(239, 68, 68, 0.12)',
+            border: '1px solid #ef4444',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            margin: '12px 0',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontWeight: 800, color: '#f87171', fontSize: '13px' }}>
+            🔒 Table {S.activeTable} Not Activated Yet
+          </div>
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#fca5a5', lineHeight: 1.4 }}>
+            You can select dishes freely. Ask your waiter or captain to activate Table {S.activeTable} so your order can be sent to the kitchen.
+          </p>
+        </div>
+      )}
+
       {/* Floating Frozen Bottom View Cart & Place Order Bar when items are selected */}
       {cnt() > 0 && (
         <div
@@ -1572,31 +1597,54 @@ export function MenuTabView() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              placeOrder(optMob, S.waOptIn);
-              if (currentStaff) setOptMob('');
-            }}
-            style={{
-              background: '#16a34a',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '999px',
-              padding: '10px 18px',
-              fontSize: '13px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(22, 163, 74, 0.35)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {!S.me.mob
-              ? 'Login & Order ▸'
-              : S.sess
-                ? 'Add to Order ▸'
-                : 'Place Order ▸'}
-          </button>
+          {isTableLocked ? (
+            <button
+              type="button"
+              onClick={() => {
+                say(`🔒 Table ${S.activeTable} is not activated yet. Ask your waiter or staff to activate this table.`);
+              }}
+              style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '999px',
+                padding: '10px 16px',
+                fontSize: '12px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.35)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              🔒 Table Locked ▸
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                placeOrder(optMob, S.waOptIn);
+                if (currentStaff) setOptMob('');
+              }}
+              style={{
+                background: '#16a34a',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '999px',
+                padding: '10px 18px',
+                fontSize: '13px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.35)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {!S.me.mob
+                ? 'Login & Order ▸'
+                : S.sess
+                  ? 'Add to Order ▸'
+                  : 'Place Order ▸'}
+            </button>
+          )}
         </div>
       )}
 
@@ -1688,6 +1736,7 @@ export function OrderTabView() {
     S,
     setTab,
     say,
+    total,
     updateState,
     inviteMemberToSession,
     removeInvitedMember,
@@ -1761,6 +1810,23 @@ export function OrderTabView() {
     return sub + gstAmt;
   })();
 
+  const totalAmount = total();
+  const isPostpaid = S.googleConfig?.billingModel !== 'prepaid';
+  const hasActiveOrders = S.orders.some((o) => o.st !== 5);
+  const underPrepOrders = S.orders.filter((o) => o.st === 1 || o.st === 2 || o.st === 3);
+  const deliveredOrders = S.orders.filter((o) => o.st === 4);
+
+  const underPrepItems: { name: string; qty: number; status: string }[] = [];
+  underPrepOrders.forEach((o) => {
+    const statusText = o.st === 1 ? 'Received in kitchen' : o.st === 2 ? 'Cooking' : 'Ready to serve';
+    S.menu.forEach((m) => {
+      const q = o.it[m.id] || 0;
+      if (q > 0) underPrepItems.push({ name: m.n[S.lang] || m.e, qty: q, status: statusText });
+    });
+  });
+
+  const effectivePayable = hasPrepaidPending ? totalPayablePrepaid : totalAmount;
+
   const rawUpiId = (S.googleConfig?.upiId || '').trim();
   const hasValidUpi = isValidUpiId(rawUpiId);
   const upiId = hasValidUpi ? rawUpiId : '';
@@ -1769,28 +1835,28 @@ export function OrderTabView() {
     ? buildUpiUri({
         upiId,
         payeeName: upiName,
-        amount: totalPayablePrepaid,
+        amount: effectivePayable,
       })
     : '';
   const gpayUri = hasValidUpi
     ? buildGPayIntentUri({
         upiId,
         payeeName: upiName,
-        amount: totalPayablePrepaid,
+        amount: effectivePayable,
       })
     : '';
   const phonePeUri = hasValidUpi
     ? buildPhonePeIntentUri({
         upiId,
         payeeName: upiName,
-        amount: totalPayablePrepaid,
+        amount: effectivePayable,
       })
     : '';
   const paytmUri = hasValidUpi
     ? buildPaytmIntentUri({
         upiId,
         payeeName: upiName,
-        amount: totalPayablePrepaid,
+        amount: effectivePayable,
       })
     : '';
   const customStandeeImg = (S.googleConfig?.upiQrImageUrl || '').trim();
@@ -2103,6 +2169,297 @@ export function OrderTabView() {
                     ⚙️ Switch to Admin Tab &rarr; Set Real UPI ID
                   </button>
                 )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Post-Payment Mode: Bill & Pay Card on Order Tab */}
+      {!hasPrepaidPending && isPostpaid && hasActiveOrders && !S.paid && (
+        <div
+          className="card"
+          style={{
+            border: '2px solid #10b981',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(59, 130, 246, 0.08))',
+            padding: '16px',
+            borderRadius: '16px',
+            marginBottom: '14px',
+            boxShadow: '0 4px 16px rgba(16, 185, 129, 0.2)',
+          }}
+        >
+          <div className="row sp" style={{ alignItems: 'flex-start' }}>
+            <div>
+              <span
+                className="tag"
+                style={{
+                  background: S.billSrc === 'waiter' ? '#10b981' : '#3b82f6',
+                  color: '#ffffff',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  padding: '3px 8px',
+                }}
+              >
+                {S.billSrc === 'waiter' ? '🧾 INVOICE PUSHED BY CASHIER' : '🍽️ DINE-IN BILL · PAY ANYTIME'}
+              </span>
+              <h3 style={{ margin: '8px 0 3px', fontSize: '18px' }}>
+                {S.billSrc === 'waiter' ? 'Official Bill Ready for Payment' : 'Dine-in Bill & UPI Pay'}
+              </h3>
+              <p className="mu" style={{ margin: 0, fontSize: '13px' }}>
+                Total Payable: <strong style={{ color: '#10b981', fontSize: '16px' }}>₹{totalAmount}</strong> · {activeTableLabel} (Counter {S.sess.no})
+              </p>
+            </div>
+          </div>
+
+          {/* User Requirement: If some foods are under preparation, give notification that this line item is under preparation hence that item will also generate bill */}
+          {underPrepItems.length > 0 && (
+            <div
+              style={{
+                background: 'rgba(245, 158, 11, 0.15)',
+                border: '1px solid #f59e0b',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                margin: '12px 0 8px',
+              }}
+            >
+              <div style={{ fontWeight: 800, color: '#f59e0b', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                ⚠️ Notice: {underPrepItems.length} {underPrepItems.length === 1 ? 'item is' : 'items are'} currently under preparation
+              </div>
+              <div style={{ fontSize: '12px', color: '#e5e7eb', marginTop: '3px', lineHeight: 1.4 }}>
+                The following dishes are still cooking in the kitchen and <b>will also generate bill (included in ₹{totalAmount})</b>:
+              </div>
+              <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '12px', color: '#cbd5e1' }}>
+                {underPrepItems.map((item, idx) => (
+                  <li key={idx} style={{ marginTop: '2px' }}>
+                    <b>{item.qty}× {item.name}</b> — <span style={{ color: '#fbbf24' }}>{item.status}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {deliveredOrders.length > 0 && underPrepItems.length === 0 && (
+            <p style={{ fontSize: '12.5px', color: '#10b981', margin: '8px 0 4px', fontWeight: 600 }}>
+              🍽️ All ordered dishes have been delivered! Scan QR or tap below to pay.
+            </p>
+          )}
+
+          <div style={{ marginTop: '12px', textAlign: 'center' }}>
+            {hasValidUpi && upiUri ? (
+              <>
+                <div
+                  style={{
+                    display: 'inline-block',
+                    padding: '10px',
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  }}
+                >
+                  <img
+                    src={qrDisplayUrl}
+                    alt="UPI Scan & Pay QR"
+                    style={{ width: '170px', height: '170px', display: 'block', margin: '0 auto', objectFit: 'contain' }}
+                  />
+                  <span style={{ color: '#111827', fontSize: '11px', fontWeight: 600, display: 'block', marginTop: '6px' }}>
+                    Pay to: <b>{upiName}</b> ({upiId})
+                  </span>
+                  <span style={{ color: '#4b5563', fontSize: '10px', display: 'block' }}>
+                    Scan with GPay / PhonePe / Paytm / BHIM
+                  </span>
+                </div>
+
+                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <a
+                    href={gpayUri}
+                    className="btn"
+                    style={{
+                      background: '#0f9d58',
+                      color: '#ffffff',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      fontWeight: 'bold',
+                      padding: '12px',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
+                    }}
+                  >
+                    🟢 Open Google Pay (GPay) · ₹{totalAmount}
+                  </a>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <a
+                      href={phonePeUri}
+                      className="btn"
+                      style={{
+                        background: '#5f259f',
+                        color: '#ffffff',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        padding: '10px 6px',
+                        borderRadius: '8px',
+                      }}
+                    >
+                      🟣 PhonePe
+                    </a>
+                    <a
+                      href={paytmUri}
+                      className="btn"
+                      style={{
+                        background: '#00baf2',
+                        color: '#002e6e',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        padding: '10px 6px',
+                        borderRadius: '8px',
+                      }}
+                    >
+                      🔵 Paytm
+                    </a>
+                  </div>
+
+                  <a
+                    href={upiUri}
+                    className="btn ghost"
+                    style={{
+                      fontSize: '12px',
+                      padding: '8px 12px',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                    }}
+                  >
+                    📱 Other UPI App (BHIM / CRED / Any)
+                  </a>
+
+                  <div className="row" style={{ gap: '8px', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      style={{ flex: 1, fontSize: '12px', padding: '6px 10px' }}
+                      onClick={() => {
+                        navigator.clipboard?.writeText?.(upiUri);
+                        say('UPI Payment Link copied to clipboard! 📋');
+                      }}
+                    >
+                      📋 Copy UPI Link
+                    </button>
+                    <button
+                      type="button"
+                      className="btn alt"
+                      style={{ flex: 1, fontSize: '12px', padding: '6px 10px', marginTop: 0 }}
+                      onClick={() => setTab('bill')}
+                    >
+                      🧾 View Itemized Bill ▸
+                    </button>
+                  </div>
+
+                  {S.orders.some((o) => o.customerPaidReported) ? (
+                    <div
+                      style={{
+                        background: '#ecfdf5',
+                        border: '2px solid #10b981',
+                        borderRadius: '10px',
+                        padding: '12px',
+                        color: '#065f46',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        marginTop: '10px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      🔔 Payment Claim Submitted! Cashier and kitchen have been alerted.
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        marginTop: '10px',
+                        padding: '12px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px dashed #10b981',
+                        borderRadius: '10px',
+                      }}
+                    >
+                      <label style={{ display: 'block', fontSize: '11px', color: '#cbd5e1', marginBottom: '6px', textAlign: 'left' }}>
+                        Paid on GPay / PhonePe? Enter 12-digit UPI Ref / UTR to auto-reconcile with cashier:
+                      </label>
+                      <input
+                        value={utrInput}
+                        onChange={(e) => setUtrInput(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                        placeholder="Enter 12-digit UPI Ref / UTR (optional)"
+                        className="inp"
+                        style={{
+                          width: '100%',
+                          textAlign: 'center',
+                          letterSpacing: '1px',
+                          fontWeight: 'bold',
+                          marginBottom: '8px',
+                          fontSize: '13px',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{
+                          width: '100%',
+                          background: 'linear-gradient(135deg, #10b981, #059669)',
+                          color: '#ffffff',
+                          fontWeight: 'bold',
+                          padding: '10px',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                        }}
+                        onClick={() => {
+                          reportCustomerPrepaidPayment(utrInput);
+                        }}
+                      >
+                        ✅ I Have Paid ₹{totalAmount} (Alert Cashier)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div
+                style={{
+                  padding: '14px',
+                  borderRadius: '12px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px dashed #ef4444',
+                  textAlign: 'center',
+                }}
+              >
+                <b style={{ color: '#f87171', fontSize: '14px' }}>
+                  UPI Payment Not Available
+                </b>
+                <p className="mu" style={{ fontSize: '12px', margin: '4px 0 0' }}>
+                  Please pay at the cashier counter or request the waiter.
+                </p>
+                <button
+                  type="button"
+                  className="btn alt"
+                  style={{ marginTop: '8px', fontSize: '12px' }}
+                  onClick={() => setTab('bill')}
+                >
+                  Go to Bill Tab
+                </button>
               </div>
             )}
           </div>
@@ -2534,6 +2891,7 @@ export function BillTabView() {
     sendBill,
     startNewOrder,
     updateState,
+    reportCustomerPrepaidPayment,
     say,
   } = useTadka();
   const [waInput, setWaInput] = useState('');
@@ -2542,6 +2900,7 @@ export function BillTabView() {
   const [sentWaMobs, setSentWaMobs] = useState<string[]>([]);
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
   const [couponInput, setCouponInput] = useState('');
+  const [utrInput, setUtrInput] = useState('');
   const rules = S.googleConfig?.rewardRules || DEFAULT_REWARD_RULES;
 
   if (!S.status) {
@@ -3139,15 +3498,65 @@ export function BillTabView() {
 
   const tierLabel = S.pts >= 200 ? '🥇 Gold' : '🥈 Silver';
 
+  const underPrepDishes: { name: string; qty: number; status: string }[] = [];
+  S.orders
+    .filter((o) => o.st === 1 || o.st === 2 || o.st === 3)
+    .forEach((o) => {
+      const statusLabel = o.st === 1 ? 'Received in kitchen' : o.st === 2 ? 'Cooking' : 'Ready to serve';
+      S.menu.forEach((m) => {
+        const q = o.it[m.id] || 0;
+        if (q > 0) underPrepDishes.push({ name: m.n[S.lang] || m.e, qty: q, status: statusLabel });
+      });
+    });
+
   return (
     <>
       {S.billSrc === 'waiter' && (
-        <div className="wa" style={{ margin: '0 0 10px' }}>
-          <b>🧾 Bill from {(S.googleConfig.restaurantName || '').trim() || 'Tadka Truck'}</b>
-          <p>
-            Your waiter order for Table {S.activeTable}. Check the items and pay
-            below.
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.15))',
+            border: '2px solid #10b981',
+            borderRadius: '14px',
+            padding: '12px 16px',
+            marginBottom: '12px',
+          }}
+        >
+          <div style={{ fontSize: '11px', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            🧾 Official Invoice Pushed by Cashier / Manager
+          </div>
+          <div style={{ fontSize: '16px', fontWeight: 800, marginTop: '2px' }}>
+            Table {S.activeTable} · Counter {S.sess?.no || '—'} · Total: ₹{t}
+          </div>
+          <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#e5e7eb' }}>
+            Your official invoice is ready. Please scan the QR code or tap your preferred UPI app below to complete payment.
           </p>
+        </div>
+      )}
+
+      {/* User Requirement: If some foods are under preparation of that counter and table, give notification that this line item is under preparation hence that item will also generate bill */}
+      {underPrepDishes.length > 0 && (
+        <div
+          style={{
+            background: 'rgba(245, 158, 11, 0.15)',
+            border: '1px solid #f59e0b',
+            borderRadius: '12px',
+            padding: '12px 14px',
+            marginBottom: '12px',
+          }}
+        >
+          <div style={{ fontWeight: 800, color: '#f59e0b', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            ⚠️ Notice: {underPrepDishes.length} {underPrepDishes.length === 1 ? 'dish is' : 'dishes are'} currently under preparation
+          </div>
+          <div style={{ fontSize: '12px', color: '#e5e7eb', marginTop: '3px', lineHeight: 1.4 }}>
+            The following dishes are currently being prepared in the kitchen and <b>will also generate bill (included in ₹{t})</b>:
+          </div>
+          <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: '12px', color: '#cbd5e1' }}>
+            {underPrepDishes.map((it, idx) => (
+              <li key={idx} style={{ marginTop: '2px' }}>
+                <b>{it.qty}× {it.name}</b> — <span style={{ color: '#fbbf24' }}>{it.status}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -3575,6 +3984,38 @@ export function BillTabView() {
               >
                 ✅ I have paid ₹{per} via UPI
               </button>
+
+              <div style={{ marginTop: '12px', borderTop: '1px dashed rgba(255,255,255,0.2)', paddingTop: '10px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: '#cbd5e1', marginBottom: '6px', textAlign: 'left' }}>
+                  Paid on GPay / PhonePe? Enter 12-digit UPI Ref / UTR to notify cashier:
+                </label>
+                <input
+                  value={utrInput}
+                  onChange={(e) => setUtrInput(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                  placeholder="Enter 12-digit UPI Ref / UTR (optional)"
+                  className="inp"
+                  style={{ width: '100%', textAlign: 'center', letterSpacing: '1px', fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    color: '#ffffff',
+                    fontWeight: 'bold',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    width: '100%',
+                  }}
+                  onClick={() => {
+                    reportCustomerPrepaidPayment(utrInput);
+                    doPay('UPI', 'app');
+                  }}
+                >
+                  ✅ I Have Paid ₹{per} (Alert Cashier &amp; Claim)
+                </button>
+              </div>
             </div>
           );
         })()

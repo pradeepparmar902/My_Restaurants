@@ -128,6 +128,8 @@ interface TadkaContextValue {
   resetTables: () => void;
   regenerateTableQr: (tableId: number) => void;
   setActiveTable: (tableId: number) => void;
+  toggleTableActive: (tableId: number) => void;
+  setTableActive: (tableId: number, active: boolean) => void;
   resetDemoState: () => void;
 
   // Google Sheets & Google Drive Storage
@@ -784,6 +786,14 @@ export function TadkaProvider({
     (optionalMobRaw?: string, waConsent?: boolean) => {
       if (S.billSrc === 'waiter' && !S.paid) {
         say('The bill was already sent. Ask staff to recall it before adding items');
+        return;
+      }
+
+      // Anti-fake order protection for dine-in / postpaid mode: Table must be activated by staff
+      const isPostpaid = S.googleConfig?.billingModel !== 'prepaid';
+      const currentTable = S.tables.find((t) => t.id === S.activeTable);
+      if (isPostpaid && currentTable && currentTable.active === false) {
+        say(`🔒 Table ${S.activeTable} is not activated yet. Please ask your waiter or captain to activate Table ${S.activeTable} to place your order.`);
         return;
       }
 
@@ -2166,7 +2176,7 @@ export function TadkaProvider({
 
       updateState((prev) => {
         const nextOrders = prev.orders.map((o) =>
-          o.paymentPending
+          o.paymentPending || (!prev.paid && o.st !== 5)
             ? {
                 ...o,
                 customerPaidReported: true,
@@ -2640,6 +2650,33 @@ export function TadkaProvider({
       say(`Switched to Table ${tableId}`);
     },
     [say, updateState]
+  );
+
+  const toggleTableActive = useCallback(
+    (tableId: number) => {
+      updateState((prev) => {
+        const nextTables = prev.tables.map((t) =>
+          t.id === tableId ? { ...t, active: t.active === false ? true : false } : t
+        );
+        const target = nextTables.find((t) => t.id === tableId);
+        const statusLabel = target?.active === false ? 'Locked (Inactive) 🔒' : 'Activated (Ready for Orders) 🟢';
+        say(`${target?.label || `Table ${tableId}`} is now ${statusLabel}`);
+        return { ...prev, tables: nextTables };
+      });
+    },
+    [say, updateState]
+  );
+
+  const setTableActive = useCallback(
+    (tableId: number, active: boolean) => {
+      updateState((prev) => {
+        const nextTables = prev.tables.map((t) =>
+          t.id === tableId ? { ...t, active } : t
+        );
+        return { ...prev, tables: nextTables };
+      });
+    },
+    [updateState]
   );
 
   const resetDemoState = useCallback(() => {
@@ -3736,6 +3773,8 @@ export function TadkaProvider({
         resetTables,
         regenerateTableQr,
         setActiveTable,
+        toggleTableActive,
+        setTableActive,
         resetDemoState,
         sheetOrdersToday,
         proofSubmissions,

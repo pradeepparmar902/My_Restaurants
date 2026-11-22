@@ -267,10 +267,48 @@ export function BillReadyBanner() {
   const { S, total, setTab } = useTadka();
   if (S.billSrc !== 'waiter' || S.paid || S.tab === 'bill') return null;
   return (
-    <div className="wa" style={{ margin: '0 0 10px' }}>
-      <b>🧾 Your bill is ready · ₹{total()}</b>
-      <button className="btn alt" onClick={() => setTab('bill')}>
-        View and pay
+    <div
+      style={{
+        background: 'linear-gradient(135deg, #10b981, #059669)',
+        color: '#ffffff',
+        padding: '12px 16px',
+        borderRadius: '14px',
+        margin: '0 0 12px',
+        boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '10px',
+        flexWrap: 'wrap',
+      }}
+    >
+      <div>
+        <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          🧾 Official Invoice Pushed by Cashier
+        </div>
+        <div style={{ fontSize: '15px', fontWeight: 800, marginTop: '2px' }}>
+          Table {S.activeTable} · Counter {S.sess?.no || '—'} · Total: ₹{total()}
+        </div>
+        <div style={{ fontSize: '11px', opacity: 0.9 }}>
+          Scan QR or tap to pay directly via GPay / PhonePe / Paytm
+        </div>
+      </div>
+      <button
+        type="button"
+        className="chip"
+        style={{
+          background: '#ffffff',
+          color: '#065f46',
+          fontWeight: 800,
+          fontSize: '12.5px',
+          padding: '8px 14px',
+          border: 'none',
+          cursor: 'pointer',
+          borderRadius: '999px',
+        }}
+        onClick={() => setTab('bill')}
+      >
+        💳 Pay Now ▸
       </button>
     </div>
   );

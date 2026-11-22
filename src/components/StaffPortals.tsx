@@ -284,6 +284,8 @@ export function WaiterPortalView() {
     pullFromGoogleSheets,
     setWTab,
     setActiveTable,
+    toggleTableActive,
+    setTableActive,
     addTable,
     assignNo,
     setNo,
@@ -734,20 +736,85 @@ export function WaiterPortalView() {
 
               {!selectedWs && (
                 <>
+                  <div className="row sp" style={{ margin: '8px 0 4px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 700 }}>
+                      🪑 Table Status &amp; Anti-Fake Protection:
+                    </span>
+                    <div className="row" style={{ gap: '4px' }}>
+                      <button
+                        type="button"
+                        className="chip"
+                        style={{ fontSize: '11px', padding: '2px 8px', color: '#10b981' }}
+                        onClick={() => {
+                          S.tables.forEach((t) => setTableActive(t.id, true));
+                          say('All tables activated 🟢');
+                        }}
+                      >
+                        ⚡ Activate All
+                      </button>
+                      <button
+                        type="button"
+                        className="chip"
+                        style={{ fontSize: '11px', padding: '2px 8px', color: '#f87171' }}
+                        onClick={() => {
+                          S.tables.forEach((t) => setTableActive(t.id, false));
+                          say('All tables locked (inactive) 🔒');
+                        }}
+                      >
+                        🔒 Lock All
+                      </button>
+                    </div>
+                  </div>
                   <div
                     className="row"
-                    style={{ flexWrap: 'wrap', gap: '6px', margin: '8px 0 6px' }}
+                    style={{ flexWrap: 'wrap', gap: '6px', margin: '4px 0 8px' }}
                   >
-                    {S.tables.map((t) => (
-                      <button
-                        key={t.id}
-                        className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
-                        style={{ fontSize: '12px' }}
-                        onClick={() => setActiveTable(t.id)}
-                      >
-                        🪑 {t.label || `Table ${t.id}`}
-                      </button>
-                    ))}
+                    {S.tables.map((t) => {
+                      const isTableActive = t.active !== false;
+                      return (
+                        <div
+                          key={t.id}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            background: S.activeTable === t.id ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.05)',
+                            borderRadius: '20px',
+                            padding: '2px 4px',
+                            gap: '4px',
+                            border: S.activeTable === t.id ? '2px solid #3b82f6' : isTableActive ? '1px solid #10b981' : '1px solid #ef4444',
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
+                            style={{ fontSize: '12px', border: 'none', margin: 0, padding: '4px 8px' }}
+                            onClick={() => setActiveTable(t.id)}
+                          >
+                            🪑 {t.label || `Table ${t.id}`}
+                          </button>
+                          <button
+                            type="button"
+                            title={isTableActive ? 'Table is Active (Click to Lock)' : 'Table is Locked (Click to Activate)'}
+                            style={{
+                              background: isTableActive ? '#10b981' : '#ef4444',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '999px',
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              padding: '2px 7px',
+                              cursor: 'pointer',
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleTableActive(t.id);
+                            }}
+                          >
+                            {isTableActive ? '🟢 Active' : '🔒 Inactive'}
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                   <div className="row" style={{ gap: '6px', marginBottom: '10px' }}>
                     <input
@@ -3427,6 +3494,7 @@ export function SuperAdminPortalView() {
   const [checkMob, setCheckMob] = useState('');
 
   const [openSaSections, setOpenSaSections] = useState<Record<string, boolean>>({
+    pendingRoadmap: true,
     saGuide: false,
     clients: true,
     addClient: false,
@@ -3616,6 +3684,125 @@ export function SuperAdminPortalView() {
           </button>
         </div>
       </div>
+
+      {/* Section: Pending Tasks & Integrations Roadmap */}
+      <CollapsibleSection
+        title="📋 Pending Tasks &amp; Integrations Roadmap"
+        badge="Active Backlog"
+        isOpen={!!openSaSections.pendingRoadmap}
+        onToggle={() => toggleSaSection('pendingRoadmap')}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Card 1: Google Pay */}
+          <div
+            style={{
+              padding: '14px',
+              borderRadius: '12px',
+              background: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid #f59e0b',
+            }}
+          >
+            <div className="row sp" style={{ alignItems: 'flex-start' }}>
+              <div>
+                <span className="tag" style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>
+                  ⏳ AWAITING GOOGLE REVIEW (24-48 HRS)
+                </span>
+                <h4 style={{ margin: '6px 0 2px', fontSize: '15px' }}>
+                  1. Google Pay for Business Merchant Console API (Option A)
+                </h4>
+                <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
+                  Merchant ID: <code>BCR2DN6DWLD3RXC3</code> · Payments Profile: <code>0957-5529-8719</code>
+                </div>
+              </div>
+            </div>
+            <p style={{ fontSize: '12px', margin: '8px 0 4px', lineHeight: 1.5, color: '#e2e8f0' }}>
+              Your business profile has been submitted and is currently in Google&apos;s automated verification review.
+            </p>
+            <div style={{ fontSize: '12px', background: 'rgba(0,0,0,0.3)', padding: '8px 10px', borderRadius: '8px', margin: '6px 0' }}>
+              <b>Action when Google approves:</b>
+              <ol style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                <li>Open Google Pay &amp; Wallet Console &rarr; <b>Integrations</b> tab.</li>
+                <li>Add UPI ID: <code>pradeepparmar9022@okaxis</code></li>
+                <li>Set Webhook URL: <code>https://my-restaurants-zeta.vercel.app/api/payments/webhook</code></li>
+              </ol>
+            </div>
+          </div>
+
+          {/* Card 2: Option B SMS Forwarder */}
+          <div
+            style={{
+              padding: '14px',
+              borderRadius: '12px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid #10b981',
+            }}
+          >
+            <div className="row sp" style={{ alignItems: 'flex-start' }}>
+              <div>
+                <span className="tag" style={{ background: '#10b981', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>
+                  🟢 READY FOR PHONE SETUP
+                </span>
+                <h4 style={{ margin: '6px 0 2px', fontSize: '15px' }}>
+                  2. Free Android Bank SMS-to-Webhook Bridge (Option B)
+                </h4>
+                <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
+                  Works immediately with any personal or business UPI account — zero approval needed.
+                </div>
+              </div>
+            </div>
+            <p style={{ fontSize: '12px', margin: '8px 0 4px', lineHeight: 1.5, color: '#e2e8f0' }}>
+              Whenever bank credits an inflow, counter Android phone auto-posts SMS to Vercel webhook in 1–2 seconds.
+            </p>
+            <div className="row" style={{ gap: '8px', marginTop: '6px' }}>
+              <button
+                type="button"
+                className="chip on"
+                style={{ fontSize: '11.5px', background: '#10b981' }}
+                onClick={() => {
+                  navigator.clipboard?.writeText?.('https://my-restaurants-zeta.vercel.app/api/payments/webhook');
+                  say('Copied Webhook URL to clipboard 📋');
+                }}
+              >
+                📋 Copy Webhook URL
+              </button>
+              <button
+                type="button"
+                className="chip"
+                style={{ fontSize: '11.5px' }}
+                onClick={() => {
+                  fetch('/api/payments/webhook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: 150, utr: 'TEST' + Date.now().toString().slice(-6), sender: 'GPay Test' }),
+                  }).then(() => say('Sent test GPay ping! Check Staff > Orders > Split Recon ⚡'));
+                }}
+              >
+                🧪 Test Simulated Ping
+              </button>
+            </div>
+          </div>
+
+          {/* Card 3: Soundbox */}
+          <div
+            style={{
+              padding: '14px',
+              borderRadius: '12px',
+              background: 'rgba(59, 130, 246, 0.1)',
+              border: '1px solid #3b82f6',
+            }}
+          >
+            <span className="tag" style={{ background: '#3b82f6', color: '#ffffff', fontWeight: 'bold', fontSize: '11px' }}>
+              🔊 HARDWARE &amp; AUDIO
+            </span>
+            <h4 style={{ margin: '6px 0 2px', fontSize: '15px' }}>
+              3. Counter Soundbox &amp; In-App Audio Chime
+            </h4>
+            <p style={{ fontSize: '12px', margin: '4px 0 0', color: '#e2e8f0' }}>
+              Full guide stored in <code>docs/soundbox_and_auto_reconciliation_guide.md</code>. In-app software chime is already active on Staff &amp; Kitchen portals when customer claims payment or webhook receives an inflow.
+            </p>
+          </div>
+        </div>
+      </CollapsibleSection>
 
       {/* Section 0: Super Admin Guide Notes */}
       <CollapsibleSection
@@ -4817,6 +5004,8 @@ export function AdminPortalView() {
     resetTables,
     regenerateTableQr,
     setActiveTable,
+    toggleTableActive,
+    setTableActive,
     resetDemoState,
     saveGoogleConfig,
     syncToGoogleSheets,
@@ -7359,6 +7548,17 @@ export function AdminPortalView() {
                           onClick={() => setSelectedQrTableId(t.id)}
                         >
                           📷 {isQrOpen ? 'Viewing QR' : 'Create QR'}
+                        </button>
+                        <button
+                          className={`chip ${t.active !== false ? 'on' : ''}`}
+                          style={{
+                            border: t.active !== false ? '1px solid #10b981' : '1px solid #ef4444',
+                            color: t.active !== false ? '#10b981' : '#f87171',
+                            fontWeight: 700,
+                          }}
+                          onClick={() => toggleTableActive(t.id)}
+                        >
+                          {t.active !== false ? '🟢 Active' : '🔒 Inactive'}
                         </button>
                         <button
                           className={`chip ${S.activeTable === t.id ? 'on' : ''}`}

@@ -147,6 +147,7 @@ export interface DiningTable {
   id: number;
   label: string;
   token: string;
+  active?: boolean; // false = locked/inactive (anti-fake order protection), true/undefined = active
 }
 
 export interface RewardRulesConfig {

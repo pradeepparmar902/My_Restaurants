@@ -87,12 +87,12 @@ export const INITIAL_STAFF: StaffMember[] = [
 ];
 
 export const INITIAL_TABLES: DiningTable[] = [
-  { id: 1, label: 'Table 1', token: 'qr-tadka-t1-a8f9' },
-  { id: 2, label: 'Table 2', token: 'qr-tadka-t2-b4c2' },
-  { id: 3, label: 'Table 3', token: 'qr-tadka-t3-c9d1' },
-  { id: 4, label: 'Table 4', token: 'qr-tadka-t4-f7e3' },
-  { id: 5, label: 'Table 5', token: 'qr-tadka-t5-d2a6' },
-  { id: 6, label: 'Table 6', token: 'qr-tadka-t6-e5b8' },
+  { id: 1, label: 'Table 1', token: 'qr-tadka-t1-a8f9', active: true },
+  { id: 2, label: 'Table 2', token: 'qr-tadka-t2-b4c2', active: true },
+  { id: 3, label: 'Table 3', token: 'qr-tadka-t3-c9d1', active: true },
+  { id: 4, label: 'Table 4', token: 'qr-tadka-t4-f7e3', active: true },
+  { id: 5, label: 'Table 5', token: 'qr-tadka-t5-d2a6', active: true },
+  { id: 6, label: 'Table 6', token: 'qr-tadka-t6-e5b8', active: true },
 ];
 
 export const COUNTRY_CODES: [string, string][] = [
