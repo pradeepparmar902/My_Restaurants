@@ -1262,6 +1262,37 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
     prevReportedCountRef.current = reportedOrdersCount;
   }, [reportedOrdersCount]);
 
+  useEffect(() => {
+    if (viewMode !== 'split') return;
+    const fetchServerFeed = async () => {
+      try {
+        const res = await fetch('/api/payments/webhook');
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.inflows)) {
+          setCustomBankFeed((prev) => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const newOnes = data.inflows
+              .filter((inf: { id: string }) => !existingIds.has(inf.id))
+              .map((inf: { id: string; amount: number; utr: string; payerName: string; time: string }) => ({
+                id: inf.id,
+                amount: inf.amount,
+                utr: inf.utr,
+                payer: inf.payerName || 'GPay / Paytm Bank Feed',
+                time: inf.time || 'Live',
+              }));
+            if (newOnes.length === 0) return prev;
+            return [...newOnes, ...prev];
+          });
+        }
+      } catch {
+        // Ignore offline fetch errors
+      }
+    };
+    fetchServerFeed();
+    const interval = setInterval(fetchServerFeed, 6000);
+    return () => clearInterval(interval);
+  }, [viewMode]);
+
   const filteredOrders = pendingOrders.filter((o) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.trim().toLowerCase();
@@ -1384,14 +1415,58 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
                 Incoming UPI/GPay inflows on the left automatically match against unpaid counter bills on the right.
               </p>
             </div>
-            <button
-              type="button"
-              className="chip on"
-              style={{ fontSize: '11px' }}
-              onClick={() => setShowAddInflow(!showAddInflow)}
-            >
-              {showAddInflow ? '✖ Close Form' : '+ Log Bank Credit / UTR'}
-            </button>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="chip"
+                style={{ fontSize: '11px' }}
+                onClick={() => {
+                  const url = `${window.location.origin}/api/payments/webhook`;
+                  navigator.clipboard?.writeText?.(url);
+                  say(`Copied Webhook URL: ${url} 📋`);
+                }}
+              >
+                📋 Copy Webhook URL
+              </button>
+              <button
+                type="button"
+                className="chip"
+                style={{ fontSize: '11px', color: '#10b981', borderColor: '#10b981' }}
+                onClick={async () => {
+                  const testTarget = pendingOrders[0];
+                  const testAmt = testTarget ? orderTotals[testTarget.id] || 273 : 273;
+                  const randomUtr = `43${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+                  try {
+                    const res = await fetch('/api/payments/webhook', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        amount: testAmt,
+                        utr: randomUtr,
+                        payerName: 'GPay Test Payer',
+                        source: 'GooglePay',
+                      }),
+                    });
+                    const d = await res.json();
+                    if (d.ok) {
+                      say(`Simulated GPay Webhook received: ₹${testAmt} (UTR ${randomUtr}) 🔔 Matching with orders!`);
+                    }
+                  } catch {
+                    say('Test ping failed');
+                  }
+                }}
+              >
+                🧪 Test GPay Ping
+              </button>
+              <button
+                type="button"
+                className="chip on"
+                style={{ fontSize: '11px' }}
+                onClick={() => setShowAddInflow(!showAddInflow)}
+              >
+                {showAddInflow ? '✖ Close Form' : '+ Log Bank Credit'}
+              </button>
+            </div>
           </div>
 
           {showAddInflow && (

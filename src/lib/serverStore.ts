@@ -3,9 +3,53 @@ import { INITIAL_STATE } from '@/lib/constants';
 import { cleanCounterNumber, getSubtotal, getDiscount, getTotal, filterPositiveItems } from '@/lib/helpers';
 
 // Global singleton in-memory store for API routes (mirrors Supabase DB tables in local/demo mode)
+export interface ServerBankInflow {
+  id: string;
+  source: 'Paytm' | 'GooglePay' | 'PhonePe' | 'SMS' | 'Manual';
+  amount: number;
+  utr: string;
+  payerName: string;
+  payerVpa?: string;
+  time: string;
+  rawPayload?: Record<string, unknown>;
+  reconciledOrderId?: string;
+  receivedAt: string;
+}
+
 declare global {
   // eslint-disable-next-line no-var
   var __TADKA_STORE__: AppState | undefined;
+  // eslint-disable-next-line no-var
+  var __TADKA_BANK_INFLOWS__: ServerBankInflow[] | undefined;
+}
+
+export function getBankInflows(): ServerBankInflow[] {
+  if (!global.__TADKA_BANK_INFLOWS__) {
+    global.__TADKA_BANK_INFLOWS__ = [];
+  }
+  return global.__TADKA_BANK_INFLOWS__;
+}
+
+export function addBankInflow(inflow: Omit<ServerBankInflow, 'id' | 'receivedAt'>): ServerBankInflow {
+  const list = getBankInflows();
+  const entry: ServerBankInflow = {
+    ...inflow,
+    id: `inflow-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    receivedAt: new Date().toISOString(),
+  };
+  list.unshift(entry);
+  if (list.length > 100) list.pop();
+  return entry;
+}
+
+export function markBankInflowReconciled(inflowId: string, orderId: string): boolean {
+  const list = getBankInflows();
+  const item = list.find((i) => i.id === inflowId);
+  if (item) {
+    item.reconciledOrderId = orderId;
+    return true;
+  }
+  return false;
 }
 
 export function getStore(): AppState {
