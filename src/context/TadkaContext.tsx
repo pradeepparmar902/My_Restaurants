@@ -856,13 +856,6 @@ export function TadkaProvider({
         return;
       }
 
-      // Anti-fake order protection: Table must be activated by staff before placing any order (prepaid or postpaid)
-      const currentTable = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
-      if (currentTable && currentTable.active === false) {
-        say(`🔒 Table ${S.activeTable} is currently inactive (locked). Please ask your waiter or staff to activate Table ${S.activeTable} to place your order.`);
-        return;
-      }
-
       const it = filterPositiveItems(S.draft);
       if (Object.keys(it).length === 0) return;
 
@@ -901,7 +894,17 @@ export function TadkaProvider({
         }
       }
 
+      let tableBlocked = false;
+      let blockedTableNum = S.activeTable;
+
       updateState((prev) => {
+        // Anti-fake order protection: Table must be activated by staff before placing any order
+        const currentTable = prev.tables.find((t) => Number(t.id) === Number(prev.activeTable));
+        if (currentTable && currentTable.active === false) {
+          tableBlocked = true;
+          blockedTableNum = prev.activeTable;
+          return prev;
+        }
         const todayBizDate = getCurrentBusinessDate();
         const isNewBusinessDay = prev.counterBusinessDate !== todayBizDate;
         let nextCtr = isNewBusinessDay ? 1 : prev.ctr;
@@ -1063,8 +1066,13 @@ export function TadkaProvider({
           tab: 'order',
         };
       });
+
+      if (tableBlocked) {
+        say(`🔒 Table ${blockedTableNum} is currently inactive (locked). Please ask your waiter or staff to activate Table ${blockedTableNum} to place your order.`);
+        return;
+      }
     },
-    [S.billSrc, S.paid, S.draft, S.menu, S.cc, S.me.mob, say, updateState]
+    [S.billSrc, S.paid, S.draft, S.menu, S.cc, S.me.mob, S.tables, S.activeTable, say, updateState]
   );
 
   placeOrderRef.current = placeOrder;
@@ -1771,12 +1779,6 @@ export function TadkaProvider({
 
   const bookWaiter = useCallback(
     (rawMob: string, rawCounterNo: string, targetCounterNo?: string | null) => {
-      const currentTable = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
-      if (currentTable && currentTable.active === false) {
-        say(`🔒 Table ${S.activeTable} is currently inactive (locked). Please activate Table ${S.activeTable} before booking an order.`);
-        return;
-      }
-
       const mv = normalizeMobile(rawMob, S.cc);
       if (mv === null) {
         say('Enter a valid 10-digit mobile number');
@@ -1786,7 +1788,17 @@ export function TadkaProvider({
       if (Object.keys(it).length === 0) return;
 
       let targetLabel = `Table ${S.activeTable}`;
+      let tableBlocked = false;
+      let blockedTableNum = S.activeTable;
+
       updateState((prev) => {
+        const currentTable = prev.tables.find((t) => Number(t.id) === Number(prev.activeTable));
+        if (currentTable && currentTable.active === false) {
+          tableBlocked = true;
+          blockedTableNum = prev.activeTable;
+          return prev;
+        }
+
         const todayBizDate = getCurrentBusinessDate();
         const isNewBusinessDay = prev.counterBusinessDate !== todayBizDate;
         let nextCtr = isNewBusinessDay ? 1 : prev.ctr;
@@ -2010,9 +2022,14 @@ export function TadkaProvider({
         };
       });
 
+      if (tableBlocked) {
+        say(`🔒 Table ${blockedTableNum} is currently inactive (locked). Please activate Table ${blockedTableNum} before booking an order.`);
+        return;
+      }
+
       say(`Order booked for ${targetLabel} 🍳`);
     },
-    [S.cc, S.WD, S.activeTable, say, updateState]
+    [S.cc, S.WD, S.tables, S.activeTable, say, updateState]
   );
 
   const pushWaiter = useCallback(
