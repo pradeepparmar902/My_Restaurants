@@ -89,9 +89,8 @@ export function MenuTabView() {
           ? '#be123c'
           : '#15803d';
   const currentStaff = staffOf();
-  const isPostpaid = S.googleConfig?.billingModel !== 'prepaid';
-  const currentTable = S.tables.find((t) => t.id === S.activeTable);
-  const isTableLocked = isPostpaid && currentTable && currentTable.active === false;
+  const currentTable = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
+  const isTableLocked = currentTable ? currentTable.active === false : false;
 
   const L: Record<string, string> = {
     en: 'RECOMMENDED FOR YOU',
@@ -1827,6 +1826,9 @@ export function OrderTabView() {
 
   const effectivePayable = hasPrepaidPending ? totalPayablePrepaid : totalAmount;
 
+  const currentTableObj = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
+  const isTableInactive = currentTableObj ? currentTableObj.active === false : false;
+
   const rawUpiId = (S.googleConfig?.upiId || '').trim();
   const hasValidUpi = isValidUpiId(rawUpiId);
   const upiId = hasValidUpi ? rawUpiId : '';
@@ -1892,7 +1894,30 @@ export function OrderTabView() {
         </div>
       )}
 
-      {hasPrepaidPending && (
+      {/* If Table is Inactive: show clear notice, block ordering & DO NOT show payment QR code */}
+      {isTableInactive && (
+        <div
+          className="card"
+          style={{
+            border: '2px solid #ef4444',
+            background: 'rgba(239, 68, 68, 0.12)',
+            padding: '16px',
+            borderRadius: '16px',
+            marginBottom: '14px',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontSize: '32px', marginBottom: '6px' }}>🔒</div>
+          <h3 style={{ margin: '4px 0', color: '#f87171', fontSize: '18px' }}>
+            Table {S.activeTable} is Currently Inactive
+          </h3>
+          <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#fca5a5', lineHeight: 1.5 }}>
+            This table has not been activated by staff yet. Please ask your waiter or captain to activate Table {S.activeTable}. Payment QR codes and order processing are locked until activated.
+          </p>
+        </div>
+      )}
+
+      {!isTableInactive && hasPrepaidPending && (
         <div
           className="card"
           style={{
@@ -2176,7 +2201,7 @@ export function OrderTabView() {
       )}
 
       {/* Post-Payment Mode: Bill & Pay Card on Order Tab */}
-      {!hasPrepaidPending && isPostpaid && hasActiveOrders && !S.paid && (
+      {!isTableInactive && !hasPrepaidPending && hasActiveOrders && !S.paid && (
         <div
           className="card"
           style={{
@@ -3497,6 +3522,8 @@ export function BillTabView() {
   };
 
   const tierLabel = S.pts >= 200 ? '🥇 Gold' : '🥈 Silver';
+  const currentTableObj = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
+  const isTableInactive = currentTableObj ? currentTableObj.active === false : false;
 
   const underPrepDishes: { name: string; qty: number; status: string }[] = [];
   S.orders
@@ -3839,6 +3866,14 @@ export function BillTabView() {
             Request waiter to collect ₹{t}
           </button>
         )
+      ) : isTableInactive ? (
+        <div className="card" style={{ textAlign: 'center', border: '1px solid #ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '16px' }}>
+          <div style={{ fontSize: '28px', marginBottom: '4px' }}>🔒</div>
+          <b style={{ color: '#f87171', fontSize: '15px' }}>Table {S.activeTable} is Currently Inactive</b>
+          <p className="mu" style={{ fontSize: '12px', margin: '4px 0 0' }}>
+            Payment QR code is locked. Please ask your waiter or captain to activate Table {S.activeTable}.
+          </p>
+        </div>
       ) : S.pm === 'UPI' && (S.googleConfig.upiId || '').trim() ? (
         (() => {
           const upiId = (S.googleConfig.upiId || '').trim();

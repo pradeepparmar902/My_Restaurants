@@ -932,9 +932,8 @@ export function WaiterPortalView() {
               )}
 
               {(() => {
-                const isPostpaid = S.googleConfig?.billingModel !== 'prepaid';
-                const activeTableObj = S.tables.find((t) => t.id === S.activeTable);
-                const isCurrentTableInactive = isPostpaid && activeTableObj && activeTableObj.active === false;
+                const activeTableObj = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
+                const isCurrentTableInactive = activeTableObj ? activeTableObj.active === false : false;
 
                 return (
                   <>

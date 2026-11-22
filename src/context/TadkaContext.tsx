@@ -227,6 +227,7 @@ function saveEphemeralBrowserState(state: AppState) {
       draft: state.draft,
       cart: state.cart,
       sess: state.sess,
+      tables: state.tables,
       googleConfig: {
         enabled: state.googleConfig?.enabled ?? true,
         appStyle: state.googleConfig?.appStyle || 'style1',
@@ -391,13 +392,21 @@ export function TadkaProvider({
             qrMatchedTableId = Number(qTable);
           }
 
-          if (qActive !== null && qrMatchedTableId) {
+          if (qActive !== null) {
+            const targetId = qrMatchedTableId || (qTable && Number(qTable) > 0 ? Number(qTable) : 1);
             const isParamActive = qActive !== '0' && qActive !== 'false';
-            const tidx = tableList.findIndex((tb) => tb.id === qrMatchedTableId);
+            const tidx = tableList.findIndex((tb) => Number(tb.id) === Number(targetId));
             if (tidx !== -1) {
               tableList[tidx] = { ...tableList[tidx], active: isParamActive };
-              qrDynamicTables = tableList;
+            } else {
+              tableList.push({
+                id: targetId,
+                label: qLabel || `Table ${targetId}`,
+                token: qToken || `t${targetId}`,
+                active: isParamActive,
+              });
             }
+            qrDynamicTables = tableList;
           }
         }
 
@@ -433,7 +442,7 @@ export function TadkaProvider({
           jainOnly:
             typeof parsed.jainOnly === 'boolean' ? parsed.jainOnly : prev.jainOnly,
           draft: parsed.draft || {},
-          tables: qrDynamicTables || prev.tables,
+          tables: qrDynamicTables || (parsed.tables && parsed.tables.length ? parsed.tables : prev.tables),
           ctr: cleanCtr,
           counterBusinessDate: todayBizDate,
           usedCountersToday: cleanUsed,
@@ -846,11 +855,10 @@ export function TadkaProvider({
         return;
       }
 
-      // Anti-fake order protection for dine-in / postpaid mode: Table must be activated by staff
-      const isPostpaid = S.googleConfig?.billingModel !== 'prepaid';
-      const currentTable = S.tables.find((t) => t.id === S.activeTable);
-      if (isPostpaid && currentTable && currentTable.active === false) {
-        say(`🔒 Table ${S.activeTable} is not activated yet. Please ask your waiter or captain to activate Table ${S.activeTable} to place your order.`);
+      // Anti-fake order protection: Table must be activated by staff before placing any order (prepaid or postpaid)
+      const currentTable = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
+      if (currentTable && currentTable.active === false) {
+        say(`🔒 Table ${S.activeTable} is currently inactive (locked). Please ask your waiter or staff to activate Table ${S.activeTable} to place your order.`);
         return;
       }
 
@@ -1762,10 +1770,9 @@ export function TadkaProvider({
 
   const bookWaiter = useCallback(
     (rawMob: string, rawCounterNo: string, targetCounterNo?: string | null) => {
-      const isPostpaid = S.googleConfig?.billingModel !== 'prepaid';
-      const currentTable = S.tables.find((t) => t.id === S.activeTable);
-      if (isPostpaid && currentTable && currentTable.active === false) {
-        say(`🔒 Table ${S.activeTable} is inactive. Please activate Table ${S.activeTable} before booking an order.`);
+      const currentTable = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
+      if (currentTable && currentTable.active === false) {
+        say(`🔒 Table ${S.activeTable} is currently inactive (locked). Please activate Table ${S.activeTable} before booking an order.`);
         return;
       }
 
