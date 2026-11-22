@@ -5106,7 +5106,7 @@ export function WhatsAppGatewaySettingsSection() {
           const s = await getWhatsAppStatus(gatewayUrl, activeWorkspaceSlug);
           if (s.qr) {
             setQrCodeUrl(s.qr);
-            setStatus('connecting');
+            setStatus(s.status || 'qr');
           }
           if (s.status === 'connected') {
             setStatus('connected');
@@ -5131,7 +5131,7 @@ export function WhatsAppGatewaySettingsSection() {
             const data = JSON.parse(ev.data);
             if (data.type === 'qr' && data.qr) {
               setQrCodeUrl(data.qr);
-              setStatus('connecting');
+              setStatus('qr');
             }
             if (data.type === 'status') {
               setStatus(data.status);
@@ -5265,7 +5265,7 @@ export function WhatsAppGatewaySettingsSection() {
               <span className="tag ok" style={{ background: '#dcfce7', color: '#15803d', fontWeight: 'bold' }}>
                 🟢 Linked {phone ? `(+${phone})` : ''}
               </span>
-            ) : status === 'connecting' ? (
+            ) : (status === 'connecting' || status === 'qr' || Boolean(qrCodeUrl)) ? (
               <span className="tag" style={{ background: '#fef08a', color: '#854d0e', fontWeight: 'bold' }}>
                 🟡 Scan QR Code
               </span>

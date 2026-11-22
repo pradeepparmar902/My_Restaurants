@@ -89,12 +89,21 @@ class WhatsAppService extends EventEmitter {
    */
   async startSession(sessionId = 'default') {
     const existing = this.sessions.get(sessionId);
-    if (existing && (existing.status === 'connected' || existing.status === 'connecting')) {
+    // Keep existing session if it is actively connected, negotiating, or showing a QR code
+    if (existing && (existing.status === 'connected' || existing.status === 'connecting' || existing.status === 'qr')) {
       return existing;
     }
 
+    if (existing?.reconnectTimer) {
+      clearTimeout(existing.reconnectTimer);
+      existing.reconnectTimer = null;
+    }
+
     if (existing?.sock) {
-      try { existing.sock.end(); } catch (e) {}
+      try {
+        existing.sock.ev.removeAllListeners('connection.update');
+        existing.sock.end();
+      } catch (e) {}
     }
 
     const session = {
@@ -103,6 +112,7 @@ class WhatsAppService extends EventEmitter {
       status: 'connecting',
       qrDataUrl: null,
       reconnectAttempts: 0,
+      reconnectTimer: null,
     };
     this.sessions.set(sessionId, session);
     this.emit('status', { sessionId, status: 'connecting' });
@@ -167,13 +177,19 @@ class WhatsAppService extends EventEmitter {
         console.log(`[WhatsApp ${sessionId}] Connection closed (code: ${statusCode}). Reconnect: ${shouldReconnect}`);
         this.emit('status', { sessionId, status: 'disconnected', code: statusCode });
 
+        if (session.reconnectTimer) {
+          clearTimeout(session.reconnectTimer);
+          session.reconnectTimer = null;
+        }
+
         if (shouldReconnect) {
-          // Reconnect automatically after delay
-          setTimeout(() => {
+          // Reconnect automatically with a stable 5s backoff
+          session.reconnectTimer = setTimeout(() => {
+            session.reconnectTimer = null;
             this.startSession(sessionId).catch(err => {
               console.error(`[WhatsApp ${sessionId}] Reconnect failed:`, err.message);
             });
-          }, 3000);
+          }, 5000);
         } else {
           // Logged out: clean up session folder
           this.sessions.delete(sessionId);
@@ -258,7 +274,12 @@ class WhatsAppService extends EventEmitter {
   async disconnectSession(sessionId = 'default') {
     const session = this.sessions.get(sessionId);
     if (session) {
+      if (session.reconnectTimer) {
+        clearTimeout(session.reconnectTimer);
+        session.reconnectTimer = null;
+      }
       if (session.sock) {
+        try { session.sock.ev.removeAllListeners('connection.update'); } catch (e) {}
         try { await session.sock.logout(); } catch (e) {}
         try { session.sock.end(); } catch (e) {}
       }
