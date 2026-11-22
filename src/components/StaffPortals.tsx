@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTadka } from '@/context/TadkaContext';
 import {
   DietaryFilterOption,
@@ -1188,6 +1188,14 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
   const [searchQuery, setSearchQuery] = useState('');
   const [activeQrId, setActiveQrId] = useState<string | null>(null);
   const [methodMap, setMethodMap] = useState<Record<string, PaymentMethod>>({});
+  const [viewMode, setViewMode] = useState<'queue' | 'split'>('queue');
+  const [customBankFeed, setCustomBankFeed] = useState<
+    Array<{ id: string; amount: number; utr: string; payer: string; time: string }>
+  >([]);
+  const [inflowAmt, setInflowAmt] = useState('');
+  const [inflowUtr, setInflowUtr] = useState('');
+  const [inflowPayer, setInflowPayer] = useState('');
+  const [showAddInflow, setShowAddInflow] = useState(false);
   const prevReportedCountRef = useRef(0);
 
   const pendingOrders = (() => {
@@ -1279,6 +1287,34 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
   const gstEnabled = S.googleConfig?.gstEnabled !== false;
   const gstRate = S.googleConfig?.gstRate ?? 5;
 
+  const orderTotals = useMemo(() => {
+    const res: Record<string, number> = {};
+    pendingOrders.forEach((o) => {
+      let sub = 0;
+      S.menu.forEach((m) => {
+        const q = o.it[m.id] || 0;
+        if (q > 0) sub += (o.prices?.[m.id] ?? m.p) * q;
+      });
+      const gst = gstEnabled ? Math.round((sub * gstRate) / 100) : 0;
+      res[o.id] = sub + gst;
+    });
+    return res;
+  }, [pendingOrders, S.menu, gstEnabled, gstRate]);
+
+  const bankFeed = [
+    ...customBankFeed,
+    ...pendingOrders
+      .filter((po) => po.customerPaidReported)
+      .map((po) => ({
+        id: `claimed-${po.id}`,
+        amount: orderTotals[po.id] || 0,
+        utr: po.customerUtr || `UPI-${po.counterNo}`,
+        payer: po.mob || 'Customer App',
+        time: po.time || 'Just now',
+        orderId: po.id,
+      })),
+  ];
+
   return (
     <div className="card" style={{ padding: '14px', borderRadius: '14px', marginBottom: '14px' }}>
       <div className="row sp" style={{ marginBottom: '10px' }}>
@@ -1288,25 +1324,370 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
             {pendingOrders.length} order(s) waiting for payment verification
           </p>
         </div>
-        <button
-          className="chip"
-          style={{ fontSize: '11px' }}
-          onClick={() => pullFromGoogleSheets()}
-        >
-          🔄 Refresh
-        </button>
+        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="chip"
+            style={{
+              fontSize: '11px',
+              background: viewMode === 'queue' ? 'rgba(255,255,255,0.2)' : 'transparent',
+              borderColor: viewMode === 'queue' ? '#10b981' : undefined,
+            }}
+            onClick={() => setViewMode('queue')}
+          >
+            📋 Queue
+          </button>
+          <button
+            type="button"
+            className="chip"
+            style={{
+              fontSize: '11px',
+              background: viewMode === 'split' ? 'rgba(16,185,129,0.25)' : 'transparent',
+              color: viewMode === 'split' ? '#10b981' : undefined,
+              borderColor: viewMode === 'split' ? '#10b981' : undefined,
+              fontWeight: 'bold',
+            }}
+            onClick={() => setViewMode('split')}
+          >
+            ⚖️ Split Recon (GPay vs Bills)
+          </button>
+          <button
+            className="chip"
+            style={{ fontSize: '11px' }}
+            onClick={() => pullFromGoogleSheets()}
+          >
+            🔄 Refresh
+          </button>
+        </div>
       </div>
 
-      <div style={{ marginBottom: '12px' }}>
-        <input
-          type="text"
-          className="inp"
-          placeholder="🔍 Search Counter # (e.g. C1), Table, or Mobile..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ width: '100%', fontSize: '13px' }}
-        />
-      </div>
+      {viewMode === 'split' ? (
+        <div style={{ marginTop: '10px' }}>
+          <div
+            style={{
+              padding: '10px 12px',
+              borderRadius: '10px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              marginBottom: '12px',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '6px',
+            }}
+          >
+            <div>
+              <b style={{ color: '#10b981' }}>⚖️ Live Bank Auto-Reconciliation Split View</b>
+              <p className="mu" style={{ margin: '2px 0 0', fontSize: '11px' }}>
+                Incoming UPI/GPay inflows on the left automatically match against unpaid counter bills on the right.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="chip on"
+              style={{ fontSize: '11px' }}
+              onClick={() => setShowAddInflow(!showAddInflow)}
+            >
+              {showAddInflow ? '✖ Close Form' : '+ Log Bank Credit / UTR'}
+            </button>
+          </div>
+
+          {showAddInflow && (
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px dashed #10b981',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                marginBottom: '12px',
+              }}
+            >
+              <b style={{ fontSize: '12px', display: 'block', marginBottom: '6px', color: '#10b981' }}>
+                ➕ Log Incoming UPI / Bank Credit (From GPay / Soundbox)
+              </b>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="number"
+                  placeholder="Amount ₹ (e.g. 273)"
+                  value={inflowAmt}
+                  onChange={(e) => setInflowAmt(e.target.value)}
+                  className="inp"
+                  style={{ fontSize: '12px', padding: '6px 8px' }}
+                />
+                <input
+                  type="text"
+                  placeholder="12-digit UTR No."
+                  value={inflowUtr}
+                  onChange={(e) => setInflowUtr(e.target.value)}
+                  className="inp"
+                  style={{ fontSize: '12px', padding: '6px 8px' }}
+                />
+                <input
+                  type="text"
+                  placeholder="Payer Name (optional)"
+                  value={inflowPayer}
+                  onChange={(e) => setInflowPayer(e.target.value)}
+                  className="inp"
+                  style={{ fontSize: '12px', padding: '6px 8px' }}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 'bold' }}
+                  onClick={() => {
+                    const amt = Number(inflowAmt);
+                    if (!amt || amt <= 0) {
+                      say('Please enter a valid amount');
+                      return;
+                    }
+                    const newEntry = {
+                      id: `manual-${Date.now()}`,
+                      amount: amt,
+                      utr: inflowUtr.trim() || `UTR-${Math.floor(100000000000 + Math.random() * 900000000000)}`,
+                      payer: inflowPayer.trim() || 'Bank UPI Inflow',
+                      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    };
+                    setCustomBankFeed((prev) => [newEntry, ...prev]);
+                    setInflowAmt('');
+                    setInflowUtr('');
+                    setInflowPayer('');
+                    setShowAddInflow(false);
+                    say(`Logged ₹${amt} bank credit! Looking for matching bill... 🔍`);
+                  }}
+                >
+                  Save Inflow
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
+              gap: '14px',
+              alignItems: 'start',
+            }}
+          >
+            {/* LEFT COLUMN: BANK / GPAY INFLOW FEED */}
+            <div
+              style={{
+                background: 'rgba(16, 185, 129, 0.04)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: '12px',
+                padding: '12px',
+              }}
+            >
+              <div className="row sp" style={{ marginBottom: '10px' }}>
+                <b style={{ color: '#10b981', fontSize: '13px' }}>
+                  📥 GPay &amp; Bank Inflow Feed ({bankFeed.length})
+                </b>
+                <span className="tag" style={{ fontSize: '10px', background: '#10b981', color: '#000', fontWeight: 'bold' }}>
+                  Live Bank Feed
+                </span>
+              </div>
+
+              {bankFeed.length === 0 ? (
+                <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280', fontSize: '12px' }}>
+                  No incoming credits recorded yet. When customers pay via app or you log bank credits, they will appear here.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {bankFeed.map((bf) => {
+                    const matchedOrder = pendingOrders.find((po) => orderTotals[po.id] === bf.amount);
+                    return (
+                      <div
+                        key={bf.id}
+                        style={{
+                          background: matchedOrder ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                          border: matchedOrder ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px',
+                          padding: '10px',
+                        }}
+                      >
+                        <div className="row sp">
+                          <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#10b981' }}>
+                            ₹{bf.amount}
+                          </span>
+                          <span className="mu" style={{ fontSize: '11px' }}>
+                            ⏰ {bf.time}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11px', marginTop: '2px', color: '#e5e7eb' }}>
+                          Payer: <b>{bf.payer}</b>
+                        </div>
+                        <div className="mu" style={{ fontSize: '10px', fontFamily: 'monospace' }}>
+                          UTR: {bf.utr}
+                        </div>
+                        {matchedOrder && (
+                          <div
+                            style={{
+                              marginTop: '6px',
+                              padding: '4px 6px',
+                              background: '#ecfdf5',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              color: '#065f46',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                            }}
+                          >
+                            <span>🔗 Matches <b>Counter {matchedOrder.counterNo}</b></span>
+                            <span style={{ fontWeight: 'bold' }}>₹{bf.amount}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT COLUMN: UNPAID BILLS & PREPAID ORDERS */}
+            <div
+              style={{
+                background: 'rgba(245, 158, 11, 0.04)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                borderRadius: '12px',
+                padding: '12px',
+              }}
+            >
+              <div className="row sp" style={{ marginBottom: '10px' }}>
+                <b style={{ color: '#f59e0b', fontSize: '13px' }}>
+                  🟠 Unpaid Orders &amp; Bills ({sortedOrders.length})
+                </b>
+                <span className="tag" style={{ fontSize: '10px', background: '#f59e0b', color: '#000', fontWeight: 'bold' }}>
+                  Waiting Approval
+                </span>
+              </div>
+
+              {sortedOrders.length === 0 ? (
+                <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280', fontSize: '12px' }}>
+                  No unpaid orders! All counters are cleared.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {sortedOrders.map((o) => {
+                    const total = orderTotals[o.id] || 0;
+                    const matchingFeed = bankFeed.find((bf) => bf.amount === total);
+                    return (
+                      <div
+                        key={o.id}
+                        style={{
+                          background: matchingFeed ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                          border: matchingFeed ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px',
+                          padding: '10px',
+                        }}
+                      >
+                        <div className="row sp">
+                          <div>
+                            <span
+                              className="tag"
+                              style={{
+                                background: matchingFeed ? '#10b981' : '#f59e0b',
+                                color: '#000',
+                                fontWeight: 'bold',
+                                fontSize: '11px',
+                              }}
+                            >
+                              Counter {o.counterNo}
+                            </span>
+                            <span className="mu" style={{ fontSize: '11px', marginLeft: '6px' }}>
+                              Table {o.table}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#10b981' }}>
+                            ₹{total}
+                          </span>
+                        </div>
+
+                        <div className="mu" style={{ fontSize: '11px', marginTop: '4px' }}>
+                          📱 {o.mob} {o.time ? `· ⏰ ${o.time}` : ''}
+                        </div>
+
+                        {matchingFeed ? (
+                          <div style={{ marginTop: '8px' }}>
+                            <div
+                              style={{
+                                padding: '4px 6px',
+                                background: '#ecfdf5',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                color: '#065f46',
+                                marginBottom: '6px',
+                              }}
+                            >
+                              ✅ <b>100% Match Found</b> (Bank Inflow ₹{matchingFeed.amount})
+                            </div>
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{
+                                width: '100%',
+                                background: 'linear-gradient(135deg, #10b981, #059669)',
+                                padding: '7px',
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                              }}
+                              onClick={() => {
+                                confirmPrepaidOrder(o.id, 'UPI');
+                                setCustomBankFeed((prev) => prev.filter((b) => b.id !== matchingFeed.id));
+                                say(`Reconciled Counter ${o.counterNo} with Bank Inflow ₹${total} ✅ Sent to Kitchen!`);
+                              }}
+                            >
+                              ⚡ Reconcile &amp; Send to Kitchen
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: '8px', display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="btn ghost"
+                              style={{ fontSize: '11px', padding: '4px 10px' }}
+                              onClick={() => {
+                                confirmPrepaidOrder(o.id, 'Cash');
+                                say(`Tagged Counter ${o.counterNo} as Cash Paid ✅`);
+                              }}
+                            >
+                              Paid in Cash
+                            </button>
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{ fontSize: '11px', padding: '4px 10px' }}
+                              onClick={() => {
+                                confirmPrepaidOrder(o.id, 'UPI');
+                                say(`Force Confirmed Counter ${o.counterNo} ✅`);
+                              }}
+                            >
+                              Confirm Paid
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ marginBottom: '12px' }}>
+            <input
+              type="text"
+              className="inp"
+              placeholder="🔍 Search Counter # (e.g. C1), Table, or Mobile..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: '100%', fontSize: '13px' }}
+            />
+          </div>
 
       {filteredOrders.length === 0 ? (
         <div
@@ -1549,6 +1930,8 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
             );
           })}
         </div>
+      )}
+        </>
       )}
     </div>
   );
