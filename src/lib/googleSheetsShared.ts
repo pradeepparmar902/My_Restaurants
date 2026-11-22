@@ -100,6 +100,8 @@ export function buildSheetRowsForState(
     ['next_counter_number', state.ctr, new Date().toISOString()],
     ['used_counters_today', (state.usedCountersToday || []).join(','), new Date().toISOString()],
     ['tables_status_json', JSON.stringify((state.tables || []).map((t) => ({ id: t.id, active: t.active !== false }))), new Date().toISOString()],
+    ['whatsapp_gateway_url', state.googleConfig?.whatsappGatewayUrl || '', new Date().toISOString()],
+    ['whatsapp_direct_enabled', state.googleConfig?.whatsappDirectEnabled !== false, new Date().toISOString()],
   ];
 
   const Menu_Items: (string | number | boolean)[][] = [
@@ -849,6 +851,8 @@ export function parseConfigFromSheetRows(
       cfg.gstMode = val;
     }
     if (key === 'gstin' && val) cfg.gstin = val;
+    if (key === 'whatsapp_gateway_url') cfg.whatsappGatewayUrl = val;
+    if (key === 'whatsapp_direct_enabled') cfg.whatsappDirectEnabled = val === 'true';
     if (key === 'tables_status_json' && val) {
       try {
         const parsed = JSON.parse(val);

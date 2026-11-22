@@ -48,6 +48,7 @@ import {
   parseStaffFromSheetRows,
   PulledSheetOrder,
 } from '@/lib/googleSheetsShared';
+import { formatOrderConfirmationMessage, sendDirectWhatsAppMessage } from '@/lib/whatsappClient';
 
 interface TadkaContextValue {
   S: AppState;
@@ -544,28 +545,53 @@ export function TadkaProvider({
     }
     isHydratedRef.current = true;
 
-    // On mount, pull table activation status from server so customer device reflects current table state
-    fetch(`${getTablesApiBase()}?tenant=${encodeURIComponent(currentSlug)}&_=${Date.now()}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.tables) {
-          setS((prev) => {
-            let hasChange = false;
-            const next = prev.tables.map((t) => {
-              if (data.tables[t.id] !== undefined && t.active !== data.tables[t.id]) {
-                hasChange = true;
-                return { ...t, active: Boolean(data.tables[t.id]) };
+    // Periodic pull of table activation status from server so customer device reflects waiter unlocks in real-time
+    const syncTableStatus = () => {
+      fetch(`${getTablesApiBase()}?tenant=${encodeURIComponent(currentSlug)}&_=${Date.now()}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.tables) {
+            setS((prev) => {
+              let hasChange = false;
+              const next = prev.tables.map((t) => {
+                if (data.tables[t.id] !== undefined && t.active !== data.tables[t.id]) {
+                  hasChange = true;
+                  return { ...t, active: Boolean(data.tables[t.id]) };
+                }
+                return t;
+              });
+              if (hasChange) {
+                const currentActive = data.tables[prev.activeTable];
+                if (currentActive === true && typeof window !== 'undefined') {
+                  try {
+                    const sp = new URLSearchParams(window.location.search);
+                    if (sp.has('active')) {
+                      sp.delete('active');
+                      const cleanUrl =
+                        window.location.pathname +
+                        (sp.toString() ? `?${sp.toString()}` : '') +
+                        window.location.hash;
+                      window.history.replaceState({}, '', cleanUrl);
+                    }
+                  } catch {
+                    // ignore
+                  }
+                }
+                return { ...prev, tables: next };
               }
-              return t;
+              return prev;
             });
-            return hasChange ? { ...prev, tables: next } : prev;
-          });
-        }
-      })
-      .catch(() => {});
+          }
+        })
+        .catch(() => {});
+    };
 
+    syncTableStatus();
+    const tablePollTimer = setInterval(syncTableStatus, 3500);
+
+    let bc: BroadcastChannel | null = null;
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      const bc = new BroadcastChannel(getWorkspaceChannelName());
+      bc = new BroadcastChannel(getWorkspaceChannelName());
       bc.onmessage = (ev) => {
         if (ev.data && ev.data.type === 'STATE_SYNC') {
           setS((prev) => ({
@@ -580,10 +606,12 @@ export function TadkaProvider({
         }
       };
       channelRef.current = bc;
-      return () => {
-        bc.close();
-      };
     }
+
+    return () => {
+      clearInterval(tablePollTimer);
+      if (bc) bc.close();
+    };
   }, [initialTableId]);
 
   // Persist to localStorage & broadcast changes
@@ -905,12 +933,31 @@ export function TadkaProvider({
       updateState((prev) => {
         // Anti-fake order protection: Table must be activated by staff before placing any order
         const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
-        const isUrlInactive = urlActiveParam === '0' || urlActiveParam === 'false';
         const currentTable = prev.tables.find((t) => Number(t.id) === Number(prev.activeTable));
-        if (isUrlInactive || (currentTable && currentTable.active === false)) {
+        
+        // Live state takes absolute precedence; URL parameter is only an initial fallback
+        const isTableBlocked = currentTable
+          ? currentTable.active === false
+          : (urlActiveParam === '0' || urlActiveParam === 'false');
+
+        if (isTableBlocked) {
           tableBlocked = true;
           blockedTableNum = prev.activeTable;
           return prev;
+        }
+
+        // If table is verified active, clean up any stale ?active=0 from URL
+        if (typeof window !== 'undefined') {
+          try {
+            const sp = new URLSearchParams(window.location.search);
+            if (sp.has('active')) {
+              sp.delete('active');
+              const cleanUrl = window.location.pathname + (sp.toString() ? `?${sp.toString()}` : '') + window.location.hash;
+              window.history.replaceState({}, '', cleanUrl);
+            }
+          } catch {
+            // ignore
+          }
         }
         const todayBizDate = getCurrentBusinessDate();
         const isNewBusinessDay = prev.counterBusinessDate !== todayBizDate;
@@ -1078,8 +1125,44 @@ export function TadkaProvider({
         say(`🔒 Table ${blockedTableNum} is currently inactive (locked). Please ask your waiter or staff to activate Table ${blockedTableNum} to place your order.`);
         return;
       }
+
+      // Automated background WhatsApp notification dispatch
+      const targetCustomerMob = normalizedOptionalMob || S.sess?.mob || S.me.mob;
+      if (targetCustomerMob && S.googleConfig.whatsappDirectEnabled !== false) {
+        const itemRows = Object.entries(it).map(([dishId, qty]) => {
+          const dish = S.menu.find((m) => m.id === Number(dishId));
+          return {
+            name: typeof dish?.n === 'string' ? dish.n : (dish?.n as any)?.en || `Item #${dishId}`,
+            qty,
+            price: dish?.p || 0,
+          };
+        });
+        const subtotal = itemRows.reduce((acc, curr) => acc + curr.price * curr.qty, 0);
+        const waMsg = formatOrderConfirmationMessage({
+          restaurantName: (S.googleConfig.restaurantName || '').trim() || 'Tadka Restaurant',
+          counterNo: S.sess?.no || 'C1',
+          tableNo: S.activeTable,
+          orderId: `ORD-${Date.now()}`,
+          items: itemRows,
+          subtotal,
+          isPrepaid: S.googleConfig.billingModel === 'prepaid',
+        });
+        sendDirectWhatsAppMessage({
+          to: targetCustomerMob,
+          text: waMsg,
+          gatewayUrl: S.googleConfig.whatsappGatewayUrl,
+          sessionId: getActiveWorkspaceSlug(),
+          defaultCountryCode: S.cc,
+        })
+          .then((res) => {
+            if (res.ok) {
+              say('Order confirmed! 📲 WhatsApp receipt sent in background ✅');
+            }
+          })
+          .catch(() => {});
+      }
     },
-    [S.billSrc, S.paid, S.draft, S.menu, S.cc, S.me.mob, S.tables, S.activeTable, say, updateState]
+    [S.billSrc, S.paid, S.draft, S.menu, S.cc, S.me.mob, S.tables, S.activeTable, S.sess, S.googleConfig, say, updateState]
   );
 
   placeOrderRef.current = placeOrder;

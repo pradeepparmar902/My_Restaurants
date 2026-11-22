@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Direct Connector & Sender</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #25D366;
+      --primary-dark: #128C7E;
+      --bg: #f4f6f9;
+      --surface: #ffffff;
+      --text: #1f2937;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+      --error: #ef4444;
+      --success: #10b981;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 30px 20px; line-height: 1.5; }
+    .container { max-width: 900px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand svg { width: 36px; height: 36px; fill: var(--primary); }
+    .brand h1 { font-size: 20px; font-weight: 700; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .badge-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .badge-disconnected { background: #fee2e2; color: #991b1b; }
+    .badge-disconnected .badge-dot { background: #ef4444; }
+    .badge-connecting { background: #fef3c7; color: #92400e; }
+    .badge-connecting .badge-dot { background: #f59e0b; }
+    .badge-connected { background: #dcfce7; color: #166534; }
+    .badge-connected .badge-dot { background: #22c55e; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; }
+
+    .qr-box {
+      min-height: 260px;
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      text-align: center;
+      background: #fafafa;
+    }
+    .qr-box img { max-width: 220px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .qr-desc { margin-top: 12px; font-size: 13px; color: var(--text-muted); }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #374151; }
+    .form-control {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-control:focus { border-color: var(--primary-dark); }
+    textarea.form-control { resize: vertical; min-height: 90px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-danger { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+    .btn-danger:hover { background: #fecaca; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: #f3f4f6; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-top: 15px;
+      display: none;
+    }
+    .alert-success { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .alert-error { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+    /* Code tabs */
+    .tab-header { display: flex; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .tab-btn.active { color: var(--primary-dark); border-bottom-color: var(--primary-dark); }
+    pre {
+      background: #1e293b;
+      color: #f8fafc;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 1.67c4.54 0 8.24 3.7 8.24 8.24 0 2.2-.86 4.27-2.42 5.82a8.18 8.18 0 0 1-5.82 2.42c-1.45 0-2.88-.38-4.14-1.11l-.3-.17-3.12.82.83-3.04-.2-.31a8.17 8.17 0 0 1-1.25-4.43c0-4.54 3.7-8.24 8.24-8.24zm4.72 11.53c-.26-.13-1.54-.76-1.78-.85-.24-.09-.41-.13-.58.13-.17.26-.67.85-.82 1.02-.15.17-.3.19-.56.06-.26-.13-1.08-.4-2.06-1.28-.76-.68-1.28-1.52-1.43-1.78-.15-.26-.02-.4.11-.53.12-.11.26-.3.39-.45.13-.15.17-.26.26-.43.09-.17.04-.32-.02-.45-.06-.13-.58-1.4-.79-1.92-.21-.5-.42-.43-.58-.44l-.49-.01c-.17 0-.45.06-.69.32-.24.26-.91.89-.91 2.17s.93 2.52 1.06 2.69c.13.17 1.83 2.8 4.43 3.93.62.27 1.11.43 1.49.55.62.2 1.19.17 1.64.1.5-.07 1.54-.63 1.76-1.24.22-.61.22-1.13.15-1.24-.07-.11-.24-.18-.5-.31z"/></svg>
+      <div>
+        <h1>WhatsApp Direct Connector</h1>
+        <p style="font-size:12px;color:var(--text-muted)">Send WhatsApp messages directly without opening WhatsApp Web or phone app</p>
+      </div>
+    </div>
+    <div id="statusBadge" class="badge badge-disconnected">
+      <span class="badge-dot"></span>
+      <span id="statusText">Disconnected</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- WhatsApp Connection Box -->
+    <div class="card">
+      <h2>
+        <span>1. WhatsApp Connection</span>
+        <button id="btnDisconnect" class="btn btn-danger" style="display:none;font-size:12px;padding:4px 10px;" onclick="disconnect()">Disconnect</button>
+      </h2>
+
+      <div class="qr-box" id="qrBox">
+        <div id="qrInitialState">
+          <p style="font-size:14px;margin-bottom:12px;font-weight:500;">Ready to link your WhatsApp</p>
+          <button class="btn btn-primary" onclick="startConnect()">+ Connect WhatsApp</button>
+          <p class="qr-desc">Click connect to generate a QR code.</p>
+        </div>
+        <div id="qrLoadingState" style="display:none;">
+          <p style="font-size:14px;color:var(--text-muted);">Generating QR Code...</p>
+        </div>
+        <div id="qrDisplayState" style="display:none;">
+          <img id="qrImg" src="" alt="WhatsApp QR Code">
+          <p class="qr-desc">Open WhatsApp on your phone &rarr; <b>Linked Devices</b> &rarr; <b>Link a device</b> &rarr; Scan this code.</p>
+        </div>
+        <div id="connectedState" style="display:none;">
+          <svg style="width:48px;height:48px;fill:var(--success);margin-bottom:8px;" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+          <h3 style="font-size:16px;color:#166534;" id="connectedPhone">Connected</h3>
+          <p style="font-size:13px;color:var(--text-muted);margin-top:4px;">You can now send WhatsApp messages directly from any app!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Direct Message Sender Box -->
+    <div class="card">
+      <h2>2. Send Message Without Opening App</h2>
+      <form id="sendForm" onsubmit="handleSend(event)">
+        <div class="form-group">
+          <label for="recipient">Recipient Phone Number (with Country Code):</label>
+          <input type="text" id="recipient" class="form-control" placeholder="e.g. 919819984437 or +919819984437" required>
+          <small style="font-size:11.5px;color:var(--text-muted)">Formats automatically. No need to add '+' manually.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="message">Message Text:</label>
+          <textarea id="message" class="form-control" placeholder="Type your WhatsApp message here..." required></textarea>
+        </div>
+
+        <button type="submit" id="btnSend" class="btn btn-primary" style="width:100%;">
+          <span>Send Message Now</span>
+          <svg style="width:16px;height:16px;fill:currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/></svg>
+        </button>
+
+        <div id="sendAlertSuccess" class="alert alert-success">Message sent successfully!</div>
+        <div id="sendAlertError" class="alert alert-error"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- How to Integrate into other apps -->
+  <div class="card">
+    <h2>3. How to Integrate this into ANY other app</h2>
+    <div class="tab-header">
+      <button class="tab-btn active" onclick="switchTab('curl')">cURL / HTTP</button>
+      <button class="tab-btn" onclick="switchTab('js')">JavaScript (fetch / frontend)</button>
+      <button class="tab-btn" onclick="switchTab('node')">Node.js (Direct Code Import)</button>
+      <button class="tab-btn" onclick="switchTab('python')">Python</button>
+    </div>
+
+    <div id="tab-curl" class="tab-content">
+      <pre><code>curl -X POST http://localhost:5050/api/send \
+  -H "Content-Type: application/json" \
+  -d '{"to": "919819984437", "text": "Hello from my custom app!"}'</code></pre>
+    </div>
+
+    <div id="tab-js" class="tab-content" style="display:none;">
+      <pre><code>// Send message from any frontend or React / Vue / HTML app:
+async function sendWhatsApp(phoneNumber, messageText) {
+  const response = await fetch('http://localhost:5050/api/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: phoneNumber,
+      text: messageText
+    })
+  });
+  const data = await response.json();
+  if (data.ok) {
+    alert('WhatsApp Message Sent!');
+  } else {
+    alert('Error: ' + data.error);
+  }
+}</code></pre>
+    </div>
+
+    <div id="tab-node" class="tab-content" style="display:none;">
+      <pre><code>// In your other Node.js application, simply import whatsappService.js:
+const waService = require('./whatsappService');
+
+// 1. Start or resume session
+await waService.startSession('default');
+
+// 2. Send message directly:
+await waService.sendMessage('default', '919819984437', 'Hello directly from Node.js!');</code></pre>
+    </div>
+
+    <div id="tab-python" class="tab-content" style="display:none;">
+      <pre><code>import requests
+
+payload = {
+    "to": "919819984437",
+    "text": "Hello from Python script!"
+}
+response = requests.post("http://localhost:5050/api/send", json=payload)
+print(response.json())</code></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+  let sse = null;
+  const SESSION_ID = 'default';
+
+  // Check initial status on load
+  async function checkStatus() {
+    try {
+      const res = await fetch(`/api/status?sessionId=${SESSION_ID}`);
+      const data = await res.json();
+      updateStatusUI(data.status, data.phone);
+      if (data.status === 'qr' || data.status === 'connecting') {
+        listenQrStream();
+      }
+    } catch (e) {
+      updateStatusUI('disconnected');
+    }
+  }
+
+  function updateStatusUI(status, phone) {
+    const badge = document.getElementById('statusBadge');
+    const statusText = document.getElementById('statusText');
+    const btnDisconnect = document.getElementById('btnDisconnect');
+    const qrInitialState = document.getElementById('qrInitialState');
+    const qrLoadingState = document.getElementById('qrLoadingState');
+    const qrDisplayState = document.getElementById('qrDisplayState');
+    const connectedState = document.getElementById('connectedState');
+    const connectedPhone = document.getElementById('connectedPhone');
+
+    badge.className = 'badge';
+
+    if (status === 'connected') {
+      badge.classList.add('badge-connected');
+      statusText.innerText = phone ? `Connected (${phone})` : 'Connected';
+      btnDisconnect.style.display = 'inline-flex';
+      qrInitialState.style.display = 'none';
+      qrLoadingState.style.display = 'none';
+      qrDisplayState.style.display = 'none';
+      connectedState.style.display = 'block';
+      connectedPhone.innerText = phone ? `Linked: +${phone}` : 'WhatsApp Linked & Ready';
+    } else if (status === 'qr') {
+      badge.classList.add('badge-connecting');
+      statusText.innerText = 'Scan QR Code';
+      btnDisconnect.style.display = 'none';
+      qrInitialState.style.display = 'none';
+      qrLoadingState.style.display = 'none';
+      qrDisplayState.style.display = 'block';
+      connectedState.style.display = 'none';
+    } else if (status === 'connecting') {
+      badge.classList.add('badge-connecting');
+      statusText.innerText = 'Connecting...';
+      btnDisconnect.style.display = 'none';
+      qrInitialState.style.display = 'none';
+      qrLoadingState.style.display = 'block';
+      qrDisplayState.style.display = 'none';
+      connectedState.style.display = 'none';
+    } else {
+      badge.classList.add('badge-disconnected');
+      statusText.innerText = 'Disconnected';
+      btnDisconnect.style.display = 'none';
+      qrInitialState.style.display = 'block';
+      qrLoadingState.style.display = 'none';
+      qrDisplayState.style.display = 'none';
+      connectedState.style.display = 'none';
+    }
+  }
+
+  async function startConnect() {
+    updateStatusUI('connecting');
+    await fetch('/api/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID })
+    });
+    listenQrStream();
+  }
+
+  function listenQrStream() {
+    if (sse) sse.close();
+    sse = new EventSource(`/api/qr-stream?sessionId=${SESSION_ID}`);
+
+    sse.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'qr') {
+        document.getElementById('qrImg').src = data.qr;
+        updateStatusUI('qr');
+      } else if (data.type === 'status') {
+        updateStatusUI(data.status, data.phone);
+        if (data.status === 'connected') {
+          if (sse) sse.close();
+        }
+      }
+    };
+
+    sse.onerror = () => {
+      // sse will retry automatically
+    };
+  }
+
+  async function disconnect() {
+    if (!confirm('Are you sure you want to disconnect this WhatsApp number?')) return;
+    if (sse) sse.close();
+    await fetch('/api/disconnect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID })
+    });
+    updateStatusUI('disconnected');
+  }
+
+  async function handleSend(e) {
+    e.preventDefault();
+    const btnSend = document.getElementById('btnSend');
+    const alertSuccess = document.getElementById('sendAlertSuccess');
+    const alertError = document.getElementById('sendAlertError');
+    const recipient = document.getElementById('recipient').value.trim();
+    const message = document.getElementById('message').value.trim();
+
+    alertSuccess.style.display = 'none';
+    alertError.style.display = 'none';
+
+    btnSend.disabled = true;
+    btnSend.firstElementChild.innerText = 'Sending...';
+
+    try {
+      const res = await fetch('/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: SESSION_ID,
+          to: recipient,
+          text: message
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Failed to send');
+      }
+      alertSuccess.style.display = 'block';
+      alertSuccess.innerText = `Message sent to ${data.result.to} successfully!`;
+      document.getElementById('message').value = '';
+    } catch (err) {
+      alertError.style.display = 'block';
+      alertError.innerText = err.message;
+    } finally {
+      btnSend.disabled = false;
+      btnSend.firstElementChild.innerText = 'Send Message Now';
+    }
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+    event.target.classList.add('active');
+    document.getElementById('tab-' + tab).style.display = 'block';
+  }
+
+  // Initial check
+  checkStatus();
+</script>
+
+</body>
+</html>

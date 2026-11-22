@@ -22,6 +22,7 @@ import {
   ReviewAndShareCard,
   ShareMomentCard,
 } from '@/components/SharedWidgets';
+import { sendDirectWhatsAppMessage } from '@/lib/whatsappClient';
 
 export function MenuTabView() {
   const {
@@ -94,7 +95,7 @@ export function MenuTabView() {
   const currentTable = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
   const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
   const isUrlInactive = urlActiveParam === '0' || urlActiveParam === 'false';
-  const isTableLocked = isUrlInactive || (currentTable ? currentTable.active === false : false);
+  const isTableLocked = currentTable ? currentTable.active === false : isUrlInactive;
 
   const L: Record<string, string> = {
     en: 'RECOMMENDED FOR YOU',
@@ -1883,7 +1884,7 @@ export function OrderTabView() {
   const currentTableObj = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
   const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
   const isUrlInactive = urlActiveParam === '0' || urlActiveParam === 'false';
-  const isTableInactive = isUrlInactive || (currentTableObj ? currentTableObj.active === false : false);
+  const isTableInactive = currentTableObj ? currentTableObj.active === false : isUrlInactive;
 
   const rawUpiId = (S.googleConfig?.upiId || '').trim();
   const hasValidUpi = isValidUpiId(rawUpiId);
@@ -2973,6 +2974,7 @@ export function BillTabView() {
     startNewOrder,
     updateState,
     reportCustomerPrepaidPayment,
+    activeWorkspaceSlug,
     say,
   } = useTadka();
   const [waInput, setWaInput] = useState('');
@@ -3188,11 +3190,24 @@ export function BillTabView() {
                 <button
                   className="btn alt"
                   style={{ flex: 1, marginTop: 0 }}
-                  onClick={() => {
+                  onClick={async () => {
                     const msg = buildReceiptText();
-                    const digits = S.sess?.mob
-                      ? S.sess.mob.replace(/\D/g, '')
-                      : '';
+                    const targetMob = S.sess?.mob || S.me.mob;
+                    if (targetMob && S.googleConfig.whatsappDirectEnabled !== false) {
+                      say('Sending receipt via WhatsApp in background... ⏳');
+                      const res = await sendDirectWhatsAppMessage({
+                        to: targetMob,
+                        text: msg,
+                        gatewayUrl: S.googleConfig.whatsappGatewayUrl,
+                        sessionId: activeWorkspaceSlug,
+                        defaultCountryCode: S.cc,
+                      });
+                      if (res.ok) {
+                        say('Receipt sent directly to your WhatsApp in background ✅');
+                        return;
+                      }
+                    }
+                    const digits = targetMob ? targetMob.replace(/\D/g, '') : '';
                     const url = digits
                       ? `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`
                       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
@@ -3581,7 +3596,7 @@ export function BillTabView() {
   const currentTableObj = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
   const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
   const isUrlInactive = urlActiveParam === '0' || urlActiveParam === 'false';
-  const isTableInactive = isUrlInactive || (currentTableObj ? currentTableObj.active === false : false);
+  const isTableInactive = currentTableObj ? currentTableObj.active === false : isUrlInactive;
 
   const underPrepDishes: { name: string; qty: number; status: string }[] = [];
   S.orders

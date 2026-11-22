@@ -231,6 +231,8 @@ export interface GoogleCloudStorageConfig {
   gstin?: string;
   rewardRules?: RewardRulesConfig;
   tablesStatusJson?: string;
+  whatsappGatewayUrl?: string; // URL of the standalone Baileys WhatsApp connector (default: http://localhost:5050)
+  whatsappDirectEnabled?: boolean; // When true, sends order confirmations and bills directly via background WhatsApp
   lastSyncedAt?: string;
   lastSyncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
   lastSyncError?: string;

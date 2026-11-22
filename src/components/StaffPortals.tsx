@@ -40,6 +40,12 @@ import {
   TagOfflinePaidWidget,
 } from '@/components/SharedWidgets';
 import { GoogleStorageAdminCard } from '@/components/GoogleStoragePanel';
+import {
+  getWhatsAppStatus,
+  startWhatsAppSession,
+  disconnectWhatsAppSession,
+  sendDirectWhatsAppMessage,
+} from '@/lib/whatsappClient';
 
 export function ChefPortalView() {
   const {
@@ -3720,12 +3726,12 @@ export function SuperAdminPortalView() {
       {/* Section: Pending Tasks & Integrations Roadmap */}
       <CollapsibleSection
         title="📋 Pending Tasks &amp; Integrations Roadmap"
-        badge="Active Backlog"
+        badge="Active Backlog &amp; Roadmap"
         isOpen={!!openSaSections.pendingRoadmap}
         onToggle={() => toggleSaSection('pendingRoadmap')}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Card 1: Google Pay */}
+          {/* Card 1: Google Pay Console Review */}
           <div
             style={{
               padding: '14px',
@@ -3737,30 +3743,74 @@ export function SuperAdminPortalView() {
             <div className="row sp" style={{ alignItems: 'flex-start' }}>
               <div>
                 <span className="tag" style={{ background: '#f59e0b', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>
-                  ⏳ AWAITING GOOGLE REVIEW (24-48 HRS)
+                  ⏳ AWAITING GOOGLE REVIEW (24–48 HRS)
                 </span>
                 <h4 style={{ margin: '6px 0 2px', fontSize: '15px' }}>
-                  1. Google Pay for Business Merchant Console API (Option A)
+                  1. Google Pay Direct Merchant Console API
                 </h4>
                 <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
-                  Merchant ID: <code>BCR2DN6DWLD3RXC3</code> · Payments Profile: <code>0957-5529-8719</code>
+                  Merchant / Console ID: <code>BCR2DN6DWLD3RXC3</code> · Payments Profile ID: <code>0957-5529-8719</code> · Region: India (IN)
                 </div>
               </div>
             </div>
             <p style={{ fontSize: '12px', margin: '8px 0 4px', lineHeight: 1.5, color: '#e2e8f0' }}>
-              Your business profile has been submitted and is currently in Google&apos;s automated verification review.
+              Your Google Pay &amp; Wallet business profile has been submitted and is currently under review by Google.
             </p>
             <div style={{ fontSize: '12px', background: 'rgba(0,0,0,0.3)', padding: '8px 10px', borderRadius: '8px', margin: '6px 0' }}>
-              <b>Action when Google approves:</b>
+              <b>Next step when Google approves profile:</b>
               <ol style={{ margin: '4px 0 0 16px', padding: 0 }}>
                 <li>Open Google Pay &amp; Wallet Console &rarr; <b>Integrations</b> tab.</li>
-                <li>Add UPI ID: <code>pradeepparmar9022@okaxis</code></li>
-                <li>Set Webhook URL: <code>https://my-restaurants-zeta.vercel.app/api/payments/webhook</code></li>
+                <li>Add verified UPI ID: <code>pradeepparmar9022@okaxis</code></li>
+                <li>Configure Callback / Webhook: <code>https://my-restaurants-zeta.vercel.app/api/payments/webhook</code></li>
               </ol>
             </div>
           </div>
 
-          {/* Card 2: Option B SMS Forwarder */}
+          {/* Card 2: Post-Payment Mode Customer Bill Generation */}
+          <div
+            style={{
+              padding: '14px',
+              borderRadius: '12px',
+              background: 'rgba(168, 85, 247, 0.1)',
+              border: '1px solid #a855f7',
+            }}
+          >
+            <span className="tag" style={{ background: '#a855f7', color: '#ffffff', fontWeight: 'bold', fontSize: '11px' }}>
+              📋 QUEUED FOR NEXT PHASE
+            </span>
+            <h4 style={{ margin: '6px 0 2px', fontSize: '15px' }}>
+              2. Post-Payment Mode: Customer Bill Generation on Delivered Items
+            </h4>
+            <p style={{ fontSize: '12px', margin: '6px 0 4px', lineHeight: 1.5, color: '#e2e8f0' }}>
+              Once food is delivered, customer can tap &quot;Generate Bill&quot; on delivered food to generate an instant dynamic UPI QR code and payment link.
+            </p>
+            <div style={{ fontSize: '11.5px', color: '#cbd5e1', background: 'rgba(0,0,0,0.25)', padding: '6px 10px', borderRadius: '6px' }}>
+              🍲 <b>Kitchen Notice:</b> If some table items are still under preparation in the kitchen, customer receives an inline alert: <i>&quot;Item [Dish] is currently being cooked in the kitchen and is included in this bill.&quot;</i>
+            </div>
+          </div>
+
+          {/* Card 3: Push Bill Payment Mode */}
+          <div
+            style={{
+              padding: '14px',
+              borderRadius: '12px',
+              background: 'rgba(14, 165, 233, 0.1)',
+              border: '1px solid #0ea5e9',
+            }}
+          >
+            <span className="tag" style={{ background: '#0ea5e9', color: '#ffffff', fontWeight: 'bold', fontSize: '11px' }}>
+              📋 QUEUED FOR NEXT PHASE
+            </span>
+            <h4 style={{ margin: '6px 0 2px', fontSize: '15px' }}>
+              3. Push Bill Payment Mode (Manager/Cashier &rarr; Customer)
+            </h4>
+            <p style={{ fontSize: '12px', margin: '6px 0 4px', lineHeight: 1.5, color: '#e2e8f0' }}>
+              Cashier / Manager generates the final invoice at the desk and taps <b>&quot;Push Bill to Customer&quot;</b>.
+              Customer scans QR or logs in, and their invoice pops up immediately with payment link and UPI QR.
+            </p>
+          </div>
+
+          {/* Card 4: Table Activation Toggle (Anti-Fake Order Lock) */}
           <div
             style={{
               padding: '14px',
@@ -3769,52 +3819,39 @@ export function SuperAdminPortalView() {
               border: '1px solid #10b981',
             }}
           >
-            <div className="row sp" style={{ alignItems: 'flex-start' }}>
-              <div>
-                <span className="tag" style={{ background: '#10b981', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>
-                  🟢 READY FOR PHONE SETUP
-                </span>
-                <h4 style={{ margin: '6px 0 2px', fontSize: '15px' }}>
-                  2. Free Android Bank SMS-to-Webhook Bridge (Option B)
-                </h4>
-                <div style={{ fontSize: '12px', color: '#cbd5e1' }}>
-                  Works immediately with any personal or business UPI account — zero approval needed.
-                </div>
-              </div>
-            </div>
-            <p style={{ fontSize: '12px', margin: '8px 0 4px', lineHeight: 1.5, color: '#e2e8f0' }}>
-              Whenever bank credits an inflow, counter Android phone auto-posts SMS to Vercel webhook in 1–2 seconds.
+            <span className="tag" style={{ background: '#10b981', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>
+              🟢 COMPLETED &amp; ACTIVE
+            </span>
+            <h4 style={{ margin: '6px 0 2px', fontSize: '15px' }}>
+              4. Table Activation Toggle (Anti-Fake Order Lock)
+            </h4>
+            <p style={{ fontSize: '12px', margin: '6px 0 4px', lineHeight: 1.5, color: '#e2e8f0' }}>
+              Staff toggle table Active / Inactive. Inactive tables allow browsing the menu and picking items, but block placing orders until staff activates. Automatically synchronizes in real-time every 3.5s.
             </p>
-            <div className="row" style={{ gap: '8px', marginTop: '6px' }}>
-              <button
-                type="button"
-                className="chip on"
-                style={{ fontSize: '11.5px', background: '#10b981' }}
-                onClick={() => {
-                  navigator.clipboard?.writeText?.('https://my-restaurants-zeta.vercel.app/api/payments/webhook');
-                  say('Copied Webhook URL to clipboard 📋');
-                }}
-              >
-                📋 Copy Webhook URL
-              </button>
-              <button
-                type="button"
-                className="chip"
-                style={{ fontSize: '11.5px' }}
-                onClick={() => {
-                  fetch('/api/payments/webhook', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount: 150, utr: 'TEST' + Date.now().toString().slice(-6), sender: 'GPay Test' }),
-                  }).then(() => say('Sent test GPay ping! Check Staff > Orders > Split Recon ⚡'));
-                }}
-              >
-                🧪 Test Simulated Ping
-              </button>
-            </div>
           </div>
 
-          {/* Card 3: Soundbox */}
+          {/* Card 5: WhatsApp Standalone Linked Device (Baileys) */}
+          <div
+            style={{
+              padding: '14px',
+              borderRadius: '12px',
+              background: 'rgba(37, 211, 102, 0.1)',
+              border: '1px solid #25d366',
+            }}
+          >
+            <span className="tag" style={{ background: '#25d366', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>
+              🚀 INTEGRATED &amp; ACTIVE
+            </span>
+            <h4 style={{ margin: '6px 0 2px', fontSize: '15px' }}>
+              5. WhatsApp Standalone Linked Device Gateway (Baileys)
+            </h4>
+            <p style={{ fontSize: '12px', margin: '6px 0 4px', lineHeight: 1.5, color: '#e2e8f0' }}>
+              Located in <code>whatsapp-standalone-connector/</code>. Links directly via WhatsApp Multi-Device QR code (no Meta API fees).
+              Sends order confirmations, prep updates, and final bills directly in background without opening WhatsApp app on staff devices.
+            </p>
+          </div>
+
+          {/* Card 6: Option B SMS Bridge */}
           <div
             style={{
               padding: '14px',
@@ -3824,13 +3861,13 @@ export function SuperAdminPortalView() {
             }}
           >
             <span className="tag" style={{ background: '#3b82f6', color: '#ffffff', fontWeight: 'bold', fontSize: '11px' }}>
-              🔊 HARDWARE &amp; AUDIO
+              📱 ANDROID SMS BRIDGE &amp; SOUNDBOX
             </span>
             <h4 style={{ margin: '6px 0 2px', fontSize: '15px' }}>
-              3. Counter Soundbox &amp; In-App Audio Chime
+              6. Android Bank SMS-to-Webhook Bridge &amp; Counter Soundbox
             </h4>
             <p style={{ fontSize: '12px', margin: '4px 0 0', color: '#e2e8f0' }}>
-              Full guide stored in <code>docs/soundbox_and_auto_reconciliation_guide.md</code>. In-app software chime is already active on Staff &amp; Kitchen portals when customer claims payment or webhook receives an inflow.
+              Works with any personal or business UPI account. Forwarding SMS to webhook automatically verifies payments in 1–2s. Guide available in <code>PENDING_ROADMAP.md</code>.
             </p>
           </div>
         </div>
@@ -5018,6 +5055,318 @@ const BADGE_PRESETS = [
   '🎉 Today\'s Special',
 ];
 
+export function WhatsAppGatewaySettingsSection() {
+  const { S, saveGoogleConfig, activeWorkspaceSlug, updateState, say } = useTadka();
+  const [gatewayUrl, setGatewayUrl] = useState(
+    S.googleConfig.whatsappGatewayUrl || 'http://localhost:5050'
+  );
+  const [directEnabled, setDirectEnabled] = useState(
+    S.googleConfig.whatsappDirectEnabled !== false
+  );
+  const [status, setStatus] = useState<string>('checking');
+  const [phone, setPhone] = useState<string | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
+  const [testMob, setTestMob] = useState('');
+  const [isSendingTest, setIsSendingTest] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const check = async () => {
+      const res = await getWhatsAppStatus(gatewayUrl, activeWorkspaceSlug);
+      if (!active) return;
+      if (res.ok) {
+        setStatus(res.status);
+        setPhone(res.phone || null);
+      } else {
+        setStatus('offline');
+        setPhone(null);
+      }
+    };
+    check();
+    const timer = setInterval(check, 6000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [gatewayUrl, activeWorkspaceSlug]);
+
+  const handleConnect = async () => {
+    setIsStarting(true);
+    setQrCodeUrl(null);
+    try {
+      await startWhatsAppSession(gatewayUrl, activeWorkspaceSlug);
+      say('Connecting to WhatsApp gateway... QR code will appear below 📲');
+
+      const sseUrl = `${gatewayUrl.replace(/\/$/, '')}/api/qr-stream?sessionId=${encodeURIComponent(activeWorkspaceSlug)}`;
+      if (typeof window !== 'undefined' && 'EventSource' in window) {
+        const es = new EventSource(sseUrl);
+        es.onmessage = (ev) => {
+          try {
+            const data = JSON.parse(ev.data);
+            if (data.type === 'qr' && data.qr) {
+              setQrCodeUrl(data.qr);
+              setStatus('connecting');
+            }
+            if (data.type === 'status') {
+              setStatus(data.status);
+              if (data.phone) setPhone(data.phone);
+              if (data.status === 'connected') {
+                setQrCodeUrl(null);
+                es.close();
+                say(`Linked to WhatsApp +${data.phone} ✅`);
+              }
+            }
+          } catch {
+            // ignore
+          }
+        };
+        es.onerror = () => {
+          es.close();
+        };
+      }
+    } catch (err: any) {
+      say(`Failed to start session: ${err?.message || 'Error'}`);
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    const res = await disconnectWhatsAppSession(gatewayUrl, activeWorkspaceSlug);
+    if (res.ok) {
+      setStatus('disconnected');
+      setPhone(null);
+      setQrCodeUrl(null);
+      say('Disconnected WhatsApp session');
+    }
+  };
+
+  const handleSave = () => {
+    saveGoogleConfig({
+      whatsappGatewayUrl: gatewayUrl.trim(),
+      whatsappDirectEnabled: directEnabled,
+    });
+    say('WhatsApp Gateway settings saved ✅');
+  };
+
+  const handleSendTest = async () => {
+    if (!testMob.trim()) {
+      say('Enter a mobile number to test');
+      return;
+    }
+    setIsSendingTest(true);
+    try {
+      const res = await sendDirectWhatsAppMessage({
+        to: testMob,
+        text: `🍽️ *${(S.googleConfig.restaurantName || '').trim() || 'Tadka Restaurant'}*\n✅ *Test WhatsApp Message*\nYour automated WhatsApp Linked Device messaging is connected and working perfectly!`,
+        gatewayUrl,
+        sessionId: activeWorkspaceSlug,
+        defaultCountryCode: S.cc,
+      });
+      if (res.ok) {
+        say(`Test WhatsApp message sent successfully to ${testMob} 📲✅`);
+      } else {
+        say(`Send failed: ${res.error || 'Check gateway logs'}`);
+      }
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
+      {/* 1. Final Bill toggle */}
+      <div>
+        <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+          Customer Final Bill Dispatch:
+        </div>
+        <div className="row" style={{ gap: '6px' }}>
+          <button
+            className={`chip ${S.wab ? 'on' : ''}`}
+            onClick={() => updateState((p) => ({ ...p, wab: true }))}
+          >
+            Yes, send bill
+          </button>
+          <button
+            className={`chip ${!S.wab ? 'on' : ''}`}
+            onClick={() => updateState((p) => ({ ...p, wab: false }))}
+          >
+            No, don’t send
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Direct Background Sending Mode Toggle */}
+      <div style={{ borderTop: '1px dashed #5a4690', paddingTop: '10px' }}>
+        <div className="row sp">
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 700 }}>
+              🚀 Silent Background Sending (Linked Device)
+            </div>
+            <div className="mu" style={{ fontSize: '11px' }}>
+              Sends orders &amp; bills directly to customer WhatsApp without opening WhatsApp web/app
+            </div>
+          </div>
+          <button
+            className={`chip ${directEnabled ? 'on' : ''}`}
+            style={{ fontWeight: 700 }}
+            onClick={() => setDirectEnabled((prev) => !prev)}
+          >
+            {directEnabled ? '🟢 Enabled' : '⚪ Disabled'}
+          </button>
+        </div>
+      </div>
+
+      {/* 3. Standalone Gateway Status & Linking */}
+      <div
+        style={{
+          background: 'rgba(0, 0, 0, 0.25)',
+          borderRadius: '12px',
+          padding: '12px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+        }}
+      >
+        <div className="row sp" style={{ marginBottom: '8px' }}>
+          <div>
+            <b style={{ fontSize: '13px' }}>WhatsApp Linked Device Connection</b>
+            <div className="mu" style={{ fontSize: '11px' }}>
+              Service: <code>whatsapp-standalone-connector</code>
+            </div>
+          </div>
+          <div>
+            {status === 'connected' ? (
+              <span className="tag ok" style={{ background: '#dcfce7', color: '#15803d', fontWeight: 'bold' }}>
+                🟢 Linked {phone ? `(+${phone})` : ''}
+              </span>
+            ) : status === 'connecting' ? (
+              <span className="tag" style={{ background: '#fef08a', color: '#854d0e', fontWeight: 'bold' }}>
+                🟡 Scan QR Code
+              </span>
+            ) : status === 'offline' ? (
+              <span className="tag" style={{ background: '#fee2e2', color: '#b91c1c', fontWeight: 'bold' }}>
+                ⚪ Gateway Offline
+              </span>
+            ) : (
+              <span className="tag" style={{ background: '#fee2e2', color: '#b91c1c', fontWeight: 'bold' }}>
+                🔴 Disconnected
+              </span>
+            )}
+          </div>
+        </div>
+
+        {status === 'offline' && (
+          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '8px', padding: '8px 10px', fontSize: '11.5px', color: '#fca5a5', marginBottom: '10px' }}>
+            ⚠️ Standalone connector service is not running on <code>{gatewayUrl}</code>.<br />
+            To start it locally: open terminal &rarr; <code>cd whatsapp-standalone-connector</code> &rarr; <code>npm start</code> (Runs on port 5050).
+          </div>
+        )}
+
+        {/* QR Code Container */}
+        {qrCodeUrl && (
+          <div style={{ textAlign: 'center', background: '#fff', borderRadius: '12px', padding: '14px', margin: '10px 0', color: '#0f172a' }}>
+            <b style={{ fontSize: '14px', color: '#0f172a' }}>📲 Scan to Link WhatsApp</b>
+            <p style={{ fontSize: '11.5px', color: '#475569', margin: '4px 0 10px' }}>
+              Open WhatsApp on your restaurant phone &rarr; <b>Settings / 3-dots &rarr; Linked Devices &rarr; Link a Device</b> &rarr; Point camera at this QR code.
+            </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qrCodeUrl}
+              alt="WhatsApp Linked Device QR"
+              width={200}
+              height={200}
+              style={{ display: 'block', margin: '0 auto', borderRadius: '8px' }}
+            />
+          </div>
+        )}
+
+        <div className="row" style={{ gap: '8px', flexWrap: 'wrap' }}>
+          {status !== 'connected' ? (
+            <button
+              type="button"
+              className="chip on"
+              disabled={isStarting}
+              onClick={handleConnect}
+            >
+              {isStarting ? 'Connecting... ⏳' : '🔗 Link WhatsApp Device (Show QR)'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="chip"
+              style={{ color: '#ef4444', borderColor: '#ef4444' }}
+              onClick={handleDisconnect}
+            >
+              ❌ Disconnect Session
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="chip"
+            onClick={async () => {
+              const res = await getWhatsAppStatus(gatewayUrl, activeWorkspaceSlug);
+              setStatus(res.ok ? res.status : 'offline');
+              setPhone(res.phone || null);
+              say(res.ok ? `Gateway status: ${res.status}` : 'Gateway offline');
+            }}
+          >
+            🔄 Check Status
+          </button>
+        </div>
+      </div>
+
+      {/* 4. Gateway URL Configuration */}
+      <div>
+        <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+          Gateway URL (Default: <code>http://localhost:5050</code> or your cloud VPS URL)
+        </div>
+        <input
+          value={gatewayUrl}
+          onChange={(e) => setGatewayUrl(e.target.value)}
+          placeholder="http://localhost:5050"
+          className="inp"
+          style={{ width: '100%', marginBottom: '8px' }}
+        />
+        <button
+          type="button"
+          className="chip on"
+          onClick={handleSave}
+        >
+          💾 Save WhatsApp Gateway Settings
+        </button>
+      </div>
+
+      {/* 5. Live Test Message Dispatch */}
+      {status === 'connected' && (
+        <div style={{ borderTop: '1px dashed #5a4690', paddingTop: '10px' }}>
+          <b style={{ fontSize: '12px' }}>🧪 Test Background WhatsApp Message</b>
+          <p className="mu" style={{ fontSize: '11px', margin: '2px 0 6px' }}>
+            Send an instant test message to verify background delivery to any phone number
+          </p>
+          <div className="row" style={{ gap: '6px' }}>
+            <input
+              value={testMob}
+              onChange={(e) => setTestMob(e.target.value)}
+              placeholder="10-digit mobile number"
+              className="inp"
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="chip on"
+              disabled={isSendingTest}
+              onClick={handleSendTest}
+            >
+              {isSendingTest ? 'Sending... ⏳' : '📲 Send Test'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AdminPortalView() {
   const {
     S,
@@ -5487,30 +5836,12 @@ export function AdminPortalView() {
       </CollapsibleSection>
 
       <CollapsibleSection
-        title="💬 Final Bill on WhatsApp"
-        badge={S.wab ? 'On' : 'Off'}
+        title="💬 WhatsApp Messaging &amp; Linked Device Gateway"
+        badge={S.googleConfig.whatsappDirectEnabled !== false ? 'Auto-Send' : (S.wab ? 'On' : 'Off')}
         isOpen={!!openAdminSections.whatsappBill}
         onToggle={() => toggleAdminSection('whatsappBill')}
       >
-        <div className="row">
-          <button
-            className={`chip ${S.wab ? 'on' : ''}`}
-            onClick={() => updateState((p) => ({ ...p, wab: true }))}
-          >
-            Yes, send
-          </button>
-          <button
-            className={`chip ${!S.wab ? 'on' : ''}`}
-            onClick={() => updateState((p) => ({ ...p, wab: false }))}
-          >
-            No, don’t send
-          </button>
-        </div>
-        <p className="mu" style={{ marginTop: '8px' }}>
-          {S.wab
-            ? 'After payment, customers who gave their WhatsApp number get the final bill.'
-            : 'No bill is sent on WhatsApp. Customers still see it in the app.'}
-        </p>
+        <WhatsAppGatewaySettingsSection />
       </CollapsibleSection>
 
       <CollapsibleSection
@@ -7506,7 +7837,7 @@ export function AdminPortalView() {
                   : ''
               }&t=${encodeURIComponent(
                 t.token
-              )}&table=${t.id}&label=${encodeURIComponent(t.label)}${t.active === false ? '&active=0' : '&active=1'}`;
+              )}&table=${t.id}&label=${encodeURIComponent(t.label)}`;
               const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
                 qrTargetUrl
               )}`;
@@ -7566,8 +7897,19 @@ export function AdminPortalView() {
                         <b>
                           #{t.id} · {t.label}
                         </b>{' '}
+                        {t.active === false ? (
+                          <span className="tag bad" style={{ background: '#fee2e2', color: '#b91c1c' }}>
+                            🔒 Inactive / Locked
+                          </span>
+                        ) : (
+                          <span className="tag ok" style={{ background: '#dcfce7', color: '#15803d' }}>
+                            🟢 Active / Open
+                          </span>
+                        )}
                         {S.activeTable === t.id && (
-                          <span className="tag ok">Active</span>
+                          <span className="tag" style={{ background: '#e0e7ff', color: '#3730a3', marginLeft: '4px' }}>
+                            👁️ Previewing
+                          </span>
                         )}
                         <br />
                         <span className="mu" style={{ fontSize: '11px' }}>
@@ -7589,14 +7931,16 @@ export function AdminPortalView() {
                             fontWeight: 700,
                           }}
                           onClick={() => toggleTableActive(t.id)}
+                          title={t.active !== false ? 'Click to lock table (block customer ordering)' : 'Click to activate table (allow customer ordering)'}
                         >
-                          {t.active !== false ? '🟢 Active' : '🔒 Inactive'}
+                          {t.active !== false ? '🟢 Active (Open)' : '🔒 Inactive (Locked)'}
                         </button>
                         <button
                           className={`chip ${S.activeTable === t.id ? 'on' : ''}`}
                           onClick={() => setActiveTable(t.id)}
+                          title="Select this table for staff order/bill preview"
                         >
-                          {S.activeTable === t.id ? 'Active' : 'Use'}
+                          {S.activeTable === t.id ? '👁️ Selected' : 'Preview'}
                         </button>
                         <button
                           className="chip"
