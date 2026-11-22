@@ -5098,6 +5098,31 @@ export function WhatsAppGatewaySettingsSection() {
       await startWhatsAppSession(gatewayUrl, activeWorkspaceSlug);
       say('Connecting to WhatsApp gateway... QR code will appear below 📲');
 
+      // Polling fallback to ensure QR code appears even if EventSource / SSE is blocked
+      let pollCount = 0;
+      const pollTimer = setInterval(async () => {
+        pollCount++;
+        try {
+          const s = await getWhatsAppStatus(gatewayUrl, activeWorkspaceSlug);
+          if (s.qr) {
+            setQrCodeUrl(s.qr);
+            setStatus('connecting');
+          }
+          if (s.status === 'connected') {
+            setStatus('connected');
+            if (s.phone) setPhone(s.phone);
+            setQrCodeUrl(null);
+            clearInterval(pollTimer);
+            say(`Linked to WhatsApp +${s.phone} ✅`);
+          }
+        } catch {
+          // ignore
+        }
+        if (pollCount > 40) {
+          clearInterval(pollTimer);
+        }
+      }, 1500);
+
       const sseUrl = `${gatewayUrl.replace(/\/$/, '')}/api/qr-stream?sessionId=${encodeURIComponent(activeWorkspaceSlug)}`;
       if (typeof window !== 'undefined' && 'EventSource' in window) {
         const es = new EventSource(sseUrl);
@@ -5113,6 +5138,7 @@ export function WhatsAppGatewaySettingsSection() {
               if (data.phone) setPhone(data.phone);
               if (data.status === 'connected') {
                 setQrCodeUrl(null);
+                clearInterval(pollTimer);
                 es.close();
                 say(`Linked to WhatsApp +${data.phone} ✅`);
               }
@@ -5313,6 +5339,24 @@ export function WhatsAppGatewaySettingsSection() {
           >
             🔄 Check Status
           </button>
+
+          <a
+            href={gatewayUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="chip"
+            style={{ textDecoration: 'none', color: '#38bdf8', borderColor: '#38bdf8' }}
+          >
+            🌐 Open Standalone Connector ({gatewayUrl})
+          </a>
+        </div>
+
+        <div style={{ marginTop: '10px', fontSize: '11.5px', color: '#94a3b8', lineHeight: 1.5 }}>
+          💡 <b>Tip:</b> You can also open{' '}
+          <a href="http://localhost:5050" target="_blank" rel="noreferrer" style={{ color: '#38bdf8', fontWeight: 600 }}>
+            http://localhost:5050
+          </a>{' '}
+          directly in your browser to view the dedicated connector UI, scan the QR code, and monitor live WhatsApp socket events.
         </div>
       </div>
 

@@ -65,6 +65,7 @@ export async function getWhatsAppStatus(
         sessionId,
         status: data.status || 'disconnected',
         phone: data.phone,
+        qr: data.qr || null,
       };
     }
   } catch {
@@ -84,6 +85,7 @@ export async function getWhatsAppStatus(
         sessionId,
         status: data.status || 'disconnected',
         phone: data.phone,
+        qr: data.qr || null,
       };
     }
     return { ok: false, sessionId, status: 'disconnected', error: `HTTP ${res.status}` };

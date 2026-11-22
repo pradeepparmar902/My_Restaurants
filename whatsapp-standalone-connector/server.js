@@ -10,6 +10,16 @@ const path = require('path');
 const waService = require('./whatsappService');
 
 const app = express();
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -23,7 +33,8 @@ app.get('/api/status', (req, res) => {
   const status = waService.getStatus(sessionId);
   const user = waService.getUser(sessionId);
   const phone = user ? (user.id || '').split(':')[0].split('@')[0] : null;
-  res.json({ sessionId, status, phone, user });
+  const qr = waService.getQrCode(sessionId);
+  res.json({ sessionId, status, phone, qr, user });
 });
 
 // 2. List all active sessions
