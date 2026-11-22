@@ -130,6 +130,7 @@ interface TadkaContextValue {
   setActiveTable: (tableId: number) => void;
   toggleTableActive: (tableId: number) => void;
   setTableActive: (tableId: number, active: boolean) => void;
+  refreshTableActivation: (tableId?: number) => Promise<boolean>;
   resetDemoState: () => void;
 
   // Google Sheets & Google Drive Storage
@@ -204,6 +205,13 @@ function getWorkspaceChannelName(): string {
   return slug === 'tadka-truck'
     ? CHANNEL_NAME_BASE
     : `${CHANNEL_NAME_BASE}__${slug}`;
+}
+
+export function getTablesApiBase(): string {
+  if (typeof window !== 'undefined' && window.location.hostname.includes('github.io')) {
+    return 'https://my-restaurants-zeta.vercel.app/api/tables';
+  }
+  return '/api/tables';
 }
 
 /**
@@ -284,6 +292,7 @@ export function TadkaProvider({
     useState<boolean>(false);
 
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sayRef = useRef<(msg: string) => void>(() => {});
   const channelRef = useRef<BroadcastChannel | null>(null);
   const isHydratedRef = useRef(false);
   const pendingOrderAfterLoginRef = useRef<{ waConsent?: boolean } | null>(null);
@@ -537,19 +546,29 @@ export function TadkaProvider({
 
     // Real-time server sync for table activation status
     const syncTablesFromServer = () => {
-      fetch('/api/tables')
+      const currentSlug = getActiveWorkspaceSlug();
+      fetch(`${getTablesApiBase()}?tenant=${encodeURIComponent(currentSlug)}&_=${Date.now()}`)
         .then((res) => res.json())
         .then((data) => {
           if (data?.tables) {
             setS((prev) => {
               let hasChange = false;
+              let newlyActivated = false;
               const next = prev.tables.map((t) => {
                 if (data.tables[t.id] !== undefined && t.active !== data.tables[t.id]) {
                   hasChange = true;
+                  if (Number(t.id) === Number(prev.activeTable) && t.active === false && data.tables[t.id] === true) {
+                    newlyActivated = true;
+                  }
                   return { ...t, active: data.tables[t.id] };
                 }
                 return t;
               });
+              if (newlyActivated) {
+                setTimeout(() => {
+                  sayRef.current(`🎉 Table ${prev.activeTable} has been activated by staff! You can now place your order.`);
+                }, 100);
+              }
               return hasChange ? { ...prev, tables: next } : prev;
             });
           }
@@ -557,7 +576,33 @@ export function TadkaProvider({
         .catch(() => {});
     };
     syncTablesFromServer();
-    const tablePollTimer = setInterval(syncTablesFromServer, 8000);
+    const tablePollTimer = setInterval(syncTablesFromServer, 3500);
+
+    const onVisibilityOrFocus = () => {
+      // Re-read URL query params in case user rescanned or switched tabs with &active=1
+      if (typeof window !== 'undefined') {
+        const sp = new URLSearchParams(window.location.search);
+        const qActive = sp.get('active');
+        const qTable = sp.get('table');
+        if (qActive !== null) {
+          const isParamActive = qActive !== '0' && qActive !== 'false';
+          setS((prev) => {
+            const targetId = qTable && Number(qTable) > 0 ? Number(qTable) : prev.activeTable;
+            const updated = prev.tables.map((t) =>
+              Number(t.id) === Number(targetId) ? { ...t, active: isParamActive } : t
+            );
+            return { ...prev, tables: updated };
+          });
+        }
+      }
+      syncTablesFromServer();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', onVisibilityOrFocus);
+      window.addEventListener('popstate', onVisibilityOrFocus);
+      document.addEventListener('visibilitychange', onVisibilityOrFocus);
+    }
 
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       const bc = new BroadcastChannel(getWorkspaceChannelName());
@@ -578,9 +623,19 @@ export function TadkaProvider({
       return () => {
         bc.close();
         clearInterval(tablePollTimer);
+        window.removeEventListener('focus', onVisibilityOrFocus);
+        window.removeEventListener('popstate', onVisibilityOrFocus);
+        document.removeEventListener('visibilitychange', onVisibilityOrFocus);
       };
     }
-    return () => clearInterval(tablePollTimer);
+    return () => {
+      clearInterval(tablePollTimer);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', onVisibilityOrFocus);
+        window.removeEventListener('popstate', onVisibilityOrFocus);
+        document.removeEventListener('visibilitychange', onVisibilityOrFocus);
+      }
+    };
   }, [initialTableId]);
 
   // Persist to localStorage & broadcast changes
@@ -680,10 +735,13 @@ export function TadkaProvider({
       clearTimeout(toastTimerRef.current);
     }
     setS((prev) => ({ ...prev, toast: msg }));
-    toastTimerRef.current = setTimeout(() => {
-      setS((prev) => ({ ...prev, toast: '' }));
-    }, 1800);
+    if (msg) {
+      toastTimerRef.current = setTimeout(() => {
+        setS((prev) => ({ ...prev, toast: '' }));
+      }, 4500);
+    }
   }, []);
+  sayRef.current = say;
 
   const sub = useCallback(() => getSubtotal(S.menu, S.cart), [S.menu, S.cart]);
   const dsub = useCallback(() => getSubtotal(S.menu, S.draft), [S.menu, S.draft]);
@@ -2725,6 +2783,7 @@ export function TadkaProvider({
 
   const toggleTableActive = useCallback(
     (tableId: number) => {
+      const currentSlug = getActiveWorkspaceSlug();
       updateState((prev) => {
         const currentTarget = prev.tables.find((t) => t.id === tableId);
         const nextActive = currentTarget?.active === false ? true : false;
@@ -2734,10 +2793,10 @@ export function TadkaProvider({
         const statusLabel = nextActive ? 'Activated (Ready for Orders) 🟢' : 'Locked (Inactive) 🔒';
         say(`${currentTarget?.label || `Table ${tableId}`} is now ${statusLabel}`);
 
-        fetch('/api/tables', {
+        fetch(getTablesApiBase(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tableId, active: nextActive }),
+          body: JSON.stringify({ tenant: currentSlug, tableId, active: nextActive }),
         }).catch(() => {});
 
         return { ...prev, tables: nextTables };
@@ -2748,10 +2807,11 @@ export function TadkaProvider({
 
   const setTableActive = useCallback(
     (tableId: number, active: boolean) => {
-      fetch('/api/tables', {
+      const currentSlug = getActiveWorkspaceSlug();
+      fetch(getTablesApiBase(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tableId, active }),
+        body: JSON.stringify({ tenant: currentSlug, tableId, active }),
       }).catch(() => {});
 
       updateState((prev) => {
@@ -2762,6 +2822,65 @@ export function TadkaProvider({
       });
     },
     [updateState]
+  );
+
+  const refreshTableActivation = useCallback(
+    async (tableId?: number): Promise<boolean> => {
+      const targetTableId = tableId || S.activeTable;
+      const currentSlug = getActiveWorkspaceSlug();
+
+      // 1. Re-read URL query params in case user rescanned or switched tabs with &active=1
+      if (typeof window !== 'undefined') {
+        const sp = new URLSearchParams(window.location.search);
+        const qActive = sp.get('active');
+        const qTable = sp.get('table');
+        if (qActive !== null && (!qTable || Number(qTable) === Number(targetTableId))) {
+          const isUrlActive = qActive !== '0' && qActive !== 'false';
+          updateState((prev) => ({
+            ...prev,
+            tables: prev.tables.map((t) =>
+              Number(t.id) === Number(targetTableId) ? { ...t, active: isUrlActive } : t
+            ),
+          }));
+          if (isUrlActive) {
+            say(`🎉 Table ${targetTableId} is Activated! You can place your order now.`);
+            return true;
+          }
+        }
+      }
+
+      // 2. Poll server endpoint (cross-platform with CORS on Vercel fallback)
+      try {
+        const res = await fetch(
+          `${getTablesApiBase()}?tenant=${encodeURIComponent(currentSlug)}&_=${Date.now()}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.tables && data.tables[targetTableId] !== undefined) {
+            const isServerActive = Boolean(data.tables[targetTableId]);
+            updateState((prev) => ({
+              ...prev,
+              tables: prev.tables.map((t) =>
+                Number(t.id) === Number(targetTableId) ? { ...t, active: isServerActive } : t
+              ),
+            }));
+            if (isServerActive) {
+              say(`🎉 Table ${targetTableId} is Activated! You can place your order now.`);
+              return true;
+            } else {
+              say(`🔒 Table ${targetTableId} is not activated yet. Ask your waiter or staff to activate this table.`);
+              return false;
+            }
+          }
+        }
+      } catch {
+        // network / offline fallback
+      }
+
+      say(`🔒 Table ${targetTableId} is not activated yet. Ask your waiter or staff to activate this table.`);
+      return false;
+    },
+    [S.activeTable, say, updateState]
   );
 
   const resetDemoState = useCallback(() => {
@@ -3860,6 +3979,7 @@ export function TadkaProvider({
         setActiveTable,
         toggleTableActive,
         setTableActive,
+        refreshTableActivation,
         resetDemoState,
         sheetOrdersToday,
         proofSubmissions,

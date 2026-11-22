@@ -38,6 +38,7 @@ export function MenuTabView() {
     saveGoogleConfig,
     setTab,
     say,
+    refreshTableActivation,
   } = useTadka();
   const [optMob, setOptMob] = useState('');
   const [showOptMob, setShowOptMob] = useState(false);
@@ -47,6 +48,7 @@ export function MenuTabView() {
   const [onlyBestsellers, setOnlyBestsellers] = useState(false);
   const [sortPriceAsc, setSortPriceAsc] = useState(false);
   const [gridView, setGridView] = useState<'grid' | 'list'>('grid');
+  const [isRefreshingTable, setIsRefreshingTable] = useState(false);
   const currentStyle:
     | 'style1'
     | 'style2'
@@ -1502,24 +1504,63 @@ export function MenuTabView() {
         </div>
       )}
 
-      {/* Anti-Fake Order Banner when Table is Inactive in Postpaid Mode */}
+      {/* Anti-Fake Order Banner when Table is Inactive in Postpaid / Prepaid Mode */}
       {isTableLocked && (
         <div
           style={{
-            background: 'rgba(239, 68, 68, 0.12)',
-            border: '1px solid #ef4444',
-            borderRadius: '12px',
-            padding: '10px 14px',
-            margin: '12px 0',
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(245, 158, 11, 0.12))',
+            border: '1.5px solid #ef4444',
+            borderRadius: '16px',
+            padding: '14px 16px',
+            margin: '12px 0 16px',
             textAlign: 'center',
+            boxShadow: '0 4px 16px rgba(239, 68, 68, 0.12)',
           }}
         >
-          <div style={{ fontWeight: 800, color: '#f87171', fontSize: '13px' }}>
-            🔒 Table {S.activeTable} Not Activated Yet
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#dc2626', fontSize: '14px' }}>
+            <span style={{ fontSize: '16px' }}>🔒</span> Table {S.activeTable} Not Activated Yet
           </div>
-          <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#fca5a5', lineHeight: 1.4 }}>
-            You can select dishes freely. Ask your waiter or captain to activate Table {S.activeTable} so your order can be sent to the kitchen.
+          <p style={{ margin: '6px 0 12px', fontSize: '12.5px', color: '#991b1b', lineHeight: 1.45 }}>
+            You can select dishes freely. Once staff or waiter activates Table {S.activeTable}, tap <strong>Refresh Status</strong> below to unlock the Order button.
           </p>
+          <button
+            type="button"
+            onClick={async () => {
+              setIsRefreshingTable(true);
+              try {
+                await refreshTableActivation();
+              } finally {
+                setTimeout(() => setIsRefreshingTable(false), 500);
+              }
+            }}
+            disabled={isRefreshingTable}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              background: '#0f172a',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '999px',
+              padding: '9px 20px',
+              fontSize: '12.5px',
+              fontWeight: 700,
+              cursor: isRefreshingTable ? 'wait' : 'pointer',
+              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)',
+            }}
+          >
+            <span
+              style={{
+                display: 'inline-block',
+                transform: isRefreshingTable ? 'rotate(180deg)' : 'none',
+                transition: 'transform 0.4s',
+              }}
+            >
+              🔄
+            </span>
+            {isRefreshingTable ? 'Checking Status...' : '🔄 Refresh Table Status'}
+          </button>
         </div>
       )}
 
@@ -1599,8 +1640,16 @@ export function MenuTabView() {
           {isTableLocked ? (
             <button
               type="button"
-              onClick={() => {
-                say(`🔒 Table ${S.activeTable} is not activated yet. Ask your waiter or staff to activate this table.`);
+              onClick={async () => {
+                setIsRefreshingTable(true);
+                try {
+                  const activated = await refreshTableActivation();
+                  if (!activated) {
+                    say(`🔒 Table ${S.activeTable} is not activated yet. Ask your waiter or staff to activate this table.`);
+                  }
+                } finally {
+                  setTimeout(() => setIsRefreshingTable(false), 500);
+                }
               }}
               style={{
                 background: '#ef4444',
@@ -1613,9 +1662,12 @@ export function MenuTabView() {
                 cursor: 'pointer',
                 boxShadow: '0 4px 12px rgba(239, 68, 68, 0.35)',
                 whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
               }}
             >
-              🔒 Table Locked ▸
+              🔒 Table Locked · Check 🔄
             </button>
           ) : (
             <button

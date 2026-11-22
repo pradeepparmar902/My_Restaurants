@@ -22,18 +22,22 @@ declare global {
   // eslint-disable-next-line no-var
   var __TADKA_BANK_INFLOWS__: ServerBankInflow[] | undefined;
   // eslint-disable-next-line no-var
-  var __TADKA_TABLE_STATUS__: Record<number, boolean> | undefined;
+  var __TADKA_TABLE_STATUS__: Record<string, Record<number, boolean>> | undefined;
 }
 
-export function getTableStatusMap(): Record<number, boolean> {
+export function getTableStatusMap(tenant?: string): Record<number, boolean> {
+  const tKey = (tenant || 'default').trim().toLowerCase();
   if (!global.__TADKA_TABLE_STATUS__) {
-    global.__TADKA_TABLE_STATUS__ = { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true };
+    global.__TADKA_TABLE_STATUS__ = {};
   }
-  return global.__TADKA_TABLE_STATUS__;
+  if (!global.__TADKA_TABLE_STATUS__[tKey]) {
+    global.__TADKA_TABLE_STATUS__[tKey] = { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true };
+  }
+  return global.__TADKA_TABLE_STATUS__[tKey];
 }
 
-export function setTableStatus(tableId: number, active: boolean): Record<number, boolean> {
-  const map = getTableStatusMap();
+export function setTableStatus(tableId: number, active: boolean, tenant?: string): Record<number, boolean> {
+  const map = getTableStatusMap(tenant);
   map[tableId] = active;
   return map;
 }
