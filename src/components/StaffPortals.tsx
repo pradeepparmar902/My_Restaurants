@@ -931,27 +931,60 @@ export function WaiterPortalView() {
                 </>
               )}
 
-              <button
-                className="btn"
-                disabled={waiterItemCount === 0}
-                onClick={() => {
-                  bookWaiter(
-                    selectedWs
-                      ? selectedWs.mob === 'Guest'
-                        ? ''
-                        : selectedWs.mob
-                      : wmobInput,
-                    wnoInput,
-                    selectedWs ? selectedWs.counterNo : null
-                  );
-                  setWmobInput('');
-                  setWnoInput('');
-                }}
-              >
-                {selectedWs
-                  ? `➕ Add to ${selectedWs.counterNo} · ₹${waiterDraftTotal}`
-                  : `🆕 Book New Order · ₹${waiterDraftTotal}`}
-              </button>
+              {(() => {
+                const isPostpaid = S.googleConfig?.billingModel !== 'prepaid';
+                const activeTableObj = S.tables.find((t) => t.id === S.activeTable);
+                const isCurrentTableInactive = isPostpaid && activeTableObj && activeTableObj.active === false;
+
+                return (
+                  <>
+                    {isCurrentTableInactive && (
+                      <div
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid #ef4444',
+                          borderRadius: '10px',
+                          padding: '8px 12px',
+                          margin: '8px 0',
+                          fontSize: '12px',
+                          color: '#f87171',
+                          textAlign: 'center',
+                        }}
+                      >
+                        🔒 <b>Table {S.activeTable} is Inactive:</b> You can draft dishes, but please activate Table {S.activeTable} above before booking this order.
+                      </div>
+                    )}
+
+                    <button
+                      className="btn"
+                      disabled={waiterItemCount === 0 || isCurrentTableInactive}
+                      onClick={() => {
+                        if (isCurrentTableInactive) {
+                          say(`🔒 Table ${S.activeTable} is inactive. Tap "Activate" above first.`);
+                          return;
+                        }
+                        bookWaiter(
+                          selectedWs
+                            ? selectedWs.mob === 'Guest'
+                              ? ''
+                              : selectedWs.mob
+                            : wmobInput,
+                          wnoInput,
+                          selectedWs ? selectedWs.counterNo : null
+                        );
+                        setWmobInput('');
+                        setWnoInput('');
+                      }}
+                    >
+                      {isCurrentTableInactive
+                        ? `🔒 Table ${S.activeTable} Locked (Activate to Book)`
+                        : selectedWs
+                          ? `➕ Add to ${selectedWs.counterNo} · ₹${waiterDraftTotal}`
+                          : `🆕 Book New Order · ₹${waiterDraftTotal}`}
+                    </button>
+                  </>
+                );
+              })()}
             </div>
           );
 
@@ -7474,7 +7507,7 @@ export function AdminPortalView() {
                   : ''
               }&t=${encodeURIComponent(
                 t.token
-              )}&table=${t.id}&label=${encodeURIComponent(t.label)}`;
+              )}&table=${t.id}&label=${encodeURIComponent(t.label)}${t.active === false ? '&active=0' : '&active=1'}`;
               const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
                 qrTargetUrl
               )}`;
@@ -7609,9 +7642,40 @@ export function AdminPortalView() {
                       <b style={{ fontSize: '18px' }}>
                         {(S.googleConfig.restaurantName || '').trim() || 'Tadka Truck'} · {t.label}
                       </b>
-                      <p style={{ fontSize: '12px', color: '#4a3680', margin: '4px 0 10px' }}>
-                        Scan to view menu, order & pay
+                      <p style={{ fontSize: '12px', color: '#4a3680', margin: '4px 0 6px' }}>
+                        Scan to view menu, select dishes &amp; pay
                       </p>
+                      {t.active === false ? (
+                        <div
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            color: '#b91c1c',
+                            border: '1px solid #ef4444',
+                            borderRadius: '8px',
+                            padding: '6px 10px',
+                            fontSize: '11.5px',
+                            margin: '4px 0 10px',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          🔒 Table Currently Inactive: Customers can scan &amp; select dishes, but order booking is locked until activated.
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            color: '#065f46',
+                            border: '1px solid #10b981',
+                            borderRadius: '8px',
+                            padding: '6px 10px',
+                            fontSize: '11.5px',
+                            margin: '4px 0 10px',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          🟢 Table Active: Customers can scan, select dishes &amp; place orders.
+                        </div>
+                      )}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={qrImageUrl}

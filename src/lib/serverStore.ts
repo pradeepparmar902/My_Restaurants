@@ -21,6 +21,21 @@ declare global {
   var __TADKA_STORE__: AppState | undefined;
   // eslint-disable-next-line no-var
   var __TADKA_BANK_INFLOWS__: ServerBankInflow[] | undefined;
+  // eslint-disable-next-line no-var
+  var __TADKA_TABLE_STATUS__: Record<number, boolean> | undefined;
+}
+
+export function getTableStatusMap(): Record<number, boolean> {
+  if (!global.__TADKA_TABLE_STATUS__) {
+    global.__TADKA_TABLE_STATUS__ = { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true };
+  }
+  return global.__TADKA_TABLE_STATUS__;
+}
+
+export function setTableStatus(tableId: number, active: boolean): Record<number, boolean> {
+  const map = getTableStatusMap();
+  map[tableId] = active;
+  return map;
 }
 
 export function getBankInflows(): ServerBankInflow[] {

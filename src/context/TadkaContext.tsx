@@ -355,6 +355,7 @@ export function TadkaProvider({
           const qToken = sp.get('t') || '';
           const qTable = sp.get('table');
           const qLabel = sp.get('label');
+          const qActive = sp.get('active');
           const tableList = [...(parsed.tables || INITIAL_STATE.tables)];
 
           if (qToken) {
@@ -388,6 +389,15 @@ export function TadkaProvider({
             }
           } else if (qTable && Number(qTable) > 0) {
             qrMatchedTableId = Number(qTable);
+          }
+
+          if (qActive !== null && qrMatchedTableId) {
+            const isParamActive = qActive !== '0' && qActive !== 'false';
+            const tidx = tableList.findIndex((tb) => tb.id === qrMatchedTableId);
+            if (tidx !== -1) {
+              tableList[tidx] = { ...tableList[tidx], active: isParamActive };
+              qrDynamicTables = tableList;
+            }
           }
         }
 
@@ -456,14 +466,16 @@ export function TadkaProvider({
         const qToken = sp.get('t') || '';
         const qTable = sp.get('table');
         const qLabel = sp.get('label');
+        const qActive = sp.get('active');
         if (qToken) {
           const tableList = [...INITIAL_STATE.tables];
           const found = tableList.find((tb) => tb.token === qToken);
+          let derivedId = found?.id;
           if (found) {
             setS((prev) => ({ ...prev, activeTable: found.id }));
           } else {
             const tokenNumMatch = qToken.match(/-t(\d+)-/i);
-            const derivedId =
+            derivedId =
               (qTable && Number(qTable) > 0 ? Number(qTable) : 0) ||
               (tokenNumMatch ? Number(tokenNumMatch[1]) : 0) ||
               1;
@@ -482,20 +494,61 @@ export function TadkaProvider({
                 token: qToken,
               });
             }
+          }
+          if (qActive !== null && derivedId) {
+            const isParamActive = qActive !== '0' && qActive !== 'false';
+            const tidx = tableList.findIndex((tb) => tb.id === derivedId);
+            if (tidx !== -1) {
+              tableList[tidx] = { ...tableList[tidx], active: isParamActive };
+            }
+          }
+          setS((prev) => ({
+            ...prev,
+            tables: tableList,
+            activeTable: derivedId || prev.activeTable,
+          }));
+        } else if (qTable && Number(qTable) > 0) {
+          const tId = Number(qTable);
+          if (qActive !== null) {
+            const isParamActive = qActive !== '0' && qActive !== 'false';
             setS((prev) => ({
               ...prev,
-              tables: tableList,
-              activeTable: derivedId,
+              activeTable: tId,
+              tables: prev.tables.map((t) => (t.id === tId ? { ...t, active: isParamActive } : t)),
             }));
+          } else {
+            setS((prev) => ({ ...prev, activeTable: tId }));
           }
-        } else if (qTable && Number(qTable) > 0) {
-          setS((prev) => ({ ...prev, activeTable: Number(qTable) }));
         }
       }
     } catch {
       // Ignore storage read errors
     }
     isHydratedRef.current = true;
+
+    // Real-time server sync for table activation status
+    const syncTablesFromServer = () => {
+      fetch('/api/tables')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.tables) {
+            setS((prev) => {
+              let hasChange = false;
+              const next = prev.tables.map((t) => {
+                if (data.tables[t.id] !== undefined && t.active !== data.tables[t.id]) {
+                  hasChange = true;
+                  return { ...t, active: data.tables[t.id] };
+                }
+                return t;
+              });
+              return hasChange ? { ...prev, tables: next } : prev;
+            });
+          }
+        })
+        .catch(() => {});
+    };
+    syncTablesFromServer();
+    const tablePollTimer = setInterval(syncTablesFromServer, 8000);
 
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       const bc = new BroadcastChannel(getWorkspaceChannelName());
@@ -513,8 +566,12 @@ export function TadkaProvider({
         }
       };
       channelRef.current = bc;
-      return () => bc.close();
+      return () => {
+        bc.close();
+        clearInterval(tablePollTimer);
+      };
     }
+    return () => clearInterval(tablePollTimer);
   }, [initialTableId]);
 
   // Persist to localStorage & broadcast changes
@@ -1705,6 +1762,13 @@ export function TadkaProvider({
 
   const bookWaiter = useCallback(
     (rawMob: string, rawCounterNo: string, targetCounterNo?: string | null) => {
+      const isPostpaid = S.googleConfig?.billingModel !== 'prepaid';
+      const currentTable = S.tables.find((t) => t.id === S.activeTable);
+      if (isPostpaid && currentTable && currentTable.active === false) {
+        say(`🔒 Table ${S.activeTable} is inactive. Please activate Table ${S.activeTable} before booking an order.`);
+        return;
+      }
+
       const mv = normalizeMobile(rawMob, S.cc);
       if (mv === null) {
         say('Enter a valid 10-digit mobile number');
@@ -2655,12 +2719,20 @@ export function TadkaProvider({
   const toggleTableActive = useCallback(
     (tableId: number) => {
       updateState((prev) => {
+        const currentTarget = prev.tables.find((t) => t.id === tableId);
+        const nextActive = currentTarget?.active === false ? true : false;
         const nextTables = prev.tables.map((t) =>
-          t.id === tableId ? { ...t, active: t.active === false ? true : false } : t
+          t.id === tableId ? { ...t, active: nextActive } : t
         );
-        const target = nextTables.find((t) => t.id === tableId);
-        const statusLabel = target?.active === false ? 'Locked (Inactive) 🔒' : 'Activated (Ready for Orders) 🟢';
-        say(`${target?.label || `Table ${tableId}`} is now ${statusLabel}`);
+        const statusLabel = nextActive ? 'Activated (Ready for Orders) 🟢' : 'Locked (Inactive) 🔒';
+        say(`${currentTarget?.label || `Table ${tableId}`} is now ${statusLabel}`);
+
+        fetch('/api/tables', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tableId, active: nextActive }),
+        }).catch(() => {});
+
         return { ...prev, tables: nextTables };
       });
     },
@@ -2669,6 +2741,12 @@ export function TadkaProvider({
 
   const setTableActive = useCallback(
     (tableId: number, active: boolean) => {
+      fetch('/api/tables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tableId, active }),
+      }).catch(() => {});
+
       updateState((prev) => {
         const nextTables = prev.tables.map((t) =>
           t.id === tableId ? { ...t, active } : t
