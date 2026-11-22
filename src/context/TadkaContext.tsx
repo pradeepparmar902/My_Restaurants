@@ -416,6 +416,21 @@ export function TadkaProvider({
               });
             }
             qrDynamicTables = tableList;
+
+            // Clean 'active' query parameter from browser address bar so it doesn't linger in history
+            if (typeof window !== 'undefined' && sp.has('active')) {
+              try {
+                const cleanParams = new URLSearchParams(window.location.search);
+                cleanParams.delete('active');
+                const cleanUrl =
+                  window.location.pathname +
+                  (cleanParams.toString() ? `?${cleanParams.toString()}` : '') +
+                  window.location.hash;
+                window.history.replaceState({}, '', cleanUrl);
+              } catch {
+                // ignore
+              }
+            }
           }
         }
 
@@ -544,66 +559,6 @@ export function TadkaProvider({
     }
     isHydratedRef.current = true;
 
-    // Real-time server sync for table activation status
-    const syncTablesFromServer = () => {
-      const currentSlug = getActiveWorkspaceSlug();
-      fetch(`${getTablesApiBase()}?tenant=${encodeURIComponent(currentSlug)}&_=${Date.now()}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data?.tables) {
-            setS((prev) => {
-              let hasChange = false;
-              let newlyActivated = false;
-              const next = prev.tables.map((t) => {
-                if (data.tables[t.id] !== undefined && t.active !== data.tables[t.id]) {
-                  hasChange = true;
-                  if (Number(t.id) === Number(prev.activeTable) && t.active === false && data.tables[t.id] === true) {
-                    newlyActivated = true;
-                  }
-                  return { ...t, active: data.tables[t.id] };
-                }
-                return t;
-              });
-              if (newlyActivated) {
-                setTimeout(() => {
-                  sayRef.current(`🎉 Table ${prev.activeTable} has been activated by staff! You can now place your order.`);
-                }, 100);
-              }
-              return hasChange ? { ...prev, tables: next } : prev;
-            });
-          }
-        })
-        .catch(() => {});
-    };
-    syncTablesFromServer();
-    const tablePollTimer = setInterval(syncTablesFromServer, 3500);
-
-    const onVisibilityOrFocus = () => {
-      // Re-read URL query params in case user rescanned or switched tabs with &active=1
-      if (typeof window !== 'undefined') {
-        const sp = new URLSearchParams(window.location.search);
-        const qActive = sp.get('active');
-        const qTable = sp.get('table');
-        if (qActive !== null) {
-          const isParamActive = qActive !== '0' && qActive !== 'false';
-          setS((prev) => {
-            const targetId = qTable && Number(qTable) > 0 ? Number(qTable) : prev.activeTable;
-            const updated = prev.tables.map((t) =>
-              Number(t.id) === Number(targetId) ? { ...t, active: isParamActive } : t
-            );
-            return { ...prev, tables: updated };
-          });
-        }
-      }
-      syncTablesFromServer();
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('focus', onVisibilityOrFocus);
-      window.addEventListener('popstate', onVisibilityOrFocus);
-      document.addEventListener('visibilitychange', onVisibilityOrFocus);
-    }
-
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       const bc = new BroadcastChannel(getWorkspaceChannelName());
       bc.onmessage = (ev) => {
@@ -622,20 +577,8 @@ export function TadkaProvider({
       channelRef.current = bc;
       return () => {
         bc.close();
-        clearInterval(tablePollTimer);
-        window.removeEventListener('focus', onVisibilityOrFocus);
-        window.removeEventListener('popstate', onVisibilityOrFocus);
-        document.removeEventListener('visibilitychange', onVisibilityOrFocus);
       };
     }
-    return () => {
-      clearInterval(tablePollTimer);
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('focus', onVisibilityOrFocus);
-        window.removeEventListener('popstate', onVisibilityOrFocus);
-        document.removeEventListener('visibilitychange', onVisibilityOrFocus);
-      }
-    };
   }, [initialTableId]);
 
   // Persist to localStorage & broadcast changes
@@ -2829,34 +2772,14 @@ export function TadkaProvider({
       const targetTableId = tableId || S.activeTable;
       const currentSlug = getActiveWorkspaceSlug();
 
-      // 1. Re-read URL query params in case user rescanned or switched tabs with &active=1
-      if (typeof window !== 'undefined') {
-        const sp = new URLSearchParams(window.location.search);
-        const qActive = sp.get('active');
-        const qTable = sp.get('table');
-        if (qActive !== null && (!qTable || Number(qTable) === Number(targetTableId))) {
-          const isUrlActive = qActive !== '0' && qActive !== 'false';
-          updateState((prev) => ({
-            ...prev,
-            tables: prev.tables.map((t) =>
-              Number(t.id) === Number(targetTableId) ? { ...t, active: isUrlActive } : t
-            ),
-          }));
-          if (isUrlActive) {
-            say(`🎉 Table ${targetTableId} is Activated! You can place your order now.`);
-            return true;
-          }
-        }
-      }
-
-      // 2. Poll server endpoint (cross-platform with CORS on Vercel fallback)
+      // Check server endpoint where restaurant management sets table activation
       try {
         const res = await fetch(
           `${getTablesApiBase()}?tenant=${encodeURIComponent(currentSlug)}&_=${Date.now()}`
         );
         if (res.ok) {
           const data = await res.json();
-          if (data?.tables && data.tables[targetTableId] !== undefined) {
+          if (data?.tables && typeof data.tables[targetTableId] === 'boolean') {
             const isServerActive = Boolean(data.tables[targetTableId]);
             updateState((prev) => ({
               ...prev,

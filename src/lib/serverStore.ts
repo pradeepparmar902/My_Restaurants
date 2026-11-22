@@ -31,7 +31,7 @@ export function getTableStatusMap(tenant?: string): Record<number, boolean> {
     global.__TADKA_TABLE_STATUS__ = {};
   }
   if (!global.__TADKA_TABLE_STATUS__[tKey]) {
-    global.__TADKA_TABLE_STATUS__[tKey] = { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true };
+    global.__TADKA_TABLE_STATUS__[tKey] = {};
   }
   return global.__TADKA_TABLE_STATUS__[tKey];
 }

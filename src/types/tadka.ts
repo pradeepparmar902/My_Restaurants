@@ -230,6 +230,7 @@ export interface GoogleCloudStorageConfig {
   gstMode?: 'bill' | 'item';
   gstin?: string;
   rewardRules?: RewardRulesConfig;
+  tablesStatusJson?: string;
   lastSyncedAt?: string;
   lastSyncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
   lastSyncError?: string;

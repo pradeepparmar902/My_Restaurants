@@ -99,6 +99,7 @@ export function buildSheetRowsForState(
     ['counter_business_date', businessDateToday, new Date().toISOString()],
     ['next_counter_number', state.ctr, new Date().toISOString()],
     ['used_counters_today', (state.usedCountersToday || []).join(','), new Date().toISOString()],
+    ['tables_status_json', JSON.stringify((state.tables || []).map((t) => ({ id: t.id, active: t.active !== false }))), new Date().toISOString()],
   ];
 
   const Menu_Items: (string | number | boolean)[][] = [
@@ -848,6 +849,16 @@ export function parseConfigFromSheetRows(
       cfg.gstMode = val;
     }
     if (key === 'gstin' && val) cfg.gstin = val;
+    if (key === 'tables_status_json' && val) {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) {
+          cfg.tablesStatusJson = val;
+        }
+      } catch {
+        // ignore invalid JSON
+      }
+    }
     if (key === 'reward_rules_json' && val) {
       try {
         const parsed = JSON.parse(val);
