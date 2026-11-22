@@ -3188,7 +3188,8 @@ export function OwnerPortalView() {
       </CollapsibleSection>
 
       <CollapsibleSection
-        title="⚡ Prepaid Payment Verification Queue"
+        title="⚡ Live Bank Auto-Reconciliation & Queue (GPay vs Bills)"
+        badge="Live Matcher"
         isOpen={!!openSections.prepaidQueue}
         onToggle={() => toggleSection('prepaidQueue')}
         wrapInCard={false}
@@ -6026,6 +6027,77 @@ export function AdminPortalView() {
         >
           💾 Save &amp; Sync Billing Model &amp; UPI ID
         </button>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="⚡ Live Bank Auto-Reconciliation & Queue (GPay vs Bills)"
+        badge="Live Matcher"
+        isOpen={openAdminSections.bankRecon !== false}
+        onToggle={() => toggleAdminSection('bankRecon')}
+        wrapInCard={false}
+      >
+        <PendingPrepaidOrdersQueue title="💳 Prepaid Orders & Live Bank Auto-Reconciliation" />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="🔌 GPay / Paytm Webhook & Hosting Notes (Option A)"
+        badge="Process Notes"
+        isOpen={!!openAdminSections.webhookNotes}
+        onToggle={() => toggleAdminSection('webhookNotes')}
+      >
+        <div style={{ fontSize: '12px', lineHeight: 1.6, color: '#e5e7eb' }}>
+          <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px dashed #3b82f6', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px' }}>
+            <b style={{ color: '#60a5fa', fontSize: '13px' }}>🌐 Hosting Architecture: GitHub Pages vs Vercel</b>
+            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#cbd5e1' }}>
+              • <b>GitHub Pages (pradeepparmar902.github.io):</b> Static client-side host. It serves HTML/JS and has no Node.js server to run incoming HTTP webhooks.<br />
+              • <b>Vercel (Recommended 100% Free):</b> Full Next.js server hosting. 1-click deploy from your GitHub repo. Supports <code>/api/payments/webhook</code> 24/7 with zero cost.<br />
+              • <b>Static Host Alternative (Option B):</b> If you host on GitHub Pages, use our <b>Option B (Android SMS-to-Sheet)</b> or <b>Customer Claimed UTR</b> which works 100% via Google Sheets without needing a server!
+            </p>
+          </div>
+
+          <b style={{ color: '#10b981', display: 'block', marginBottom: '4px' }}>
+            📡 Your Inbound Webhook Endpoint URL:
+          </b>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <code style={{ background: '#111827', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', color: '#34d399', flex: 1, minWidth: '220px', overflowX: 'auto' }}>
+              {typeof window !== 'undefined' ? `${window.location.origin}/api/payments/webhook` : 'https://your-domain.com/api/payments/webhook'}
+            </code>
+            <button
+              type="button"
+              className="chip on"
+              style={{ fontSize: '11px', whiteSpace: 'nowrap' }}
+              onClick={() => {
+                const url = `${window.location.origin}/api/payments/webhook`;
+                navigator.clipboard?.writeText?.(url);
+                say(`Copied Webhook URL: ${url} 📋`);
+              }}
+            >
+              📋 Copy URL
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #374151', borderRadius: '8px', padding: '10px' }}>
+              <b style={{ color: '#38bdf8', fontSize: '12px' }}>🔹 Paytm for Business Setup:</b>
+              <ol style={{ margin: '6px 0 0', paddingLeft: '16px', fontSize: '11px', color: '#9ca3af' }}>
+                <li>Log in to <b>dashboard.paytm.com</b>.</li>
+                <li>Go to <b>Developer Settings</b> &gt; <b>Webhooks</b>.</li>
+                <li>Paste your webhook URL above.</li>
+                <li>Subscribe to <b>Payment Success (TXN_SUCCESS)</b> and Save.</li>
+              </ol>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #374151', borderRadius: '8px', padding: '10px' }}>
+              <b style={{ color: '#4ade80', fontSize: '12px' }}>🔹 Google Pay for Business Setup:</b>
+              <ol style={{ margin: '6px 0 0', paddingLeft: '16px', fontSize: '11px', color: '#9ca3af' }}>
+                <li>Log in to <b>business.google.com/payments</b>.</li>
+                <li>Go to <b>Settings</b> &gt; <b>Integrations &amp; Callbacks</b>.</li>
+                <li>Paste your webhook URL into Notification Webhook.</li>
+                <li>Enable <b>Transaction Credit (SUCCESS)</b> and Save.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
       </CollapsibleSection>
 
       <CollapsibleSection
