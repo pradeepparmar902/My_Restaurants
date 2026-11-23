@@ -17,6 +17,7 @@ import {
 } from '@/types/tadka';
 import { DEFAULT_REWARD_RULES, INITIAL_STATE, ORDER_STATUS_LABELS } from '@/lib/constants';
 import {
+  buildUpiUri,
   cleanCounterNumber,
   extractUserSessionSnapshot,
   filterPositiveItems,
@@ -30,6 +31,7 @@ import {
   getGST,
   getSubtotal,
   getTotal,
+  isValidUpiId,
   normalizeMobile,
   switchUserSessionInState,
 } from '@/lib/helpers';
@@ -48,7 +50,7 @@ import {
   parseStaffFromSheetRows,
   PulledSheetOrder,
 } from '@/lib/googleSheetsShared';
-import { formatOrderConfirmationMessage, sendDirectWhatsAppMessage } from '@/lib/whatsappClient';
+import { formatOrderConfirmationMessage, formatBillReceiptMessage, sendDirectWhatsAppMessage } from '@/lib/whatsappClient';
 
 interface TadkaContextValue {
   S: AppState;
@@ -2256,8 +2258,59 @@ export function TadkaProvider({
           sess: prev.sess ? { ...prev.sess, status: 'paid' } : null,
         };
       });
+
+      // Send automated background WhatsApp tax receipt / bill confirmation
+      const targetCustomerMob = S.sess?.mob || S.me.mob;
+      if (targetCustomerMob && S.googleConfig.whatsappDirectEnabled !== false) {
+        const itemRows = Object.entries(S.cart).map(([dishId, qty]) => {
+          const dish = S.menu.find((m) => m.id === Number(dishId));
+          return {
+            name: typeof dish?.n === 'string' ? dish.n : (dish?.n as any)?.en || `Item #${dishId}`,
+            qty,
+            price: dish?.p || 0,
+          };
+        });
+        const subtotal = getSubtotal(S.menu, S.cart);
+        const rules = S.googleConfig?.rewardRules || DEFAULT_REWARD_RULES;
+        const discountAmount = getDiscount(subtotal, S.reel, S.review, rules, {
+          appliedCoupon: S.appliedCoupon,
+          shared: S.shared,
+          starClaimed: S.starClaimed,
+        });
+        const gstEnabled = S.googleConfig?.gstEnabled !== false;
+        const gstRate = S.googleConfig?.gstRate ?? 5;
+        const gstMode = S.googleConfig?.gstMode === 'item' ? 'item' : 'bill';
+        const gstAmount = getGST(subtotal, discountAmount, gstEnabled, gstRate, gstMode, S.menu, S.cart);
+        const finalTotal = getTotal(subtotal, discountAmount, gstEnabled, gstRate, gstMode, S.menu, S.cart);
+
+        const waMsg = formatBillReceiptMessage({
+          restaurantName: (S.googleConfig.restaurantName || '').trim() || 'Tadka Restaurant',
+          counterNo: S.sess?.no || 'C1',
+          tableNo: S.activeTable,
+          items: itemRows,
+          subtotal,
+          gstAmount,
+          discountAmount,
+          finalTotal,
+          isPaid: true,
+        });
+
+        sendDirectWhatsAppMessage({
+          to: targetCustomerMob,
+          text: waMsg,
+          gatewayUrl: S.googleConfig.whatsappGatewayUrl,
+          sessionId: getActiveWorkspaceSlug(),
+          defaultCountryCode: S.cc,
+        })
+          .then((res) => {
+            if (res.ok) {
+              say('Payment confirmed! 🧾 Tax receipt sent to customer WhatsApp ✅');
+            }
+          })
+          .catch(() => {});
+      }
     },
-    [updateState]
+    [S, say, updateState]
   );
   const confirmPrepaidOrder = useCallback(
     (counterNoOrOrderId: string, paymentMethod: PaymentMethod = 'UPI') => {
@@ -2342,6 +2395,22 @@ export function TadkaProvider({
       });
 
       say('Prepaid payment verified & confirmed! Order sent to kitchen ✅');
+
+      // Send background WhatsApp payment confirmation to customer
+      const matchedLocalOrder = S.orders.find((o) => o.id.toLowerCase() === targetQuery);
+      const matchedSheetOrder = sheetOrdersTodayRef.current.find((po) => po.id.toLowerCase() === targetQuery);
+      const customerMob = matchedLocalOrder?.orderedByMob || matchedSheetOrder?.orderedByMob || matchedSheetOrder?.principalMob || S.sess?.mob;
+      const counterNo = matchedSheetOrder?.counterNo || S.sess?.no || 'C1';
+
+      if (customerMob && S.googleConfig.whatsappDirectEnabled !== false) {
+        sendDirectWhatsAppMessage({
+          to: customerMob,
+          text: `🍽️ *${(S.googleConfig.restaurantName || '').trim() || 'Tadka Restaurant'}*\n✅ *Payment Verified & Received!*\nYour prepaid order for Counter ${counterNo} has been confirmed and sent straight to the chef for cooking! 👨‍🍳🔥`,
+          gatewayUrl: S.googleConfig.whatsappGatewayUrl,
+          sessionId: getActiveWorkspaceSlug(),
+          defaultCountryCode: S.cc,
+        }).catch(() => {});
+      }
     },
     [S, pushUpdatedSheetOrder, say, updateState]
   );
@@ -2425,9 +2494,72 @@ export function TadkaProvider({
         ...prev,
         sess: prev.sess ? { ...prev.sess, mob: v } : prev.sess,
       }));
-      say(`Bill sent to ${v} ✅`);
+
+      // Background WhatsApp dispatch
+      if (S.googleConfig.whatsappDirectEnabled !== false) {
+        const itemRows = Object.entries(S.cart).map(([dishId, qty]) => {
+          const dish = S.menu.find((m) => m.id === Number(dishId));
+          return {
+            name: typeof dish?.n === 'string' ? dish.n : (dish?.n as any)?.en || `Item #${dishId}`,
+            qty,
+            price: dish?.p || 0,
+          };
+        });
+        const subtotal = getSubtotal(S.menu, S.cart);
+        const rules = S.googleConfig?.rewardRules || DEFAULT_REWARD_RULES;
+        const discountAmount = getDiscount(subtotal, S.reel, S.review, rules, {
+          appliedCoupon: S.appliedCoupon,
+          shared: S.shared,
+          starClaimed: S.starClaimed,
+        });
+        const gstEnabled = S.googleConfig?.gstEnabled !== false;
+        const gstRate = S.googleConfig?.gstRate ?? 5;
+        const gstMode = S.googleConfig?.gstMode === 'item' ? 'item' : 'bill';
+        const gstAmount = getGST(subtotal, discountAmount, gstEnabled, gstRate, gstMode, S.menu, S.cart);
+        const finalTotal = getTotal(subtotal, discountAmount, gstEnabled, gstRate, gstMode, S.menu, S.cart);
+
+        const rawUpiId = (S.googleConfig?.upiId || '').trim();
+        const upiName = (S.googleConfig?.upiName || S.googleConfig?.restaurantName || 'Tadka').trim();
+        const upiPaymentLink = isValidUpiId(rawUpiId)
+          ? buildUpiUri({
+              upiId: rawUpiId,
+              payeeName: upiName,
+              amount: finalTotal,
+              note: `Counter ${S.sess?.no || 'C1'} Table ${S.activeTable}`,
+            })
+          : undefined;
+
+        const waMsg = formatBillReceiptMessage({
+          restaurantName: (S.googleConfig.restaurantName || '').trim() || 'Tadka Restaurant',
+          counterNo: S.sess?.no || 'C1',
+          tableNo: S.activeTable,
+          items: itemRows,
+          subtotal,
+          gstAmount,
+          discountAmount,
+          finalTotal,
+          upiPaymentLink,
+          isPaid: S.paid,
+        });
+
+        sendDirectWhatsAppMessage({
+          to: v,
+          text: waMsg,
+          gatewayUrl: S.googleConfig.whatsappGatewayUrl,
+          sessionId: getActiveWorkspaceSlug(),
+          defaultCountryCode: S.cc,
+        })
+          .then((res) => {
+            if (res.ok) {
+              say(`Bill receipt sent directly to ${v} on WhatsApp ✅`);
+            }
+          })
+          .catch(() => {});
+      } else {
+        say(`Bill registered for ${v} ✅`);
+      }
     },
-    [S.cc, say, updateState]
+    [S, say, updateState]
   );
 
   const startNewOrder = useCallback(() => {

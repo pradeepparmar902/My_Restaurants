@@ -1289,6 +1289,7 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
     confirmPrepaidOrder,
     pullFromGoogleSheets,
     say,
+    activeWorkspaceSlug,
   } = useTadka();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeQrId, setActiveQrId] = useState<string | null>(null);
@@ -2053,23 +2054,39 @@ export function PendingPrepaidOrdersQueue({ title = '💳 Pending Prepaid Orders
                     📱 {activeQrId === o.id ? 'Hide QR' : 'Show QR to Customer'}
                   </button>
 
-                  <a
-                    href={waLink}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
                     className="chip"
                     style={{
                       background: 'rgba(37, 211, 102, 0.2)',
                       color: '#25D366',
-                      textDecoration: 'none',
+                      border: '1px solid #25D366',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px',
                       fontSize: '12px',
                     }}
+                    onClick={async () => {
+                      const plainText = `Hello! Your order for Counter ${o.counterNo} (Table ${o.table}) at ${upiName} is ready for payment.\n\nTotal Payable: ₹${total}\n\nPay via UPI: ${upiUri}\n\nOnce paid, your order goes straight to the chef for cooking!`;
+                      if (o.mob && S.googleConfig.whatsappDirectEnabled !== false) {
+                        say('Sending WhatsApp pay link in background... ⏳');
+                        const res = await sendDirectWhatsAppMessage({
+                          to: o.mob,
+                          text: plainText,
+                          gatewayUrl: S.googleConfig.whatsappGatewayUrl,
+                          sessionId: activeWorkspaceSlug,
+                          defaultCountryCode: S.cc,
+                        });
+                        if (res.ok) {
+                          say(`Pay link sent directly to ${o.mob} via background WhatsApp ✅`);
+                          return;
+                        }
+                      }
+                      window.open(waLink, '_blank', 'noopener,noreferrer');
+                    }}
                   >
                     💬 WhatsApp Pay Link
-                  </a>
+                  </button>
 
                   <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <select
