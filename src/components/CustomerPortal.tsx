@@ -40,6 +40,7 @@ export function MenuTabView() {
     setTab,
     say,
     refreshTableActivation,
+    activeWorkspaceSlug,
   } = useTadka();
   const [optMob, setOptMob] = useState('');
   const [showOptMob, setShowOptMob] = useState(false);
@@ -264,7 +265,9 @@ export function MenuTabView() {
     ...DEFAULT_REWARD_RULES,
     ...(S.googleConfig.rewardRules || {}),
   };
-  const brandName = (S.googleConfig.restaurantName || '').trim() || 'Tadka Truck';
+  const brandName =
+    (S.googleConfig.restaurantName || '').trim() ||
+    (activeWorkspaceSlug === 'bhart-dhab' ? 'Bhart Dhab' : 'Tadka Truck');
   const taglineText =
     S.sess && S.orders.length > 0 && !S.paid
       ? S.sess.pend

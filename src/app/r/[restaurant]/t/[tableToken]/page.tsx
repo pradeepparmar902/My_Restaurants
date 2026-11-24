@@ -4,10 +4,13 @@ import { TadkaShell } from '@/components/TadkaShell';
 import { INITIAL_TABLES } from '@/lib/constants';
 
 export function generateStaticParams() {
-  return INITIAL_TABLES.map((t) => ({
-    restaurant: 'tadka-truck',
-    tableToken: t.token,
-  }));
+  const restaurants = ['tadka-truck', 'bhart-dhab', 'bharat-dhaba', 'bharat-dhab'];
+  return restaurants.flatMap((restaurant) =>
+    INITIAL_TABLES.map((t) => ({
+      restaurant,
+      tableToken: t.token,
+    }))
+  );
 }
 
 export default async function TableQrLandingPage({

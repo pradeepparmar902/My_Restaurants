@@ -186,10 +186,26 @@ const SUPER_ADMIN_MOBILES = ['+919800000001'];
 export function getActiveWorkspaceSlug(): string {
   if (typeof window !== 'undefined') {
     const sp = new URLSearchParams(window.location.search);
-    const w = (sp.get('w') || sp.get('workspace') || '').trim().toLowerCase();
-    if (w) return w.replace(/[^a-z0-9_-]/g, '');
+    let w = (sp.get('w') || sp.get('workspace') || '').trim().toLowerCase();
+    if (w) {
+      w = w.replace(/[^a-z0-9_-]/g, '');
+      if (w === 'bharat-dhaba' || w === 'bharat-dhab' || w === 'bhart-dhaba') {
+        w = 'bhart-dhab';
+      }
+      return w;
+    }
+    const s = (sp.get('s') || sp.get('sheet') || '').toLowerCase();
+    if (s.includes('dwczw6dl2')) {
+      return 'bhart-dhab';
+    }
     const pathMatch = window.location.pathname.match(/\/r\/([a-z0-9_-]+)/i);
-    if (pathMatch?.[1]) return pathMatch[1].toLowerCase();
+    if (pathMatch?.[1]) {
+      let pw = pathMatch[1].toLowerCase();
+      if (pw === 'bharat-dhaba' || pw === 'bharat-dhab' || pw === 'bhart-dhaba') {
+        pw = 'bhart-dhab';
+      }
+      return pw;
+    }
   }
   return (
     process.env.NEXT_PUBLIC_DEFAULT_RESTAURANT_SLUG || 'tadka-truck'
@@ -4091,9 +4107,11 @@ export function TadkaProvider({
         }
       }
 
-      // Sanitize URL sheet ID: ignore known invalid placeholder / broken IDs
-      const isKnownBrokenSheetId = urlSheetId.startsWith('1lzAIy');
-      const validUrlSheetId = isKnownBrokenSheetId ? '' : urlSheetId;
+      // Sanitize URL sheet ID: normalize any casing variation of Bhart Dhab's sheet
+      let validUrlSheetId = urlSheetId;
+      if (urlSheetId.toLowerCase().includes('dwczw6dl2')) {
+        validUrlSheetId = '1IzALyDWczW6DL2_ZDEUwMl-dNxOMPHxVzpR97WGKY40';
+      }
 
       if (validUrlSheetId) {
         tenantCfg = {
@@ -4135,7 +4153,9 @@ export function TadkaProvider({
               (slug === 'tadka-truck' ? defaultEntry || data : null);
             if (entry) {
               tenantCfg = {
-                workspaceSlug: slug,
+                workspaceSlug: entry.slug || slug,
+                restaurantName: entry.name || '',
+                appStyle: entry.appStyle || '',
                 appsScriptWebAppUrl: entry.appsScriptWebAppUrl || tenantCfg.appsScriptWebAppUrl || '',
                 spreadsheetId: entry.spreadsheetId || tenantCfg.spreadsheetId || '',
                 driveFolderId: entry.driveFolderId || tenantCfg.driveFolderId || '',
@@ -4209,10 +4229,10 @@ export function TadkaProvider({
         const mergedCfg = {
           ...prev.googleConfig,
           workspaceSlug: slug,
-          ...(tenantCfg.appStyle ? { appStyle: tenantCfg.appStyle } : {}),
-          ...(tenantCfg.restaurantName
-            ? { restaurantName: tenantCfg.restaurantName }
-            : {}),
+          appStyle: tenantCfg.appStyle || (slug === 'bhart-dhab' ? 'style2' : prev.googleConfig.appStyle),
+          restaurantName:
+            tenantCfg.restaurantName ||
+            (slug === 'bhart-dhab' ? 'Bhart Dhab' : prev.googleConfig.restaurantName),
           ...(tenantCfg.ownerName ? { ownerName: tenantCfg.ownerName } : {}),
           ...(tenantCfg.ownerMobile
             ? { ownerMobile: tenantCfg.ownerMobile }

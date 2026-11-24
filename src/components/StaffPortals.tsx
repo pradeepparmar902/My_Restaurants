@@ -7962,11 +7962,15 @@ export function AdminPortalView() {
                         : ''
                     }`
                   : 'https://pradeepparmar902.github.io/My_Restaurants';
+              const effectiveSheetId =
+                activeWorkspaceSlug === 'bhart-dhab'
+                  ? '1IzALyDWczW6DL2_ZDEUwMl-dNxOMPHxVzpR97WGKY40'
+                  : S.googleConfig.spreadsheetId;
               const qrTargetUrl = `${baseUrl}/?w=${encodeURIComponent(
                 activeWorkspaceSlug
               )}${
-                S.googleConfig.spreadsheetId
-                  ? `&s=${encodeURIComponent(S.googleConfig.spreadsheetId)}`
+                effectiveSheetId
+                  ? `&s=${encodeURIComponent(effectiveSheetId)}`
                   : ''
               }${
                 S.googleConfig.appsScriptWebAppUrl
@@ -8124,7 +8128,9 @@ export function AdminPortalView() {
                       }}
                     >
                       <b style={{ fontSize: '18px' }}>
-                        {(S.googleConfig.restaurantName || '').trim() || 'Tadka Truck'} · {t.label}
+                        {(S.googleConfig.restaurantName || '').trim() ||
+                          (activeWorkspaceSlug === 'bhart-dhab' ? 'Bhart Dhab' : 'Tadka Truck')}{' '}
+                        · {t.label}
                       </b>
                       <p style={{ fontSize: '12px', color: '#4a3680', margin: '4px 0 6px' }}>
                         Scan to view menu, select dishes &amp; pay
