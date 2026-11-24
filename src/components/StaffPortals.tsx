@@ -7968,6 +7968,14 @@ export function AdminPortalView() {
                 S.googleConfig.spreadsheetId
                   ? `&s=${encodeURIComponent(S.googleConfig.spreadsheetId)}`
                   : ''
+              }${
+                S.googleConfig.appsScriptWebAppUrl
+                  ? `&u=${encodeURIComponent(S.googleConfig.appsScriptWebAppUrl)}`
+                  : ''
+              }${
+                S.googleConfig.whatsappGatewayUrl
+                  ? `&gw=${encodeURIComponent(S.googleConfig.whatsappGatewayUrl)}`
+                  : ''
               }&t=${encodeURIComponent(
                 t.token
               )}&table=${t.id}&label=${encodeURIComponent(t.label)}&active=${t.active !== false ? '1' : '0'}`;

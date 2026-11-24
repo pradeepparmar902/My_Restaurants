@@ -852,7 +852,9 @@ export function parseConfigFromSheetRows(
     }
     if (key === 'gstin' && val) cfg.gstin = val;
     if (key === 'whatsapp_gateway_url') cfg.whatsappGatewayUrl = val;
-    if (key === 'whatsapp_direct_enabled') cfg.whatsappDirectEnabled = val === 'true';
+    if (key === 'whatsapp_direct_enabled') {
+      cfg.whatsappDirectEnabled = val.toLowerCase() === 'true' || val === '1';
+    }
     if (key === 'tables_status_json' && val) {
       try {
         const parsed = JSON.parse(val);

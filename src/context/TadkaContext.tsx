@@ -617,22 +617,54 @@ export function TadkaProvider({
     };
   }, [initialTableId]);
 
+  // Periodic background pull from Google Sheets to sync orders in real time
+  useEffect(() => {
+    if (!S.googleConfig?.spreadsheetId) return;
+    const intervalId = setInterval(() => {
+      pullFromGoogleSheetsRef.current?.(undefined, true);
+    }, 4000);
+    return () => clearInterval(intervalId);
+  }, [S.googleConfig?.spreadsheetId]);
+
   // Automated Staff / Admin Relay: When customer orders arrive in sheetOrdersToday,
   // staff/admin device connected to local WhatsApp gateway automatically dispatches WhatsApp confirmation
+  const waStorageKey = `tadka_wa_dispatched_${activeWorkspaceSlug}`;
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(waStorageKey);
+      if (stored) {
+        const ids: string[] = JSON.parse(stored);
+        ids.forEach((id) => dispatchedWaOrderIdsRef.current.add(id));
+      }
+    } catch {}
+  }, [waStorageKey]);
+
   useEffect(() => {
     if (!sheetOrdersToday || sheetOrdersToday.length === 0) return;
     if (S.googleConfig?.whatsappDirectEnabled === false) return;
 
-    // Seed on first run so we don't resend past orders from earlier today
-    if (dispatchedWaOrderIdsRef.current.size === 0) {
-      sheetOrdersToday.forEach((po) => dispatchedWaOrderIdsRef.current.add(po.id));
-      return;
-    }
+    const now = Date.now();
+    let hasNewDispatches = false;
 
     sheetOrdersToday.forEach((po) => {
       if (po.st === 5) return; // skip cancelled
       if (dispatchedWaOrderIdsRef.current.has(po.id)) return;
+
+      // Extract timestamp from po.id (e.g. ord-1732468123456-abc)
+      let orderTime = 0;
+      if (po.id.startsWith('ord-')) {
+        const ts = Number(po.id.split('-')[1]);
+        if (!isNaN(ts) && ts > 0) orderTime = ts;
+      }
+      // Skip orders older than 30 minutes from unseeded past runs
+      if (orderTime > 0 && now - orderTime > 30 * 60 * 1000) {
+        dispatchedWaOrderIdsRef.current.add(po.id);
+        hasNewDispatches = true;
+        return;
+      }
+
       dispatchedWaOrderIdsRef.current.add(po.id);
+      hasNewDispatches = true;
 
       const customerMob = po.orderedByMob || po.principalMob;
       if (!customerMob) return;
@@ -670,6 +702,15 @@ export function TadkaProvider({
         })
         .catch(() => {});
     });
+
+    if (hasNewDispatches) {
+      try {
+        localStorage.setItem(
+          waStorageKey,
+          JSON.stringify(Array.from(dispatchedWaOrderIdsRef.current))
+        );
+      } catch {}
+    }
   }, [
     sheetOrdersToday,
     S.googleConfig?.whatsappDirectEnabled,
@@ -678,6 +719,7 @@ export function TadkaProvider({
     S.menu,
     S.cc,
     activeWorkspaceSlug,
+    waStorageKey,
   ]);
 
   // Persist to localStorage & broadcast changes
@@ -4037,23 +4079,32 @@ export function TadkaProvider({
       let urlSheetId = '';
       let urlDriveId = '';
       let urlScript = '';
+      let urlGateway = '';
       if (typeof window !== 'undefined') {
         const sp = new URLSearchParams(window.location.search);
         urlSheetId = (sp.get('s') || sp.get('sheet') || '').trim();
         urlDriveId = (sp.get('d') || '').trim();
         urlScript = (sp.get('u') || '').trim();
+        urlGateway = (sp.get('gw') || '').trim();
         if (sp.get('standalone') === '1') {
           setIsStandaloneMode(true);
         }
       }
 
-      if (urlSheetId) {
+      // Sanitize URL sheet ID: ignore known invalid placeholder / broken IDs
+      const isKnownBrokenSheetId = urlSheetId.startsWith('1lzAIy');
+      const validUrlSheetId = isKnownBrokenSheetId ? '' : urlSheetId;
+
+      if (validUrlSheetId) {
         tenantCfg = {
           workspaceSlug: slug,
-          spreadsheetId: urlSheetId,
+          spreadsheetId: validUrlSheetId,
           ...(urlDriveId ? { driveFolderId: urlDriveId } : {}),
           ...(urlScript ? { appsScriptWebAppUrl: urlScript } : {}),
+          ...(urlGateway ? { whatsappGatewayUrl: urlGateway } : {}),
         };
+      } else if (urlGateway) {
+        tenantCfg.whatsappGatewayUrl = urlGateway;
       }
 
       let masterDefaultSheetId = '';
@@ -4082,12 +4133,13 @@ export function TadkaProvider({
             const entry =
               data?.restaurants?.[slug] ||
               (slug === 'tadka-truck' ? defaultEntry || data : null);
-            if (entry && !tenantCfg.spreadsheetId) {
+            if (entry) {
               tenantCfg = {
                 workspaceSlug: slug,
-                appsScriptWebAppUrl: entry.appsScriptWebAppUrl || '',
-                spreadsheetId: entry.spreadsheetId || '',
-                driveFolderId: entry.driveFolderId || '',
+                appsScriptWebAppUrl: entry.appsScriptWebAppUrl || tenantCfg.appsScriptWebAppUrl || '',
+                spreadsheetId: entry.spreadsheetId || tenantCfg.spreadsheetId || '',
+                driveFolderId: entry.driveFolderId || tenantCfg.driveFolderId || '',
+                ...(urlGateway ? { whatsappGatewayUrl: urlGateway } : {}),
               };
               break;
             }
