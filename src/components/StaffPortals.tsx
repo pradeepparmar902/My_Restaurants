@@ -5282,7 +5282,12 @@ export function WhatsAppGatewaySettingsSection() {
           <button
             className={`chip ${directEnabled ? 'on' : ''}`}
             style={{ fontWeight: 700 }}
-            onClick={() => setDirectEnabled((prev) => !prev)}
+            onClick={() => {
+              const next = !directEnabled;
+              setDirectEnabled(next);
+              saveGoogleConfig({ whatsappDirectEnabled: next });
+              say(next ? 'Silent background WhatsApp dispatch enabled 🟢' : 'Silent WhatsApp dispatch disabled ⚪');
+            }}
           >
             {directEnabled ? '🟢 Enabled' : '⚪ Disabled'}
           </button>
@@ -5442,13 +5447,27 @@ export function WhatsAppGatewaySettingsSection() {
           className="inp"
           style={{ width: '100%', marginBottom: '8px' }}
         />
-        <button
-          type="button"
-          className="chip on"
-          onClick={handleSave}
-        >
-          💾 Save WhatsApp Gateway Settings
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+          <button
+            type="button"
+            className="chip on"
+            onClick={handleSave}
+          >
+            💾 Save WhatsApp Gateway Settings
+          </button>
+          <button
+            type="button"
+            className="chip"
+            style={{ fontSize: '11px' }}
+            onClick={() => {
+              setGatewayUrl('http://192.168.29.101:5050');
+              saveGoogleConfig({ whatsappGatewayUrl: 'http://192.168.29.101:5050' });
+              say('Gateway URL set to Local Wi-Fi IP: http://192.168.29.101:5050 📶');
+            }}
+          >
+            📶 Use Local Wi-Fi IP (192.168.29.101:5050)
+          </button>
+        </div>
       </div>
 
       {/* 5. Live Test Message Dispatch */}

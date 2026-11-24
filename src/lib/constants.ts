@@ -229,6 +229,8 @@ export const INITIAL_STATE: AppState = {
     driveFolderId: process.env.NEXT_PUBLIC_GOOGLE_DRIVE_FOLDER_ID || '',
     lastSyncedAt: new Date().toISOString(),
     lastSyncStatus: 'synced',
+    whatsappGatewayUrl: 'http://localhost:5050',
+    whatsappDirectEnabled: true,
   },
   driveAssets: [
     {

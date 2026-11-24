@@ -285,6 +285,7 @@ export function TadkaProvider({
     Record<string, { proof: SocialProofSubmission; until: number }>
   >({});
   const appliedProofIdsRef = useRef<Set<string>>(new Set());
+  const dispatchedWaOrderIdsRef = useRef<Set<string>>(new Set());
   const [activeWorkspaceSlug, setActiveWorkspaceSlug] = useState<string>(() =>
     typeof window !== 'undefined' ? getActiveWorkspaceSlug() : 'tadka-truck'
   );
@@ -615,6 +616,69 @@ export function TadkaProvider({
       if (bc) bc.close();
     };
   }, [initialTableId]);
+
+  // Automated Staff / Admin Relay: When customer orders arrive in sheetOrdersToday,
+  // staff/admin device connected to local WhatsApp gateway automatically dispatches WhatsApp confirmation
+  useEffect(() => {
+    if (!sheetOrdersToday || sheetOrdersToday.length === 0) return;
+    if (S.googleConfig?.whatsappDirectEnabled === false) return;
+
+    // Seed on first run so we don't resend past orders from earlier today
+    if (dispatchedWaOrderIdsRef.current.size === 0) {
+      sheetOrdersToday.forEach((po) => dispatchedWaOrderIdsRef.current.add(po.id));
+      return;
+    }
+
+    sheetOrdersToday.forEach((po) => {
+      if (po.st === 5) return; // skip cancelled
+      if (dispatchedWaOrderIdsRef.current.has(po.id)) return;
+      dispatchedWaOrderIdsRef.current.add(po.id);
+
+      const customerMob = po.orderedByMob || po.principalMob;
+      if (!customerMob) return;
+
+      const itemRows = Object.entries(po.it).map(([dishId, qty]) => {
+        const dish = S.menu.find((m) => m.id === Number(dishId));
+        return {
+          name: typeof dish?.n === 'string' ? dish.n : (dish?.n as any)?.en || `Item #${dishId}`,
+          qty,
+          price: po.prices?.[Number(dishId)] ?? dish?.p ?? 0,
+        };
+      });
+      const subtotal = itemRows.reduce((acc, curr) => acc + curr.price * curr.qty, 0);
+
+      const waMsg = formatOrderConfirmationMessage({
+        restaurantName: (S.googleConfig.restaurantName || '').trim() || 'Tadka Restaurant',
+        counterNo: po.counterNo || 'C1',
+        tableNo: po.table || 1,
+        orderId: po.id,
+        items: itemRows,
+        subtotal,
+      });
+
+      sendDirectWhatsAppMessage({
+        to: customerMob,
+        text: waMsg,
+        gatewayUrl: S.googleConfig.whatsappGatewayUrl,
+        sessionId: activeWorkspaceSlug,
+        defaultCountryCode: S.cc,
+      })
+        .then((res) => {
+          if (res.ok) {
+            sayRef.current(`Order confirmation sent to customer ${customerMob} via WhatsApp ✅`);
+          }
+        })
+        .catch(() => {});
+    });
+  }, [
+    sheetOrdersToday,
+    S.googleConfig?.whatsappDirectEnabled,
+    S.googleConfig?.whatsappGatewayUrl,
+    S.googleConfig?.restaurantName,
+    S.menu,
+    S.cc,
+    activeWorkspaceSlug,
+  ]);
 
   // Persist to localStorage & broadcast changes
   const updateState = useCallback((updater: (prev: AppState) => AppState) => {
