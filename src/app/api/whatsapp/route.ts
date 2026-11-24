@@ -25,6 +25,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(data);
     }
 
+    if (action === 'launch' || action === 'launch-service') {
+      const { spawn } = await import('child_process');
+      const path = await import('path');
+      const connectorDir = path.join(process.cwd(), 'whatsapp-standalone-connector');
+      const child = spawn('node', ['server.js'], {
+        cwd: connectorDir,
+        detached: true,
+        stdio: 'ignore',
+        shell: true,
+      });
+      child.unref();
+      return NextResponse.json({ ok: true, message: 'WhatsApp connector service launched in background' });
+    }
+
     return NextResponse.json({ ok: false, error: 'Unknown action' }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json(

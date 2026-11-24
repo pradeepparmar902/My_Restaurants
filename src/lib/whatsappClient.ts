@@ -127,6 +127,21 @@ export async function startWhatsAppSession(
 }
 
 /**
+ * Attempt to launch local WhatsApp gateway background service (when run on local server)
+ */
+export async function launchWhatsAppGatewayService(): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const res = await fetch('/api/whatsapp?action=launch-service', { method: 'GET' });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch {
+    // ignore
+  }
+  return { ok: false, message: 'Could not auto-launch from browser sandbox' };
+}
+
+/**
  * Disconnect WhatsApp session
  */
 export async function disconnectWhatsAppSession(

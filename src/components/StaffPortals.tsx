@@ -44,6 +44,7 @@ import {
   getWhatsAppStatus,
   startWhatsAppSession,
   disconnectWhatsAppSession,
+  launchWhatsAppGatewayService,
   sendDirectWhatsAppMessage,
 } from '@/lib/whatsappClient';
 
@@ -5108,6 +5109,27 @@ export function WhatsAppGatewaySettingsSection() {
     };
   }, [gatewayUrl, activeWorkspaceSlug]);
 
+  const handleStartService = async () => {
+    setIsStarting(true);
+    say('Attempting to start WhatsApp connector in background... ⏳');
+    const res = await launchWhatsAppGatewayService();
+    if (res.ok) {
+      say('Connector service launched! Checking connection... 🔄');
+      setTimeout(async () => {
+        const s = await getWhatsAppStatus(gatewayUrl, activeWorkspaceSlug);
+        if (s.ok) {
+          setStatus(s.status);
+          if (s.phone) setPhone(s.phone);
+          say(`WhatsApp connector is active! (${s.status}) ✅`);
+        }
+        setIsStarting(false);
+      }, 3000);
+    } else {
+      say('To start: double-click "start-whatsapp-connector.bat" on your PC, or run "setup-auto-start.bat" once so it auto-starts whenever your PC boots! 🚀');
+      setIsStarting(false);
+    }
+  };
+
   const handleConnect = async () => {
     setIsStarting(true);
     setQrCodeUrl(null);
@@ -5305,9 +5327,34 @@ export function WhatsAppGatewaySettingsSection() {
         </div>
 
         {status === 'offline' && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '8px', padding: '8px 10px', fontSize: '11.5px', color: '#fca5a5', marginBottom: '10px' }}>
-            ⚠️ Standalone connector service is not running on <code>{gatewayUrl}</code>.<br />
-            To start it locally: open terminal &rarr; <code>cd whatsapp-standalone-connector</code> &rarr; <code>npm start</code> (Runs on port 5050).
+          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '10px', padding: '12px', fontSize: '12px', color: '#fca5a5', marginBottom: '12px' }}>
+            <div style={{ fontWeight: 'bold', color: '#ef4444', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>⚠️ WhatsApp Connector is Offline</span>
+            </div>
+            <p style={{ margin: '0 0 10px 0', lineHeight: 1.4, color: '#fecaca' }}>
+              The local WhatsApp background sender is not currently running on <code>{gatewayUrl}</code>.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="chip on"
+                style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 12px', fontWeight: 'bold' }}
+                disabled={isStarting}
+                onClick={handleStartService}
+              >
+                {isStarting ? 'Starting... ⏳' : '⚡ Start Connector in Background'}
+              </button>
+              <button
+                type="button"
+                className="chip"
+                style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: '11px' }}
+                onClick={() => {
+                  say('💡 Permanent Solution: Double-click "setup-auto-start.bat" once in your project folder! It will automatically start WhatsApp in the background whenever your PC boots up.');
+                }}
+              >
+                ⚙️ Auto-Start on PC Boot
+              </button>
+            </div>
           </div>
         )}
 
