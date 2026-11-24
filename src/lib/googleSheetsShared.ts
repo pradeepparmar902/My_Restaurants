@@ -1186,23 +1186,32 @@ export function parseOrdersFromSheetRows(
     const prices: Record<number, number> = {};
     if (itemsStr) {
       const parts = itemsStr.split(',').map((p) => p.trim()).filter(Boolean);
-      for (const part of parts) {
-        const m = part.match(/^(\d+)\s*[×x]\s*(.+?)(?:\s*\(₹\s*(\d+)\))?$/i);
+      for (let pIdx = 0; pIdx < parts.length; pIdx++) {
+        const part = parts[pIdx];
+        const m = part.match(/^(\d+)\s*[×xX*]\s*(.+?)(?:\s*\([₹Rs\.]*\s*(\d+(?:\.\d+)?)\))?$/i);
         if (!m) continue;
         const qty = Number(m[1]) || 0;
         const nameLower = m[2].trim().toLowerCase();
         const lineAmt = m[3] ? Number(m[3]) : 0;
         if (qty <= 0) continue;
-        const dish = menu.find(
-          (d) =>
-            d.n.en.toLowerCase() === nameLower ||
-            d.n.hi.toLowerCase() === nameLower ||
-            d.n.gu.toLowerCase() === nameLower
-        );
+        const dish = menu.find((d) => {
+          const en = typeof d.n === 'string' ? d.n : d.n?.en || '';
+          const hi = typeof d.n === 'string' ? '' : d.n?.hi || '';
+          const gu = typeof d.n === 'string' ? '' : d.n?.gu || '';
+          return (
+            en.toLowerCase() === nameLower ||
+            (hi && hi.toLowerCase() === nameLower) ||
+            (gu && gu.toLowerCase() === nameLower)
+          );
+        });
         if (dish) {
           it[dish.id] = (it[dish.id] || 0) + qty;
           prices[dish.id] =
             lineAmt && qty ? Math.round(lineAmt / qty) : dish.p;
+        } else {
+          const synthId = -(pIdx + 1);
+          it[synthId] = qty;
+          prices[synthId] = lineAmt && qty ? Math.round(lineAmt / qty) : 0;
         }
       }
     }
@@ -1234,7 +1243,7 @@ export function parseOrdersFromSheetRows(
       return s;
     };
 
-    if (Object.keys(it).length > 0) {
+    if (Object.keys(it).length > 0 || itemsStr) {
       const isPrepaidOrder =
         paymentMethod.toLowerCase().includes('prepaid') ||
         ks === 'pending payment';

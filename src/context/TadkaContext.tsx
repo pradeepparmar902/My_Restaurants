@@ -657,7 +657,6 @@ export function TadkaProvider({
 
   useEffect(() => {
     if (!sheetOrdersToday || sheetOrdersToday.length === 0) return;
-    if (S.googleConfig?.whatsappDirectEnabled === false) return;
 
     const now = Date.now();
     let hasNewDispatches = false;
@@ -685,7 +684,7 @@ export function TadkaProvider({
       const customerMob = po.orderedByMob || po.principalMob;
       if (!customerMob) return;
 
-      const itemRows = Object.entries(po.it).map(([dishId, qty]) => {
+      let itemRows = Object.entries(po.it).map(([dishId, qty]) => {
         const dish = S.menu.find((m) => m.id === Number(dishId));
         return {
           name: typeof dish?.n === 'string' ? dish.n : (dish?.n as any)?.en || `Item #${dishId}`,
@@ -693,10 +692,30 @@ export function TadkaProvider({
           price: po.prices?.[Number(dishId)] ?? dish?.p ?? 0,
         };
       });
-      const subtotal = itemRows.reduce((acc, curr) => acc + curr.price * curr.qty, 0);
+
+      if (itemRows.length === 0 || itemRows.some((r) => r.name.startsWith('Item #-'))) {
+        if (po.itemsRaw) {
+          const rawParts = po.itemsRaw.split(',').map((p) => p.trim()).filter(Boolean);
+          itemRows = rawParts.map((rp) => {
+            const m = rp.match(/^(\d+)\s*[×xX*]\s*(.+?)(?:\s*\([₹Rs\.]*\s*(\d+(?:\.\d+)?)\))?$/i);
+            return {
+              name: m ? m[2].trim() : rp,
+              qty: m ? Number(m[1]) || 1 : 1,
+              price: m && m[3] ? Number(m[3]) : 0,
+            };
+          });
+        }
+      }
+
+      const subtotal =
+        itemRows.reduce((acc, curr) => acc + curr.price * curr.qty, 0) ||
+        po.amountInr ||
+        0;
 
       const waMsg = formatOrderConfirmationMessage({
-        restaurantName: (S.googleConfig.restaurantName || '').trim() || 'Tadka Restaurant',
+        restaurantName:
+          (S.googleConfig.restaurantName || '').trim() ||
+          (activeWorkspaceSlug === 'bhart-dhab' ? 'Bhart Dhab' : 'Tadka Restaurant'),
         counterNo: po.counterNo || 'C1',
         tableNo: po.table || 1,
         orderId: po.id,
@@ -707,7 +726,7 @@ export function TadkaProvider({
       sendDirectWhatsAppMessage({
         to: customerMob,
         text: waMsg,
-        gatewayUrl: S.googleConfig.whatsappGatewayUrl,
+        gatewayUrl: S.googleConfig.whatsappGatewayUrl || 'http://localhost:5050',
         sessionId: activeWorkspaceSlug,
         defaultCountryCode: S.cc,
       })
@@ -729,7 +748,6 @@ export function TadkaProvider({
     }
   }, [
     sheetOrdersToday,
-    S.googleConfig?.whatsappDirectEnabled,
     S.googleConfig?.whatsappGatewayUrl,
     S.googleConfig?.restaurantName,
     S.menu,
@@ -787,7 +805,8 @@ export function TadkaProvider({
             prev.paid !== next.paid ||
             prev.billSrc !== next.billSrc ||
             prev.reel !== next.reel ||
-            prev.review !== next.review;
+            prev.review !== next.review ||
+            prev.googleConfig !== next.googleConfig;
 
           if (finalState.googleConfig?.enabled && hasDataMutation) {
             const webhookUrl = finalState.googleConfig.appsScriptWebAppUrl || '';
@@ -1255,7 +1274,7 @@ export function TadkaProvider({
 
       // Automated background WhatsApp notification dispatch
       const targetCustomerMob = normalizedOptionalMob || S.sess?.mob || S.me.mob;
-      if (targetCustomerMob && S.googleConfig.whatsappDirectEnabled !== false) {
+      if (targetCustomerMob) {
         const itemRows = Object.entries(it).map(([dishId, qty]) => {
           const dish = S.menu.find((m) => m.id === Number(dishId));
           return {
@@ -1266,7 +1285,9 @@ export function TadkaProvider({
         });
         const subtotal = itemRows.reduce((acc, curr) => acc + curr.price * curr.qty, 0);
         const waMsg = formatOrderConfirmationMessage({
-          restaurantName: (S.googleConfig.restaurantName || '').trim() || 'Tadka Restaurant',
+          restaurantName:
+            (S.googleConfig.restaurantName || '').trim() ||
+            (getActiveWorkspaceSlug() === 'bhart-dhab' ? 'Bhart Dhab' : 'Tadka Restaurant'),
           counterNo: S.sess?.no || 'C1',
           tableNo: S.activeTable,
           orderId: `ORD-${Date.now()}`,
