@@ -95,7 +95,11 @@ export function MenuTabView() {
   const currentTable = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
   const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
   const isUrlInactive = urlActiveParam === '0' || urlActiveParam === 'false';
-  const isTableLocked = currentTable ? currentTable.active === false : isUrlInactive;
+  const isTableLocked = (urlActiveParam === '1' || urlActiveParam === 'true')
+    ? false
+    : currentTable
+    ? currentTable.active === false
+    : isUrlInactive;
 
   const L: Record<string, string> = {
     en: 'RECOMMENDED FOR YOU',
@@ -1884,7 +1888,11 @@ export function OrderTabView() {
   const currentTableObj = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
   const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
   const isUrlInactive = urlActiveParam === '0' || urlActiveParam === 'false';
-  const isTableInactive = currentTableObj ? currentTableObj.active === false : isUrlInactive;
+  const isTableInactive = (urlActiveParam === '1' || urlActiveParam === 'true')
+    ? false
+    : currentTableObj
+    ? currentTableObj.active === false
+    : isUrlInactive;
 
   const rawUpiId = (S.googleConfig?.upiId || '').trim();
   const hasValidUpi = isValidUpiId(rawUpiId);
@@ -3596,7 +3604,11 @@ export function BillTabView() {
   const currentTableObj = S.tables.find((t) => Number(t.id) === Number(S.activeTable));
   const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
   const isUrlInactive = urlActiveParam === '0' || urlActiveParam === 'false';
-  const isTableInactive = currentTableObj ? currentTableObj.active === false : isUrlInactive;
+  const isTableInactive = (urlActiveParam === '1' || urlActiveParam === 'true')
+    ? false
+    : currentTableObj
+    ? currentTableObj.active === false
+    : isUrlInactive;
 
   const underPrepDishes: { name: string; qty: number; status: string }[] = [];
   S.orders

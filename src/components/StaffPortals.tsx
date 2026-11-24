@@ -7951,7 +7951,7 @@ export function AdminPortalView() {
                   : ''
               }&t=${encodeURIComponent(
                 t.token
-              )}&table=${t.id}&label=${encodeURIComponent(t.label)}`;
+              )}&table=${t.id}&label=${encodeURIComponent(t.label)}&active=${t.active !== false ? '1' : '0'}`;
               const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
                 qrTargetUrl
               )}`;

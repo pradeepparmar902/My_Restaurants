@@ -659,6 +659,7 @@ export function TadkaProvider({
             prev.orders !== next.orders ||
             prev.menu !== next.menu ||
             prev.staff !== next.staff ||
+            prev.tables !== next.tables ||
             prev.sess !== next.sess ||
             prev.hist !== next.hist ||
             prev.paid !== next.paid ||
@@ -937,8 +938,10 @@ export function TadkaProvider({
         const urlActiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('active') : null;
         const currentTable = prev.tables.find((t) => Number(t.id) === Number(prev.activeTable));
         
-        // Live state takes absolute precedence; URL parameter is only an initial fallback
-        const isTableBlocked = currentTable
+        // Scanned active=1 in QR code URL or active !== false in state unlocks the table
+        const isTableBlocked = (urlActiveParam === '1' || urlActiveParam === 'true')
+          ? false
+          : currentTable
           ? currentTable.active === false
           : (urlActiveParam === '0' || urlActiveParam === 'false');
 
@@ -3011,7 +3014,39 @@ export function TadkaProvider({
       const targetTableId = tableId || S.activeTable;
       const currentSlug = getActiveWorkspaceSlug();
 
-      // Check server endpoint where restaurant management sets table activation
+      // 1. Check URL parameter directly - if scanned QR has active=1/true, unlock immediately!
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const qActive = urlParams.get('active');
+        if (qActive === '1' || qActive === 'true') {
+          updateState((prev) => ({
+            ...prev,
+            tables: prev.tables.map((t) =>
+              Number(t.id) === Number(targetTableId) ? { ...t, active: true } : t
+            ),
+          }));
+          say(`🎉 Table ${targetTableId} is Activated! You can place your order now.`);
+          return true;
+        }
+      }
+
+      // 2. Pull latest from Google Sheets to sync staff unlock across devices
+      try {
+        if (pullFromGoogleSheetsRef.current) {
+          await pullFromGoogleSheetsRef.current(undefined, true);
+        }
+      } catch {
+        // ignore
+      }
+
+      // 3. Check current state after Google Sheet pull
+      const currentTarget = S.tables.find((t) => Number(t.id) === Number(targetTableId));
+      if (currentTarget && currentTarget.active !== false) {
+        say(`🎉 Table ${targetTableId} is Activated! You can place your order now.`);
+        return true;
+      }
+
+      // 4. Check server endpoint where restaurant management sets table activation
       try {
         const res = await fetch(
           `${getTablesApiBase()}?tenant=${encodeURIComponent(currentSlug)}&_=${Date.now()}`
@@ -3057,7 +3092,7 @@ export function TadkaProvider({
       say(`🔒 Table ${targetTableId} is not activated yet. Ask your waiter or staff to activate this table.`);
       return false;
     },
-    [S.activeTable, say, updateState]
+    [S.activeTable, S.tables, say, updateState]
   );
 
   const resetDemoState = useCallback(() => {
@@ -3707,10 +3742,28 @@ export function TadkaProvider({
             });
           }
 
+          let nextTables = prev.tables;
+          if (pulledConfig?.tablesStatusJson) {
+            try {
+              const parsedTables = JSON.parse(pulledConfig.tablesStatusJson);
+              if (Array.isArray(parsedTables)) {
+                const statusMap = new Map<number, boolean>(
+                  parsedTables.map((pt: any) => [Number(pt.id), pt.active !== false])
+                );
+                nextTables = prev.tables.map((t) =>
+                  statusMap.has(Number(t.id)) ? { ...t, active: statusMap.get(Number(t.id))! } : t
+                );
+              }
+            } catch {
+              // ignore invalid JSON
+            }
+          }
+
           const nextState: AppState = {
             ...prev,
             menu: effectiveMenu,
             staff: pulledStaff || prev.staff,
+            tables: nextTables,
             orders: nextOrders,
             cart: nextCart,
             appliedCoupon: nextAppliedCoupon,
