@@ -5112,7 +5112,13 @@ export function WhatsAppGatewaySettingsSection() {
     setIsStarting(true);
     setQrCodeUrl(null);
     try {
-      await startWhatsAppSession(gatewayUrl, activeWorkspaceSlug);
+      const initRes = await startWhatsAppSession(gatewayUrl, activeWorkspaceSlug);
+      if (!initRes.ok) {
+        setStatus('offline');
+        say(`⚠️ WhatsApp connector is offline on ${gatewayUrl}. Please run start-whatsapp-connector.bat to start it.`);
+        setIsStarting(false);
+        return;
+      }
       say('Connecting to WhatsApp gateway... QR code will appear below 📲');
 
       // Polling fallback to ensure QR code appears even if EventSource / SSE is blocked
