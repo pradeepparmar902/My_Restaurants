@@ -102,6 +102,8 @@ export function buildSheetRowsForState(
     ['tables_status_json', JSON.stringify((state.tables || []).map((t) => ({ id: t.id, active: t.active !== false }))), new Date().toISOString()],
     ['whatsapp_gateway_url', state.googleConfig?.whatsappGatewayUrl || '', new Date().toISOString()],
     ['whatsapp_direct_enabled', state.googleConfig?.whatsappDirectEnabled !== false, new Date().toISOString()],
+    ['whatsapp_header_banner_url', state.googleConfig?.whatsappHeaderBannerUrl || '', new Date().toISOString()],
+    ['whatsapp_templates_json', JSON.stringify(state.googleConfig?.whatsappTemplates || []), new Date().toISOString()],
   ];
 
   const Menu_Items: (string | number | boolean)[][] = [
@@ -854,6 +856,19 @@ export function parseConfigFromSheetRows(
     if (key === 'whatsapp_gateway_url') cfg.whatsappGatewayUrl = val;
     if (key === 'whatsapp_direct_enabled') {
       cfg.whatsappDirectEnabled = val.toLowerCase() === 'true' || val === '1';
+    }
+    if (key === 'whatsapp_header_banner_url' && val) {
+      cfg.whatsappHeaderBannerUrl = val;
+    }
+    if (key === 'whatsapp_templates_json' && val) {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          cfg.whatsappTemplates = parsed;
+        }
+      } catch {
+        // ignore invalid JSON
+      }
     }
     if (key === 'tables_status_json' && val) {
       try {

@@ -174,16 +174,17 @@ export async function disconnectWhatsAppSession(
 }
 
 /**
- * Send WhatsApp text message silently in background
+ * Send WhatsApp text or image message silently in background
  */
 export async function sendDirectWhatsAppMessage(payload: {
   to: string;
   text: string;
+  imageUrl?: string;
   gatewayUrl?: string;
   sessionId?: string;
   defaultCountryCode?: string;
 }): Promise<SendWhatsAppResult> {
-  const { to, text, gatewayUrl, sessionId = 'default', defaultCountryCode = '+91' } = payload;
+  const { to, text, imageUrl, gatewayUrl, sessionId = 'default', defaultCountryCode = '+91' } = payload;
   const normalizedNumber = normalizeWhatsAppNumber(to, defaultCountryCode);
   const targetUrl = gatewayUrl?.trim() || DEFAULT_GATEWAY_URL;
 
@@ -204,6 +205,7 @@ export async function sendDirectWhatsAppMessage(payload: {
         sessionId,
         to: normalizedNumber,
         text,
+        imageUrl,
       }),
     });
     if (res.ok) {
@@ -225,6 +227,7 @@ export async function sendDirectWhatsAppMessage(payload: {
         sessionId,
         to: normalizedNumber,
         text,
+        imageUrl,
       }),
     });
     const data = await res.json();

@@ -47,6 +47,16 @@ import {
   launchWhatsAppGatewayService,
   sendDirectWhatsAppMessage,
 } from '@/lib/whatsappClient';
+import {
+  DEFAULT_WHATSAPP_TEMPLATES,
+  TEMPLATE_VARIABLES,
+  WhatsAppTemplate,
+  WhatsAppTemplateStage,
+  WhatsAppTemplateMode,
+  TemplateVariableDef,
+  renderWhatsAppTemplate,
+  generateTaxInvoiceNumber,
+} from '@/lib/whatsappTemplates';
 
 export function ChefPortalView() {
   const {
@@ -5500,6 +5510,812 @@ export function WhatsAppGatewaySettingsSection() {
   );
 }
 
+export function WhatsAppTemplatesManagerSection() {
+  const { S, saveGoogleConfig, activeWorkspaceSlug, say } = useTadka();
+
+  // Initialize templates from config or defaults
+  const [templates, setTemplates] = useState<WhatsAppTemplate[]>(() => {
+    const existing = S.googleConfig.whatsappTemplates;
+    if (existing && Array.isArray(existing) && existing.length > 0) {
+      return existing;
+    }
+    return DEFAULT_WHATSAPP_TEMPLATES;
+  });
+
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
+    () => templates[0]?.id || 'tpl-stage1-prepaid'
+  );
+
+  const [headerBannerUrl, setHeaderBannerUrl] = useState<string>(
+    S.googleConfig.whatsappHeaderBannerUrl || ''
+  );
+
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [testMobile, setTestMobile] = useState<string>('');
+  const [isSendingTest, setIsSendingTest] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync when S.googleConfig changes externally
+  useEffect(() => {
+    if (S.googleConfig.whatsappTemplates && Array.isArray(S.googleConfig.whatsappTemplates)) {
+      setTemplates(S.googleConfig.whatsappTemplates);
+    }
+    if (typeof S.googleConfig.whatsappHeaderBannerUrl === 'string') {
+      setHeaderBannerUrl(S.googleConfig.whatsappHeaderBannerUrl);
+    }
+  }, [S.googleConfig.whatsappTemplates, S.googleConfig.whatsappHeaderBannerUrl]);
+
+  const currentTemplate = useMemo(() => {
+    return templates.find((t) => t.id === selectedTemplateId) || templates[0] || DEFAULT_WHATSAPP_TEMPLATES[0];
+  }, [templates, selectedTemplateId]);
+
+  const updateCurrentTemplate = (patch: Partial<WhatsAppTemplate>) => {
+    setTemplates((prev) =>
+      prev.map((t) => (t.id === currentTemplate.id ? { ...t, ...patch, updatedAt: new Date().toISOString() } : t))
+    );
+  };
+
+  const handleBannerUpload = (file: File | null) => {
+    if (!file || !file.type.startsWith('image/')) {
+      say('Please choose a valid image file (PNG, JPG, WebP)');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const src = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxW = 800;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxW) {
+          h = Math.round((h * maxW) / w);
+          w = maxW;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          setHeaderBannerUrl(compressed);
+          say('Restaurant banner image loaded & compressed! 🖼️✅');
+        }
+      };
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const insertVariableAtCursor = (varKey: string) => {
+    const textarea = textareaRef.current;
+    const insertion = `{{${varKey}}}`;
+    if (!textarea) {
+      updateCurrentTemplate({
+        templateText: (currentTemplate.templateText || '') + ' ' + insertion,
+      });
+      return;
+    }
+    const start = textarea.selectionStart ?? textarea.value.length;
+    const end = textarea.selectionEnd ?? textarea.value.length;
+    const oldText = currentTemplate.templateText || '';
+    const newText = oldText.substring(0, start) + insertion + oldText.substring(end);
+    updateCurrentTemplate({ templateText: newText });
+
+    setTimeout(() => {
+      textarea.focus();
+      const pos = start + insertion.length;
+      textarea.setSelectionRange(pos, pos);
+    }, 20);
+  };
+
+  const wrapSelectionWith = (prefix: string, suffix: string = prefix) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    const text = currentTemplate.templateText || '';
+    const selected = text.substring(start, end) || 'text';
+    const wrapped = `${prefix}${selected}${suffix}`;
+    const newText = text.substring(0, start) + wrapped + text.substring(end);
+    updateCurrentTemplate({ templateText: newText });
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
+    }, 20);
+  };
+
+  const handleResetStageToDefault = () => {
+    const def = DEFAULT_WHATSAPP_TEMPLATES.find((t) => t.id === currentTemplate.id);
+    if (!def) {
+      say('No default found for this stage');
+      return;
+    }
+    updateCurrentTemplate({
+      name: def.name,
+      mode: def.mode,
+      templateText: def.templateText,
+      enabled: def.enabled,
+    });
+    say(`Reset "${currentTemplate.name}" to default template 🔄`);
+  };
+
+  const handleResetAllToDefault = () => {
+    if (typeof window !== 'undefined' && !window.confirm('Reset ALL WhatsApp templates to initial default system templates?')) {
+      return;
+    }
+    setTemplates(DEFAULT_WHATSAPP_TEMPLATES);
+    say('All WhatsApp templates reset to default 🔄');
+  };
+
+  const handleSaveAll = () => {
+    setIsSaving(true);
+    saveGoogleConfig({
+      whatsappTemplates: templates,
+      whatsappHeaderBannerUrl: headerBannerUrl.trim(),
+    });
+    say('WhatsApp templates & restaurant banner saved to Google Sheets! 💾✅');
+    setTimeout(() => setIsSaving(false), 600);
+  };
+
+  // Sample data dictionary for live preview
+  const sampleData = useMemo(() => {
+    const restName = S.googleConfig.restaurantName || 'Bhart Dhab';
+    const upiId = S.googleConfig.upiId || '9819984437@upi';
+    const gstRate = S.googleConfig.gstRate ?? 5;
+    const subtotal = 240;
+    const discount = 50;
+    const taxable = Math.max(0, subtotal - discount);
+    const gstAmt = Math.round((taxable * gstRate) / 100);
+    const total = taxable + gstAmt;
+    const invNo = generateTaxInvoiceNumber({ counterNo: 'C7', orderId: 'ORD-8437' });
+    const payLink = buildUpiUri({
+      upiId,
+      payeeName: restName.replace(/\s+/g, '-'),
+      amount: total,
+      note: invNo,
+    });
+
+    const socialParts: string[] = [];
+    if (S.googleConfig.googleReviewUrl) socialParts.push(`⭐ Google Review: ${S.googleConfig.googleReviewUrl}`);
+    if (S.googleConfig.instagramHandle) socialParts.push(`📸 Instagram: @${S.googleConfig.instagramHandle.replace(/^@/, '')}`);
+    if (S.googleConfig.facebookUrl) socialParts.push(`👍 Facebook: ${S.googleConfig.facebookUrl}`);
+    if (socialParts.length === 0) {
+      socialParts.push('⭐ Google Review: https://g.page/r/bhart-dhab-review', '📸 Instagram: @bhartdhab');
+    }
+
+    const offerParts: string[] = [];
+    if (S.googleConfig.rewardRules?.couponCode) {
+      offerParts.push(`🎉 Use code *${S.googleConfig.rewardRules.couponCode}* for ₹${S.googleConfig.rewardRules.couponValue || 50} OFF`);
+    }
+    offerParts.push('🌟 Collect 5 stars to unlock a Free Welcome Dessert on your next visit!');
+
+    const { dateFormatted, timeFormatted } = formatIndianDateTime(new Date().toISOString());
+
+    return {
+      restaurantName: restName,
+      restaurantTagline: S.googleConfig.restaurantTagline || 'Authentic Flavors, Fresh Every Day',
+      greetings: 'Namaste! Welcome to Bhart Dhab 🙏',
+      customerName: 'Pradeep',
+      customerMobile: '+919819984437',
+      counterNo: 'C7',
+      tableNo: 'Table 3',
+      orderId: 'ORD-8437',
+      orderStatusText: '👨‍🍳 Your order has been sent to the kitchen and is under preparation!',
+      itemsSummaryText: '• 1× Paneer Kathi Roll = ₹100\n• 2× Mango Masala Cooler = ₹140',
+      invoiceNo: invNo,
+      invoiceDate: `${dateFormatted}, ${timeFormatted}`,
+      gstin: S.googleConfig.gstin ? `🏛️ GSTIN: ${S.googleConfig.gstin}` : '🏛️ GSTIN: 27AABCU9603R1ZM',
+      subtotal,
+      discountAmount: discount,
+      gstRate,
+      gstAmount: gstAmt,
+      totalAmount: total,
+      paymentLink: payLink,
+      socialLinksText: socialParts.join('\n'),
+      currentOffersText: offerParts.join('\n'),
+    };
+  }, [S.googleConfig]);
+
+  const livePreviewText = useMemo(() => {
+    return renderWhatsAppTemplate(currentTemplate.templateText || '', sampleData);
+  }, [currentTemplate.templateText, sampleData]);
+
+  const handleSendTestMessage = async () => {
+    const rawMob = testMobile.trim().replace(/\D/g, '');
+    if (rawMob.length < 10) {
+      say('Please enter a 10-digit mobile number for WhatsApp test');
+      return;
+    }
+    setIsSendingTest(true);
+    try {
+      const gatewayUrl = S.googleConfig.whatsappGatewayUrl || 'http://localhost:5050';
+      const res = await sendDirectWhatsAppMessage({
+        to: rawMob,
+        text: livePreviewText,
+        imageUrl: headerBannerUrl.trim() || undefined,
+        gatewayUrl,
+        sessionId: activeWorkspaceSlug,
+      });
+      if (res.ok) {
+        say(`Test WhatsApp template delivered to ${rawMob}! 📲✅`);
+      } else {
+        say(`Failed to send test: ${res.error || 'Check gateway connection'}`);
+      }
+    } catch (err: any) {
+      say(`Error: ${err?.message || 'Failed to dispatch test message'}`);
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
+  const filteredVariables = useMemo(() => {
+    if (activeCategory === 'all') return TEMPLATE_VARIABLES;
+    return TEMPLATE_VARIABLES.filter((v) => v.category === activeCategory);
+  }, [activeCategory]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <p className="mu" style={{ margin: '0', fontSize: '12px', lineHeight: 1.5 }}>
+        Customize WhatsApp messages for every stage of your restaurant. Drag &amp; drop or click variables like{' '}
+        <code>{'{{invoice_no}}'}</code>, <code>{'{{payment_link}}'}</code>, <code>{'{{gst_amount}}'}</code>,{' '}
+        <code>{'{{current_offers}}'}</code>, and upload a header banner. All changes sync directly to Google Sheets!
+      </p>
+
+      {/* 1. Restaurant Header Banner Manager */}
+      <div
+        style={{
+          background: 'rgba(0, 0, 0, 0.22)',
+          borderRadius: '12px',
+          padding: '12px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+        }}
+      >
+        <div className="row sp" style={{ marginBottom: '8px' }}>
+          <div>
+            <b style={{ fontSize: '13px' }}>🖼️ Restaurant Header Banner (All Templates)</b>
+            <div className="mu" style={{ fontSize: '11px' }}>
+              Sent as the top visual header image with every WhatsApp message
+            </div>
+          </div>
+          {headerBannerUrl && (
+            <button
+              type="button"
+              className="chip"
+              style={{ fontSize: '11px', color: '#f87171', borderColor: '#f87171' }}
+              onClick={() => {
+                setHeaderBannerUrl('');
+                say('Header banner cleared');
+              }}
+            >
+              🗑️ Clear Banner
+            </button>
+          )}
+        </div>
+
+        {/* Banner Preview & Controls */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {headerBannerUrl ? (
+            <div
+              style={{
+                width: '180px',
+                height: '90px',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                background: '#111',
+                border: '1px solid #444',
+                position: 'relative',
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={headerBannerUrl}
+                alt="Restaurant Banner Preview"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+          ) : (
+            <div
+              style={{
+                width: '180px',
+                height: '90px',
+                borderRadius: '8px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px dashed #666',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                color: '#888',
+                textAlign: 'center',
+                padding: '6px',
+              }}
+            >
+              No Banner Image
+            </div>
+          )}
+
+          <div style={{ flex: 1, minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className="row" style={{ gap: '6px' }}>
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    handleBannerUpload(e.target.files[0]);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="chip on"
+                style={{ fontSize: '11.5px' }}
+                onClick={() => bannerInputRef.current?.click()}
+              >
+                📁 Upload Banner File
+              </button>
+            </div>
+            <div style={{ fontSize: '11px', color: '#aaa' }}>Or paste an image web URL:</div>
+            <input
+              value={headerBannerUrl}
+              onChange={(e) => setHeaderBannerUrl(e.target.value)}
+              placeholder="https://example.com/restaurant-banner.jpg"
+              className="inp"
+              style={{ width: '100%', fontSize: '11.5px' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Stage Switcher Tabs */}
+      <div>
+        <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+          Select Message Stage to Edit:
+        </div>
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
+          {templates.map((tpl) => {
+            const isSelected = tpl.id === currentTemplate.id;
+            let icon = '💬';
+            if (tpl.stage === 'order_prepaid') icon = '💳';
+            else if (tpl.stage === 'order_postpaid') icon = '👨‍🍳';
+            else if (tpl.stage === 'order_delivered') icon = '🍱';
+            else if (tpl.stage === 'bill_dispatch') icon = '🧾';
+            else if (tpl.stage === 'feedback') icon = '⭐';
+            else if (tpl.stage === 'special_offer') icon = '🎉';
+
+            return (
+              <button
+                key={tpl.id}
+                type="button"
+                className={`chip ${isSelected ? 'on' : ''}`}
+                style={{
+                  fontSize: '11.5px',
+                  whiteSpace: 'nowrap',
+                  fontWeight: isSelected ? 700 : 500,
+                  border: isSelected ? '1px solid #10b981' : undefined,
+                  opacity: tpl.enabled ? 1 : 0.6,
+                }}
+                onClick={() => setSelectedTemplateId(tpl.id)}
+              >
+                <span>{icon}</span>
+                <span>{tpl.name.split(':')[0] || tpl.name}</span>
+                {!tpl.enabled && <span style={{ fontSize: '10px', color: '#f87171' }}>(Off)</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3. Stage Configuration & Mode Selector */}
+      <div
+        style={{
+          background: 'rgba(255, 255, 255, 0.03)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '10px',
+          padding: '10px 12px',
+        }}
+      >
+        <div className="row sp" style={{ flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '2px' }}>Template Title:</div>
+            <input
+              value={currentTemplate.name}
+              onChange={(e) => updateCurrentTemplate({ name: e.target.value })}
+              className="inp"
+              style={{ width: '100%', fontWeight: 600, fontSize: '12.5px' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {/* Mode Selector */}
+            <div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '2px' }}>Applies To:</div>
+              <div className="row" style={{ gap: '4px' }}>
+                <button
+                  type="button"
+                  className={`chip ${currentTemplate.mode === 'prepaid' ? 'on' : ''}`}
+                  style={{ fontSize: '11px', padding: '3px 8px' }}
+                  onClick={() => updateCurrentTemplate({ mode: 'prepaid' })}
+                >
+                  💳 Prepaid
+                </button>
+                <button
+                  type="button"
+                  className={`chip ${currentTemplate.mode === 'postpaid' ? 'on' : ''}`}
+                  style={{ fontSize: '11px', padding: '3px 8px' }}
+                  onClick={() => updateCurrentTemplate({ mode: 'postpaid' })}
+                >
+                  👨‍🍳 Postpaid
+                </button>
+                <button
+                  type="button"
+                  className={`chip ${currentTemplate.mode === 'both' ? 'on' : ''}`}
+                  style={{ fontSize: '11px', padding: '3px 8px' }}
+                  onClick={() => updateCurrentTemplate({ mode: 'both' })}
+                >
+                  🌐 Both
+                </button>
+              </div>
+            </div>
+
+            {/* Active Toggle */}
+            <div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '2px' }}>Status:</div>
+              <button
+                type="button"
+                className={`chip ${currentTemplate.enabled ? 'on' : ''}`}
+                style={{ fontSize: '11px', padding: '3px 8px' }}
+                onClick={() => updateCurrentTemplate({ enabled: !currentTemplate.enabled })}
+              >
+                {currentTemplate.enabled ? '🟢 Active' : '⚪ Disabled'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Drag & Drop / Clickable Variable Chips Toolbar */}
+      <div
+        style={{
+          background: 'rgba(0, 0, 0, 0.28)',
+          borderRadius: '10px',
+          padding: '10px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+        }}
+      >
+        <div className="row sp" style={{ marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+          <b style={{ fontSize: '12px' }}>✨ Drag &amp; Drop or Click Variables to Insert:</b>
+          <div className="row" style={{ gap: '4px' }}>
+            {(['all', 'core', 'order', 'billing', 'links'] as const).map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                className={`chip ${activeCategory === cat ? 'on' : ''}`}
+                style={{ fontSize: '10.5px', padding: '2px 7px' }}
+                onClick={() => setActiveCategory(cat)}
+              >
+                {cat === 'all'
+                  ? 'All'
+                  : cat === 'core'
+                    ? 'Brand'
+                    : cat === 'order'
+                      ? 'Order/Kitchen'
+                      : cat === 'billing'
+                        ? 'Bill/GST'
+                        : 'Links/Offers'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Chips list */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '130px', overflowY: 'auto' }}>
+          {filteredVariables.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/plain', `{{${v.key}}}`);
+              }}
+              onClick={() => insertVariableAtCursor(v.key)}
+              title={`${v.description} (e.g. ${v.example})`}
+              className="chip"
+              style={{
+                fontSize: '11px',
+                padding: '3px 8px',
+                cursor: 'pointer',
+                background: 'rgba(16, 185, 129, 0.1)',
+                borderColor: '#10b981',
+                color: '#6ee7b7',
+              }}
+            >
+              + {`{{${v.key}}}`}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: '10.5px', color: '#94a3b8', marginTop: '6px' }}>
+          💡 <i>Tip: Click any variable chip to insert at current cursor position, or drag into the text editor.</i>
+        </div>
+      </div>
+
+      {/* 5. Editor & Live WhatsApp Bubble Simulation Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '12px' }}>
+        {/* Left: Template Text Editor */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div className="row sp">
+            <b style={{ fontSize: '12px' }}>✏️ Template Text Editor:</b>
+            <div className="row" style={{ gap: '4px' }}>
+              <button
+                type="button"
+                className="chip"
+                style={{ fontSize: '10.5px', padding: '2px 6px' }}
+                onClick={() => wrapSelectionWith('*')}
+                title="Bold (*text*)"
+              >
+                <b>B</b>
+              </button>
+              <button
+                type="button"
+                className="chip"
+                style={{ fontSize: '10.5px', padding: '2px 6px' }}
+                onClick={() => wrapSelectionWith('_')}
+                title="Italic (_text_)"
+              >
+                <i>I</i>
+              </button>
+              <button
+                type="button"
+                className="chip"
+                style={{ fontSize: '10.5px', padding: '2px 6px' }}
+                onClick={() => wrapSelectionWith('~')}
+                title="Strikethrough (~text~)"
+              >
+                <s>S</s>
+              </button>
+              <button
+                type="button"
+                className="chip"
+                style={{ fontSize: '10.5px', padding: '2px 6px' }}
+                onClick={() => insertVariableAtCursor('payment_link')}
+                title="Insert Payment Link"
+              >
+                🔗 Pay Link
+              </button>
+              <button
+                type="button"
+                className="chip"
+                style={{ fontSize: '10.5px', padding: '2px 6px' }}
+                onClick={handleResetStageToDefault}
+                title="Reset this stage to default"
+              >
+                🔄 Reset
+              </button>
+            </div>
+          </div>
+
+          <textarea
+            ref={textareaRef}
+            value={currentTemplate.templateText}
+            onChange={(e) => updateCurrentTemplate({ templateText: e.target.value })}
+            onDrop={(e) => {
+              e.preventDefault();
+              const droppedData = e.dataTransfer.getData('text/plain');
+              if (droppedData) {
+                const textarea = textareaRef.current;
+                if (!textarea) return;
+                const start = textarea.selectionStart ?? textarea.value.length;
+                const end = textarea.selectionEnd ?? textarea.value.length;
+                const oldText = currentTemplate.templateText || '';
+                const newText = oldText.substring(0, start) + droppedData + oldText.substring(end);
+                updateCurrentTemplate({ templateText: newText });
+              }
+            }}
+            placeholder="Type your WhatsApp template here..."
+            className="inp"
+            style={{
+              width: '100%',
+              minHeight: '280px',
+              fontFamily: 'monospace',
+              fontSize: '12px',
+              lineHeight: 1.5,
+              resize: 'vertical',
+              padding: '10px',
+              background: '#0d1117',
+              color: '#f0f6fc',
+              border: '1px solid #30363d',
+              borderRadius: '8px',
+            }}
+          />
+        </div>
+
+        {/* Right: Live WhatsApp Chat Simulation Bubble */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div className="row sp">
+            <b style={{ fontSize: '12px' }}>📱 Live Customer WhatsApp Preview:</b>
+            <span style={{ fontSize: '11px', color: '#10b981' }}>● Real-time Simulation</span>
+          </div>
+
+          {/* WhatsApp Window Shell */}
+          <div
+            style={{
+              background: '#0b141a',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              border: '1px solid #222d34',
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: '280px',
+            }}
+          >
+            {/* WhatsApp Header Bar */}
+            <div
+              style={{
+                background: '#202c33',
+                padding: '8px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+              }}
+            >
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: '#128c7e',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  color: '#fff',
+                }}
+              >
+                {(S.googleConfig.restaurantName || 'B')[0]}
+              </div>
+              <div>
+                <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#e9edef' }}>
+                  {S.googleConfig.restaurantName || 'Bhart Dhab'}
+                </div>
+                <div style={{ fontSize: '10.5px', color: '#8696a0' }}>Online · Business Account</div>
+              </div>
+            </div>
+
+            {/* Chat Body */}
+            <div
+              style={{
+                padding: '12px',
+                background: 'linear-gradient(rgba(11, 20, 26, 0.96), rgba(11, 20, 26, 0.96)), repeating-linear-gradient(45deg, #0b141a, #0b141a 10px, #111b21 10px, #111b21 20px)',
+                flex: 1,
+                overflowY: 'auto',
+                maxHeight: '380px',
+              }}
+            >
+              {/* WhatsApp Message Bubble */}
+              <div
+                style={{
+                  background: '#005c4b',
+                  color: '#e9edef',
+                  borderRadius: '8px 8px 2px 8px',
+                  padding: headerBannerUrl ? '0' : '8px 10px',
+                  maxWidth: '92%',
+                  marginLeft: 'auto',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
+                  overflow: 'hidden',
+                  position: 'relative',
+                }}
+              >
+                {/* Header Banner Preview in Bubble */}
+                {headerBannerUrl && (
+                  <div style={{ width: '100%', maxHeight: '140px', overflow: 'hidden', background: '#000' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={headerBannerUrl}
+                      alt="WhatsApp Header Banner"
+                      style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }}
+                    />
+                  </div>
+                )}
+
+                <div style={{ padding: headerBannerUrl ? '8px 10px' : '0' }}>
+                  <div
+                    style={{
+                      whiteSpace: 'pre-wrap',
+                      fontSize: '11.5px',
+                      lineHeight: 1.45,
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {livePreviewText}
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      gap: '3px',
+                      fontSize: '10px',
+                      color: '#8696a0',
+                      marginTop: '4px',
+                    }}
+                  >
+                    <span>08:30 AM</span>
+                    <span style={{ color: '#53bdeb', fontWeight: 'bold' }}>✓✓</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 6. Action Bar: Save & Test Dispatch */}
+      <div
+        style={{
+          borderTop: '1px dashed #5a4690',
+          paddingTop: '12px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px',
+        }}
+      >
+        <div className="row" style={{ gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="chip on"
+            style={{ fontWeight: 700 }}
+            disabled={isSaving}
+            onClick={handleSaveAll}
+          >
+            {isSaving ? 'Saving... ⏳' : '💾 Save & Sync WhatsApp Templates'}
+          </button>
+
+          <button
+            type="button"
+            className="chip"
+            style={{ fontSize: '11px', color: '#f87171' }}
+            onClick={handleResetAllToDefault}
+          >
+            ⚠️ Reset All Templates to Default
+          </button>
+        </div>
+
+        {/* Live Test Send */}
+        <div className="row" style={{ gap: '6px', flex: 1, maxWidth: '340px' }}>
+          <input
+            value={testMobile}
+            onChange={(e) => setTestMobile(e.target.value)}
+            placeholder="10-digit mobile number"
+            className="inp"
+            style={{ flex: 1, fontSize: '11.5px' }}
+          />
+          <button
+            type="button"
+            className="chip on"
+            style={{ fontSize: '11.5px', whiteSpace: 'nowrap' }}
+            disabled={isSendingTest}
+            onClick={handleSendTestMessage}
+          >
+            {isSendingTest ? 'Sending... ⏳' : '📲 Send Test'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AdminPortalView() {
   const {
     S,
@@ -5661,6 +6477,7 @@ export function AdminPortalView() {
     team: true,
     giveAccess: false,
     whatsappBill: false,
+    whatsappTemplates: false,
     billingWorkflow: true,
     gstSettings: false,
     rewardMaster: false,
@@ -5682,6 +6499,7 @@ export function AdminPortalView() {
       team: val,
       giveAccess: val,
       whatsappBill: val,
+      whatsappTemplates: val,
       brandProfile: val,
       billingWorkflow: val,
       gstSettings: val,
@@ -5975,6 +6793,15 @@ export function AdminPortalView() {
         onToggle={() => toggleAdminSection('whatsappBill')}
       >
         <WhatsAppGatewaySettingsSection />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="📝 WhatsApp Message Templates &amp; Stage Builder"
+        badge={`${(S.googleConfig.whatsappTemplates || DEFAULT_WHATSAPP_TEMPLATES).filter((t) => t.enabled).length} Active`}
+        isOpen={!!openAdminSections.whatsappTemplates}
+        onToggle={() => toggleAdminSection('whatsappTemplates')}
+      >
+        <WhatsAppTemplatesManagerSection />
       </CollapsibleSection>
 
       <CollapsibleSection

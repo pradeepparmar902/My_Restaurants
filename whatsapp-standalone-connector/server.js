@@ -103,16 +103,24 @@ app.get('/api/qr-stream', (req, res) => {
 
 // 5. Send WhatsApp Message (Directly without opening WhatsApp)
 app.post('/api/send', async (req, res) => {
-  const { sessionId = 'default', to, text } = req.body;
+  const { sessionId = 'default', to, text, imageUrl } = req.body;
   if (!to) {
     return res.status(400).json({ error: 'Field "to" (phone number) is required.' });
   }
-  if (!text) {
-    return res.status(400).json({ error: 'Field "text" (message) is required.' });
+  if (!text && !imageUrl) {
+    return res.status(400).json({ error: 'Field "text" or "imageUrl" is required.' });
   }
 
   try {
-    const result = await waService.sendMessage(sessionId, to, text);
+    let result;
+    if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim().startsWith('http')) {
+      result = await waService.sendMedia(sessionId, to, {
+        image: { url: imageUrl.trim() },
+        caption: text || '',
+      });
+    } else {
+      result = await waService.sendMessage(sessionId, to, text);
+    }
     res.json({ ok: true, result });
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });

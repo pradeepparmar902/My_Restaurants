@@ -51,6 +51,7 @@ import {
   PulledSheetOrder,
 } from '@/lib/googleSheetsShared';
 import { formatOrderConfirmationMessage, formatBillReceiptMessage, sendDirectWhatsAppMessage } from '@/lib/whatsappClient';
+import { buildOrderWhatsAppPayload, buildFinalBillWhatsAppPayload } from '@/lib/whatsappTemplates';
 
 interface TadkaContextValue {
   S: AppState;
@@ -712,20 +713,28 @@ export function TadkaProvider({
         po.amountInr ||
         0;
 
-      const waMsg = formatOrderConfirmationMessage({
-        restaurantName:
-          (S.googleConfig.restaurantName || '').trim() ||
-          (activeWorkspaceSlug === 'bhart-dhab' ? 'Bhart Dhab' : 'Tadka Restaurant'),
+      const { text: waMsg, imageUrl: bannerUrl } = buildOrderWhatsAppPayload({
+        googleConfig: S.googleConfig,
+        activeWorkspaceSlug,
         counterNo: po.counterNo || 'C1',
         tableNo: po.table || 1,
         orderId: po.id,
+        businessDate: po.businessDate,
+        customerMob,
         items: itemRows,
+        itemsRaw: po.itemsRaw,
         subtotal,
+        totalAmount: po.amountInr,
+        isPrepaid:
+          po.paymentPending ||
+          S.googleConfig?.billingModel === 'prepaid' ||
+          po.paymentMethod?.toLowerCase().includes('prepaid'),
       });
 
       sendDirectWhatsAppMessage({
         to: customerMob,
         text: waMsg,
+        imageUrl: bannerUrl,
         gatewayUrl: S.googleConfig.whatsappGatewayUrl || 'http://localhost:5050',
         sessionId: activeWorkspaceSlug,
         defaultCountryCode: S.cc,
@@ -1284,13 +1293,13 @@ export function TadkaProvider({
           };
         });
         const subtotal = itemRows.reduce((acc, curr) => acc + curr.price * curr.qty, 0);
-        const waMsg = formatOrderConfirmationMessage({
-          restaurantName:
-            (S.googleConfig.restaurantName || '').trim() ||
-            (getActiveWorkspaceSlug() === 'bhart-dhab' ? 'Bhart Dhab' : 'Tadka Restaurant'),
+        const { text: waMsg, imageUrl: bannerUrl } = buildOrderWhatsAppPayload({
+          googleConfig: S.googleConfig,
+          activeWorkspaceSlug: getActiveWorkspaceSlug(),
           counterNo: S.sess?.no || 'C1',
           tableNo: S.activeTable,
           orderId: `ORD-${Date.now()}`,
+          customerMob: targetCustomerMob,
           items: itemRows,
           subtotal,
           isPrepaid: S.googleConfig.billingModel === 'prepaid',
@@ -1298,6 +1307,7 @@ export function TadkaProvider({
         sendDirectWhatsAppMessage({
           to: targetCustomerMob,
           text: waMsg,
+          imageUrl: bannerUrl,
           gatewayUrl: S.googleConfig.whatsappGatewayUrl,
           sessionId: getActiveWorkspaceSlug(),
           defaultCountryCode: S.cc,

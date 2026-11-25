@@ -75,14 +75,15 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'send') {
-      if (!to || !text) {
-        return NextResponse.json({ ok: false, error: 'Missing "to" or "text"' }, { status: 400 });
+      const { imageUrl } = body;
+      if (!to || (!text && !imageUrl)) {
+        return NextResponse.json({ ok: false, error: 'Missing "to" or message content' }, { status: 400 });
       }
 
       const res = await fetch(`${cleanGateway}/api/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, to, text }),
+        body: JSON.stringify({ sessionId, to, text, imageUrl }),
       });
       const data = await res.json();
       return NextResponse.json(data, { status: res.status });

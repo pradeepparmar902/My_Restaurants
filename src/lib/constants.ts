@@ -1,4 +1,5 @@
 import { AppState, Dish, StaffMember, Permission, StaffRoleName, DiningTable, RewardRulesConfig } from '@/types/tadka';
+import { DEFAULT_WHATSAPP_TEMPLATES } from '@/lib/whatsappTemplates';
 
 export const DEFAULT_REWARD_RULES: RewardRulesConfig = {
   minBillForStar: 0,
@@ -231,6 +232,8 @@ export const INITIAL_STATE: AppState = {
     lastSyncStatus: 'synced',
     whatsappGatewayUrl: 'http://localhost:5050',
     whatsappDirectEnabled: true,
+    whatsappHeaderBannerUrl: '',
+    whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
   },
   driveAssets: [
     {
