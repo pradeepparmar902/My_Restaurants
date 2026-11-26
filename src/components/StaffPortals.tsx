@@ -6414,59 +6414,103 @@ export function AdminPortalView() {
   const [billingModelInput, setBillingModelInput] = useState<'prepaid' | 'postpaid'>(
     S.googleConfig.billingModel || 'postpaid'
   );
+  const [paymentHubTab, setPaymentHubTab] = useState<'qr_upi' | 'recon' | 'webhook'>('qr_upi');
 
-  // Keep Admin form inputs synced when Google Sheets finishes pulling S.googleConfig
+  // Track fields being actively edited so background Google Sheets polling never overwrites user's typing
+  const dirtyFieldsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
-    setAppStyleInput(
-      S.googleConfig.appStyle === 'style6'
-        ? 'style6'
-        : S.googleConfig.appStyle === 'style5'
-          ? 'style5'
-          : S.googleConfig.appStyle === 'style4'
-            ? 'style4'
-            : S.googleConfig.appStyle === 'style3'
-              ? 'style3'
-              : S.googleConfig.appStyle === 'style2'
-                ? 'style2'
-                : 'style1'
-    );
-    setRestaurantNameInput(S.googleConfig.restaurantName || 'Tadka Truck');
-    setRestaurantTaglineInput(S.googleConfig.restaurantTagline || '');
-    if (S.googleConfig.menuLanguages?.length) {
-      setMenuLanguagesInput(S.googleConfig.menuLanguages);
-    } else if (S.googleConfig.enabledLanguages?.length) {
-      setMenuLanguagesInput(
-        DEFAULT_MENU_LANGUAGES.map((l) => ({
-          ...l,
-          enabled: S.googleConfig.enabledLanguages!.includes(l.code),
-        }))
+    dirtyFieldsRef.current.clear();
+  }, [activeWorkspaceSlug]);
+
+  // Keep Admin form inputs synced when Google Sheets finishes pulling S.googleConfig (without overwriting dirty fields)
+  useEffect(() => {
+    if (!dirtyFieldsRef.current.has('appStyle')) {
+      setAppStyleInput(
+        S.googleConfig.appStyle === 'style6'
+          ? 'style6'
+          : S.googleConfig.appStyle === 'style5'
+            ? 'style5'
+            : S.googleConfig.appStyle === 'style4'
+              ? 'style4'
+              : S.googleConfig.appStyle === 'style3'
+                ? 'style3'
+                : S.googleConfig.appStyle === 'style2'
+                  ? 'style2'
+                  : 'style1'
       );
     }
-    if (S.googleConfig.dietaryFilters) {
-      setDietaryFiltersInput(S.googleConfig.dietaryFilters);
-    } else {
-      setDietaryFiltersInput(
-        DEFAULT_DIETARY_FILTERS.map((f) => ({
-          ...f,
-          enabled:
-            f.id === 'veg'
-              ? S.googleConfig.showVegFilter !== false
-              : f.id === 'jain'
-                ? S.googleConfig.showJainFilter !== false
-                : f.enabled,
-        }))
-      );
+    if (!dirtyFieldsRef.current.has('restaurantName')) {
+      setRestaurantNameInput(S.googleConfig.restaurantName || 'Tadka Truck');
     }
-    setRevUrlInput(S.googleConfig.googleReviewUrl || '');
-    setIgHandleInput(S.googleConfig.instagramHandle || '@tadkatruck');
-    setFbUrlInput(S.googleConfig.facebookUrl || '');
-    setSocTagInput(S.googleConfig.socialTag || '#TadkaTruck @tadkatruck');
-    setUpiIdInput(S.googleConfig.upiId || '');
-    setUpiNameInput(S.googleConfig.upiName || 'Tadka Truck');
-    setGstEnabledInput(S.googleConfig.gstEnabled !== false);
-    setGstRateInput(String(S.googleConfig.gstRate ?? 5));
-    setGstModeInput(S.googleConfig.gstMode === 'item' ? 'item' : 'bill');
-    setGstinInput(S.googleConfig.gstin || '');
+    if (!dirtyFieldsRef.current.has('restaurantTagline')) {
+      setRestaurantTaglineInput(S.googleConfig.restaurantTagline || '');
+    }
+    if (!dirtyFieldsRef.current.has('menuLanguages')) {
+      if (S.googleConfig.menuLanguages?.length) {
+        setMenuLanguagesInput(S.googleConfig.menuLanguages);
+      } else if (S.googleConfig.enabledLanguages?.length) {
+        setMenuLanguagesInput(
+          DEFAULT_MENU_LANGUAGES.map((l) => ({
+            ...l,
+            enabled: S.googleConfig.enabledLanguages!.includes(l.code),
+          }))
+        );
+      }
+    }
+    if (!dirtyFieldsRef.current.has('dietaryFilters')) {
+      if (S.googleConfig.dietaryFilters) {
+        setDietaryFiltersInput(S.googleConfig.dietaryFilters);
+      } else {
+        setDietaryFiltersInput(
+          DEFAULT_DIETARY_FILTERS.map((f) => ({
+            ...f,
+            enabled:
+              f.id === 'veg'
+                ? S.googleConfig.showVegFilter !== false
+                : f.id === 'jain'
+                  ? S.googleConfig.showJainFilter !== false
+                  : f.enabled,
+          }))
+        );
+      }
+    }
+    if (!dirtyFieldsRef.current.has('googleReviewUrl')) {
+      setRevUrlInput(S.googleConfig.googleReviewUrl || '');
+    }
+    if (!dirtyFieldsRef.current.has('instagramHandle')) {
+      setIgHandleInput(S.googleConfig.instagramHandle || '@tadkatruck');
+    }
+    if (!dirtyFieldsRef.current.has('facebookUrl')) {
+      setFbUrlInput(S.googleConfig.facebookUrl || '');
+    }
+    if (!dirtyFieldsRef.current.has('socialTag')) {
+      setSocTagInput(S.googleConfig.socialTag || '#TadkaTruck @tadkatruck');
+    }
+    if (!dirtyFieldsRef.current.has('upiId')) {
+      setUpiIdInput(S.googleConfig.upiId || '');
+    }
+    if (!dirtyFieldsRef.current.has('upiName')) {
+      setUpiNameInput(S.googleConfig.upiName || 'Tadka Truck');
+    }
+    if (!dirtyFieldsRef.current.has('upiQrImageUrl')) {
+      setUpiQrImageUrlInput(S.googleConfig.upiQrImageUrl || '');
+    }
+    if (!dirtyFieldsRef.current.has('gstEnabled')) {
+      setGstEnabledInput(S.googleConfig.gstEnabled !== false);
+    }
+    if (!dirtyFieldsRef.current.has('gstRate')) {
+      setGstRateInput(String(S.googleConfig.gstRate ?? 5));
+    }
+    if (!dirtyFieldsRef.current.has('gstMode')) {
+      setGstModeInput(S.googleConfig.gstMode === 'item' ? 'item' : 'bill');
+    }
+    if (!dirtyFieldsRef.current.has('gstin')) {
+      setGstinInput(S.googleConfig.gstin || '');
+    }
+    if (!dirtyFieldsRef.current.has('billingModel')) {
+      setBillingModelInput(S.googleConfig.billingModel || 'postpaid');
+    }
   }, [S.googleConfig]);
 
   const [openAdminSections, setOpenAdminSections] = useState<
@@ -7299,7 +7343,7 @@ export function AdminPortalView() {
       </CollapsibleSection>
 
       <CollapsibleSection
-        title="💳 UPI Payment QR Code, Payment Links & ⚡ Billing Mode"
+        title="💳 QR Codes, UPI & Payments Hub (GPay / PhonePe / Paytm / Soundbox)"
         badge={`${billingModelInput === 'prepaid' ? '⚡ Prepaid (Pay First)' : '🍽️ Postpaid (Dine-in)'} · ${
           upiIdInput ? 'UPI: ' + upiIdInput : '⚠️ Set UPI ID'
         }`}
@@ -7307,348 +7351,408 @@ export function AdminPortalView() {
         onToggle={() => toggleAdminSection('billingWorkflow')}
       >
         <p className="mu" style={{ margin: '0 0 10px', fontSize: '12px' }}>
-          Configure your restaurant&apos;s direct bank UPI ID for 0%-fee customer QR payments &amp; 1-tap payment links, and choose whether dining is Prepaid or Postpaid.
+          Unified payments center: Manage your restaurant&apos;s direct bank UPI ID, live auto-generated payment QR codes, 1-tap Google Pay / PhonePe payment links, prepaid billing workflow, live bank auto-reconciliation, and incoming payment webhooks.
         </p>
 
-        <div
-          style={{
-            background: 'rgba(59, 130, 246, 0.12)',
-            borderRadius: '10px',
-            padding: '10px 12px',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
-            marginBottom: '12px',
-            fontSize: '12px',
-            lineHeight: 1.5,
-          }}
-        >
-          <b>💡 Where Payment QR Code &amp; Payment Links appear for customers:</b>
-          <ul style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
-            <li>
-              <b>⚡ In Prepaid Mode:</b> As soon as customers place an order on their phone, the <b>Payment QR Code</b> and <b>1-Tap Google Pay / PhonePe / Paytm links</b> appear immediately on screen so they pay before food preparation.
-            </li>
-            <li>
-              <b>🍽️ In Postpaid Mode:</b> Customers place orders without paying upfront. The <b>Payment QR Code</b> and <b>Payment Link</b> appear under their <b>Bill Tab</b> when ready to pay at exit, or when the waiter pushes the digital bill.
-            </li>
-          </ul>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+        {/* Unified Hub Sub-Tabs */}
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '14px', paddingBottom: '4px' }}>
           <button
             type="button"
-            className={`chip ${billingModelInput === 'postpaid' ? 'on' : ''}`}
-            style={{
-              padding: '12px 10px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '6px',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              border: billingModelInput === 'postpaid' ? '2px solid #10b981' : '1px solid #444',
-              background: billingModelInput === 'postpaid' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.03)',
-            }}
-            onClick={() => setBillingModelInput('postpaid')}
+            className={`chip ${paymentHubTab === 'qr_upi' ? 'on' : ''}`}
+            style={{ fontWeight: paymentHubTab === 'qr_upi' ? 700 : 500, fontSize: '12px', whiteSpace: 'nowrap' }}
+            onClick={() => setPaymentHubTab('qr_upi')}
           >
-            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>🍽️ Postpaid (Dine-in)</span>
-            <span style={{ fontSize: '11px', opacity: 0.85, textAlign: 'center' }}>
-              Order &rarr; Cook &amp; Serve &rarr; Pay at exit
-            </span>
-            <span style={{ fontSize: '10px', color: '#10b981', marginTop: '2px' }}>
-              Standard for restaurants &amp; dhabas
-            </span>
+            📱 Payment QR &amp; Direct UPI
           </button>
-
           <button
             type="button"
-            className={`chip ${billingModelInput === 'prepaid' ? 'on' : ''}`}
-            style={{
-              padding: '12px 10px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '6px',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              border: billingModelInput === 'prepaid' ? '2px solid #f59e0b' : '1px solid #444',
-              background: billingModelInput === 'prepaid' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.03)',
-            }}
-            onClick={() => setBillingModelInput('prepaid')}
+            className={`chip ${paymentHubTab === 'recon' ? 'on' : ''}`}
+            style={{ fontWeight: paymentHubTab === 'recon' ? 700 : 500, fontSize: '12px', whiteSpace: 'nowrap' }}
+            onClick={() => setPaymentHubTab('recon')}
           >
-            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>⚡ Prepaid (Pay First)</span>
-            <span style={{ fontSize: '11px', opacity: 0.85, textAlign: 'center' }}>
-              Order &rarr; Pay &amp; Verify &rarr; Chef cooks
-            </span>
-            <span style={{ fontSize: '10px', color: '#f59e0b', marginTop: '2px' }}>
-              Ideal for food trucks, QSRs &amp; food courts
-            </span>
+            ⚡ Live Bank Reconciliation &amp; Queue
+          </button>
+          <button
+            type="button"
+            className={`chip ${paymentHubTab === 'webhook' ? 'on' : ''}`}
+            style={{ fontWeight: paymentHubTab === 'webhook' ? 700 : 500, fontSize: '12px', whiteSpace: 'nowrap' }}
+            onClick={() => setPaymentHubTab('webhook')}
+          >
+            🔌 Webhooks &amp; Soundbox Setup
+          </button>
+          <button
+            type="button"
+            className="chip"
+            style={{ fontSize: '12px', color: '#38bdf8', borderColor: '#38bdf8', whiteSpace: 'nowrap' }}
+            onClick={() => {
+              setOpenAdminSections((prev) => ({ ...prev, tablesQr: true }));
+              setTimeout(() => {
+                const el = document.getElementById('admin-tables-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+                else say('Opened Tables & QR Code Generator below! 🪑');
+              }, 100);
+            }}
+          >
+            🪑 Table Dining QRs &rarr;
           </button>
         </div>
 
-        <div
-          style={{
-            marginTop: '14px',
-            padding: '12px',
-            borderRadius: '12px',
-            background: 'rgba(59, 130, 246, 0.08)',
-            border: '1px solid rgba(59, 130, 246, 0.25)',
-          }}
-        >
-          <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px', color: '#60a5fa' }}>
-            💳 Restaurant Direct UPI ID (Google Pay / PhonePe / Paytm / BHIM)
-          </div>
-          <p className="mu" style={{ fontSize: '11px', margin: '0 0 10px' }}>
-            Enter your real bank VPA. When customers scan or tap to pay in Prepaid or Bill tabs, 100% of money lands directly in your bank account with 0% fee.
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div>
-              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
-                Your Real UPI ID (e.g. mobile@paytm, name@okhdfcbank, hotel@icici)
-              </div>
-              <input
-                type="text"
-                value={upiIdInput}
-                onChange={(e) => setUpiIdInput(e.target.value.trim())}
-                placeholder="e.g. 9820012345@paytm, yourname@okhdfcbank"
-                className="inp"
-                style={{ width: '100%', fontFamily: 'monospace', fontSize: '13px' }}
-              />
-              {!upiIdInput.includes('@') && upiIdInput.length > 0 && (
-                <span style={{ color: '#f87171', fontSize: '11px', marginTop: '2px', display: 'block' }}>
-                  ⚠️ UPI ID must contain "@" (e.g. name@okaxis or 9820012345@paytm)
-                </span>
-              )}
-              {/(.)\1\1/.test(upiIdInput) && (
-                <span style={{ color: '#f59e0b', fontSize: '11px', marginTop: '2px', display: 'block' }}>
-                  ⚠️ Typo Warning: Your UPI ID contains 3 identical letters together (&quot;{upiIdInput.match(/(.)\1\1/)?.[0]}&quot; in {upiIdInput}). Double-check your spelling!
-                </span>
-              )}
-              <div
-                style={{
-                  marginTop: '6px',
-                  padding: '8px 10px',
-                  borderRadius: '8px',
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  border: '1px dashed #3b82f6',
-                  fontSize: '11px',
-                  lineHeight: 1.5,
-                }}
-              >
-                <b>🔍 Where to find your real UPI ID on your phone:</b>
-                <ul style={{ margin: '4px 0 0', paddingLeft: '16px' }}>
-                  <li>
-                    <b>Google Pay:</b> Tap your profile picture (top-right) &rarr; your real UPI ID is displayed right under your mobile number (e.g. <code>yourname@okhdfcbank</code>, <code>yourmobile@okaxis</code>, <code>name@okicici</code>, or <code>name@oksbi</code>).
-                  </li>
-                  <li>
-                    <b>PhonePe:</b> Tap profile picture &rarr; <b>UPI IDs</b> (e.g. <code>yourmobile@ybl</code> or <code>mobile@ibl</code>).
-                  </li>
-                  <li>
-                    <b>Paytm:</b> Tap profile icon &rarr; UPI ID (e.g. <code>yourmobile@paytm</code>).
-                  </li>
-                </ul>
-                <span style={{ color: '#fbbf24', display: 'block', marginTop: '4px' }}>
-                  ⚠️ <b>Important:</b> Test or dummy numbers (such as <code>8989898989@upi</code>) have no bank account linked and will be rejected by Google Pay with <i>&quot;No Payment account registered&quot;</i>. Please enter your real bank UPI ID to receive payments.
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
-                Payee Business / Account Name (Shown on customer's Google Pay screen)
-              </div>
-              <input
-                type="text"
-                value={upiNameInput}
-                onChange={(e) => setUpiNameInput(e.target.value)}
-                placeholder="e.g. Bharat Dhaba or Rajesh Patel"
-                className="inp"
-                style={{ width: '100%', fontSize: '13px' }}
-              />
-            </div>
-
-            <div>
-              <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
-                📸 Custom Official Standee QR Image Link (Optional 100% Reliable Backup)
-              </div>
-              <input
-                type="text"
-                value={upiQrImageUrlInput}
-                onChange={(e) => setUpiQrImageUrlInput(e.target.value)}
-                placeholder="Paste link to your official Google Pay / PhonePe merchant standee photo"
-                className="inp"
-                style={{ width: '100%', fontSize: '13px' }}
-              />
-              {upiQrImageUrlInput.includes('@') && (
-                <span style={{ color: '#f87171', fontSize: '11px', marginTop: '2px', display: 'block' }}>
-                  ⚠️ This field is for an image web URL (e.g. https://.../standee.jpg), NOT a UPI ID. Leave this field empty if you want the app to auto-generate the QR code from your UPI ID above.
-                </span>
-              )}
-              <span className="mu" style={{ fontSize: '10px' }}>
-                If provided, customers will see your exact physical standee photo instead of the generated QR. Leave empty to use auto-generated QR.
-              </span>
-            </div>
-
-            {isValidUpiId(upiIdInput) && (
-              <div
-                style={{
-                  marginTop: '10px',
-                  padding: '10px',
-                  background: '#ffffff',
-                  borderRadius: '10px',
-                  textAlign: 'center',
-                }}
-              >
-                <span style={{ color: '#111827', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
-                  🧪 Test Your Live UPI QR (Scan with your Google Pay now to verify):
-                </span>
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                    buildUpiUri({
-                      upiId: upiIdInput,
-                      payeeName: upiNameInput || 'Restaurant',
-                      amount: 1,
-                      note: 'Test Payment',
-                    })
-                  )}`}
-                  alt="Live Test QR"
-                  style={{ width: '140px', height: '140px', display: 'block', margin: '0 auto' }}
-                />
-                <span style={{ color: '#16a34a', fontSize: '11px', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
-                  ✅ Valid NPCI Format · Payee: {upiNameInput || 'Restaurant'} ({upiIdInput})
-                </span>
-
-                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <a
-                    href={buildUpiUri({
-                      upiId: upiIdInput,
-                      payeeName: upiNameInput || 'Restaurant',
-                      amount: 1,
-                      note: 'Test Payment Link',
-                    })}
-                    className="chip on"
-                    style={{ textDecoration: 'none', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                  >
-                    🔗 Test 1-Tap UPI Payment Link
-                  </a>
-                </div>
-
-                <div
-                  style={{
-                    marginTop: '8px',
-                    padding: '8px 10px',
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    textAlign: 'left',
-                    fontSize: '11px',
-                    color: '#334155',
-                    lineHeight: '1.4',
-                  }}
-                >
-                  <strong style={{ color: '#b45309' }}>⚠️ Testing with Google Pay:</strong>
-                  <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                    <li>
-                      <b>Typo Check:</b> Ensure the UPI ID is spelled exactly as registered in Google Pay. If misspelled, Google Pay reports <i>&quot;No payment account registered&quot;</i>.
-                    </li>
-                    <li>
-                      <b>Self-Pay Restriction:</b> Google Pay blocks scanning your own QR code from the same account. Scan from <b>another phone</b> or test with <b>PhonePe / Paytm / BHIM</b>.
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          className="btn alt"
-          style={{ marginTop: '12px' }}
-          onClick={async () => {
-            const nextCfg = {
-              billingModel: billingModelInput,
-              upiId: upiIdInput.trim(),
-              upiName: upiNameInput.trim() || 'Restaurant',
-              upiQrImageUrl: upiQrImageUrlInput.trim(),
-            };
-            saveGoogleConfig(nextCfg);
-            await syncToGoogleSheets(nextCfg);
-            say(`Billing model (${billingModelInput.toUpperCase()}) & UPI ID (${upiIdInput || 'Saved'}) synced ✅`);
-          }}
-        >
-          💾 Save &amp; Sync Billing Model &amp; UPI ID
-        </button>
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="⚡ Live Bank Auto-Reconciliation & Queue (GPay vs Bills)"
-        badge="Live Matcher"
-        isOpen={openAdminSections.bankRecon !== false}
-        onToggle={() => toggleAdminSection('bankRecon')}
-        wrapInCard={false}
-      >
-        <PendingPrepaidOrdersQueue title="💳 Prepaid Orders & Live Bank Auto-Reconciliation" />
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="🔌 GPay / Paytm Webhook & Hosting Notes (Option A)"
-        badge="Process Notes"
-        isOpen={!!openAdminSections.webhookNotes}
-        onToggle={() => toggleAdminSection('webhookNotes')}
-      >
-        <div style={{ fontSize: '12px', lineHeight: 1.6, color: '#e5e7eb' }}>
-          <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px dashed #3b82f6', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px' }}>
-            <b style={{ color: '#60a5fa', fontSize: '13px' }}>🌐 Hosting Architecture: GitHub Pages vs Vercel</b>
-            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#cbd5e1' }}>
-              • <b>GitHub Pages (pradeepparmar902.github.io):</b> Static client-side host. It serves HTML/JS and has no Node.js server to run incoming HTTP webhooks.<br />
-              • <b>Vercel (Recommended 100% Free):</b> Full Next.js server hosting. 1-click deploy from your GitHub repo. Supports <code>/api/payments/webhook</code> 24/7 with zero cost.<br />
-              • <b>Static Host Alternative (Option B):</b> If you host on GitHub Pages, use our <b>Option B (Android SMS-to-Sheet)</b> or <b>Customer Claimed UTR</b> which works 100% via Google Sheets without needing a server!
-            </p>
-          </div>
-
-          <b style={{ color: '#10b981', display: 'block', marginBottom: '4px' }}>
-            📡 Your Inbound Webhook Endpoint URL:
-          </b>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
-            <code style={{ background: '#111827', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', color: '#34d399', flex: 1, minWidth: '220px', overflowX: 'auto' }}>
-              {typeof window !== 'undefined' ? `${window.location.origin}/api/payments/webhook` : 'https://your-domain.com/api/payments/webhook'}
-            </code>
-            <button
-              type="button"
-              className="chip on"
-              style={{ fontSize: '11px', whiteSpace: 'nowrap' }}
-              onClick={() => {
-                const url = `${window.location.origin}/api/payments/webhook`;
-                navigator.clipboard?.writeText?.(url);
-                say(`Copied Webhook URL: ${url} 📋`);
+        {/* TAB 1: Payment QR & Direct UPI ID */}
+        {paymentHubTab === 'qr_upi' && (
+          <div>
+            <div
+              style={{
+                background: 'rgba(59, 130, 246, 0.12)',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                marginBottom: '12px',
+                fontSize: '12px',
+                lineHeight: 1.5,
               }}
             >
-              📋 Copy URL
+              <b>💡 Where Payment QR Code &amp; Payment Links appear for customers:</b>
+              <ul style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
+                <li>
+                  <b>⚡ In Prepaid Mode:</b> As soon as customers place an order on their phone, the <b>Payment QR Code</b> and <b>1-Tap Google Pay / PhonePe / Paytm links</b> appear immediately on screen so they pay before food preparation.
+                </li>
+                <li>
+                  <b>🍽️ In Postpaid Mode:</b> Customers place orders without paying upfront. The <b>Payment QR Code</b> and <b>Payment Link</b> appear under their <b>Bill Tab</b> when ready to pay at exit, or when the waiter pushes the digital bill.
+                </li>
+              </ul>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+              <button
+                type="button"
+                className={`chip ${billingModelInput === 'postpaid' ? 'on' : ''}`}
+                style={{
+                  padding: '12px 10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  border: billingModelInput === 'postpaid' ? '2px solid #10b981' : '1px solid #444',
+                  background: billingModelInput === 'postpaid' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255,255,255,0.03)',
+                }}
+                onClick={() => {
+                  dirtyFieldsRef.current.add('billingModel');
+                  setBillingModelInput('postpaid');
+                }}
+              >
+                <span style={{ fontSize: '14px', fontWeight: 'bold' }}>🍽️ Postpaid (Dine-in)</span>
+                <span style={{ fontSize: '11px', opacity: 0.85, textAlign: 'center' }}>
+                  Order &rarr; Cook &amp; Serve &rarr; Pay at exit
+                </span>
+                <span style={{ fontSize: '10px', color: '#10b981', marginTop: '2px' }}>
+                  Standard for restaurants &amp; dhabas
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className={`chip ${billingModelInput === 'prepaid' ? 'on' : ''}`}
+                style={{
+                  padding: '12px 10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  border: billingModelInput === 'prepaid' ? '2px solid #f59e0b' : '1px solid #444',
+                  background: billingModelInput === 'prepaid' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.03)',
+                }}
+                onClick={() => {
+                  dirtyFieldsRef.current.add('billingModel');
+                  setBillingModelInput('prepaid');
+                }}
+              >
+                <span style={{ fontSize: '14px', fontWeight: 'bold' }}>⚡ Prepaid (Pay First)</span>
+                <span style={{ fontSize: '11px', opacity: 0.85, textAlign: 'center' }}>
+                  Order &rarr; Pay &amp; Verify &rarr; Chef cooks
+                </span>
+                <span style={{ fontSize: '10px', color: '#f59e0b', marginTop: '2px' }}>
+                  Ideal for food trucks, QSRs &amp; food courts
+                </span>
+              </button>
+            </div>
+
+            <div
+              style={{
+                marginTop: '14px',
+                padding: '12px',
+                borderRadius: '12px',
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+              }}
+            >
+              <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px', color: '#60a5fa' }}>
+                💳 Restaurant Direct UPI ID (Google Pay / PhonePe / Paytm / BHIM)
+              </div>
+              <p className="mu" style={{ fontSize: '11px', margin: '0 0 10px' }}>
+                Enter your real bank VPA. When customers scan or tap to pay in Prepaid or Bill tabs, 100% of money lands directly in your bank account with 0% fee.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div>
+                  <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                    Your Real UPI ID (e.g. mobile@paytm, name@okhdfcbank, hotel@icici)
+                  </div>
+                  <input
+                    type="text"
+                    value={upiIdInput}
+                    onChange={(e) => {
+                      dirtyFieldsRef.current.add('upiId');
+                      setUpiIdInput(e.target.value.trim());
+                    }}
+                    placeholder="e.g. 9820012345@paytm, yourname@okhdfcbank"
+                    className="inp"
+                    style={{ width: '100%', fontFamily: 'monospace', fontSize: '13px' }}
+                  />
+                  {!upiIdInput.includes('@') && upiIdInput.length > 0 && (
+                    <span style={{ color: '#f87171', fontSize: '11px', marginTop: '2px', display: 'block' }}>
+                      ⚠️ UPI ID must contain "@" (e.g. name@okaxis or 9820012345@paytm)
+                    </span>
+                  )}
+                  {/(.)\1\1/.test(upiIdInput) && (
+                    <span style={{ color: '#f59e0b', fontSize: '11px', marginTop: '2px', display: 'block' }}>
+                      ⚠️ Typo Warning: Your UPI ID contains 3 identical letters together (&quot;{upiIdInput.match(/(.)\1\1/)?.[0]}&quot; in {upiIdInput}). Double-check your spelling!
+                    </span>
+                  )}
+                  <div
+                    style={{
+                      marginTop: '6px',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      border: '1px dashed #3b82f6',
+                      fontSize: '11px',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <b>🔍 Where to find your real UPI ID on your phone:</b>
+                    <ul style={{ margin: '4px 0 0', paddingLeft: '16px' }}>
+                      <li>
+                        <b>Google Pay:</b> Tap your profile picture (top-right) &rarr; your real UPI ID is displayed right under your mobile number (e.g. <code>yourname@okhdfcbank</code>, <code>yourmobile@okaxis</code>, <code>name@okicici</code>, or <code>name@oksbi</code>).
+                      </li>
+                      <li>
+                        <b>PhonePe:</b> Tap profile picture &rarr; <b>UPI IDs</b> (e.g. <code>yourmobile@ybl</code> or <code>mobile@ibl</code>).
+                      </li>
+                      <li>
+                        <b>Paytm:</b> Tap profile icon &rarr; UPI ID (e.g. <code>yourmobile@paytm</code>).
+                      </li>
+                    </ul>
+                    <span style={{ color: '#fbbf24', display: 'block', marginTop: '4px' }}>
+                      ⚠️ <b>Important:</b> Test or dummy numbers (such as <code>8989898989@upi</code>) have no bank account linked and will be rejected by Google Pay with <i>&quot;No Payment account registered&quot;</i>. Please enter your real bank UPI ID to receive payments.
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                    Payee Business / Account Name (Shown on customer's Google Pay screen)
+                  </div>
+                  <input
+                    type="text"
+                    value={upiNameInput}
+                    onChange={(e) => {
+                      dirtyFieldsRef.current.add('upiName');
+                      setUpiNameInput(e.target.value);
+                    }}
+                    placeholder="e.g. Bharat Dhaba or Rajesh Patel"
+                    className="inp"
+                    style={{ width: '100%', fontSize: '13px' }}
+                  />
+                </div>
+
+                <div>
+                  <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                    📸 Custom Official Standee QR Image Link (Optional 100% Reliable Backup)
+                  </div>
+                  <input
+                    type="text"
+                    value={upiQrImageUrlInput}
+                    onChange={(e) => {
+                      dirtyFieldsRef.current.add('upiQrImageUrl');
+                      setUpiQrImageUrlInput(e.target.value);
+                    }}
+                    placeholder="Paste link to your official Google Pay / PhonePe merchant standee photo"
+                    className="inp"
+                    style={{ width: '100%', fontSize: '13px' }}
+                  />
+                  {upiQrImageUrlInput.includes('@') && (
+                    <span style={{ color: '#f87171', fontSize: '11px', marginTop: '2px', display: 'block' }}>
+                      ⚠️ This field is for an image web URL (e.g. https://.../standee.jpg), NOT a UPI ID. Leave this field empty if you want the app to auto-generate the QR code from your UPI ID above.
+                    </span>
+                  )}
+                  <span className="mu" style={{ fontSize: '10px' }}>
+                    If provided, customers will see your exact physical standee photo instead of the generated QR. Leave empty to use auto-generated QR.
+                  </span>
+                </div>
+
+                {isValidUpiId(upiIdInput) && (
+                  <div
+                    style={{
+                      marginTop: '10px',
+                      padding: '10px',
+                      background: '#ffffff',
+                      borderRadius: '10px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <span style={{ color: '#111827', fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+                      🧪 Test Your Live UPI QR (Scan with your Google Pay now to verify):
+                    </span>
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                        buildUpiUri({
+                          upiId: upiIdInput,
+                          payeeName: upiNameInput || 'Restaurant',
+                          amount: 1,
+                          note: 'Test Payment',
+                        })
+                      )}`}
+                      alt="Live Test QR"
+                      style={{ width: '140px', height: '140px', display: 'block', margin: '0 auto' }}
+                    />
+                    <span style={{ color: '#16a34a', fontSize: '11px', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
+                      ✅ Valid NPCI Format · Payee: {upiNameInput || 'Restaurant'} ({upiIdInput})
+                    </span>
+
+                    <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <a
+                        href={buildUpiUri({
+                          upiId: upiIdInput,
+                          payeeName: upiNameInput || 'Restaurant',
+                          amount: 1,
+                          note: 'Test Payment Link',
+                        })}
+                        className="chip on"
+                        style={{ textDecoration: 'none', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        🔗 Test 1-Tap UPI Payment Link
+                      </a>
+                    </div>
+
+                    <div
+                      style={{
+                        marginTop: '8px',
+                        padding: '8px 10px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        textAlign: 'left',
+                        fontSize: '11px',
+                        color: '#334155',
+                        lineHeight: '1.4',
+                      }}
+                    >
+                      <strong style={{ color: '#b45309' }}>⚠️ Testing with Google Pay:</strong>
+                      <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                        <li>
+                          <b>Typo Check:</b> Ensure the UPI ID is spelled exactly as registered in Google Pay. If misspelled, Google Pay reports <i>&quot;No payment account registered&quot;</i>.
+                        </li>
+                        <li>
+                          <b>Self-Pay Restriction:</b> Google Pay blocks scanning your own QR code from the same account. Scan from <b>another phone</b> or test with <b>PhonePe / Paytm / BHIM</b>.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="btn alt"
+              style={{ marginTop: '12px' }}
+              onClick={async () => {
+                const nextCfg = {
+                  billingModel: billingModelInput,
+                  upiId: upiIdInput.trim(),
+                  upiName: upiNameInput.trim() || 'Restaurant',
+                  upiQrImageUrl: upiQrImageUrlInput.trim(),
+                };
+                dirtyFieldsRef.current.delete('upiId');
+                dirtyFieldsRef.current.delete('upiName');
+                dirtyFieldsRef.current.delete('upiQrImageUrl');
+                dirtyFieldsRef.current.delete('billingModel');
+                saveGoogleConfig(nextCfg);
+                await syncToGoogleSheets(nextCfg);
+                say(`Billing model (${billingModelInput.toUpperCase()}) & UPI ID (${upiIdInput || 'Saved'}) synced ✅`);
+              }}
+            >
+              💾 Save &amp; Sync Billing Model &amp; UPI ID
             </button>
           </div>
+        )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #374151', borderRadius: '8px', padding: '10px' }}>
-              <b style={{ color: '#38bdf8', fontSize: '12px' }}>🔹 Paytm for Business Setup:</b>
-              <ol style={{ margin: '6px 0 0', paddingLeft: '16px', fontSize: '11px', color: '#9ca3af' }}>
-                <li>Log in to <b>dashboard.paytm.com</b>.</li>
-                <li>Go to <b>Developer Settings</b> &gt; <b>Webhooks</b>.</li>
-                <li>Paste your webhook URL above.</li>
-                <li>Subscribe to <b>Payment Success (TXN_SUCCESS)</b> and Save.</li>
-              </ol>
+        {/* TAB 2: Live Bank Auto-Reconciliation */}
+        {paymentHubTab === 'recon' && (
+          <div style={{ marginTop: '6px' }}>
+            <PendingPrepaidOrdersQueue title="💳 Prepaid Orders & Live Bank Auto-Reconciliation" />
+          </div>
+        )}
+
+        {/* TAB 3: Webhooks & Soundbox Setup */}
+        {paymentHubTab === 'webhook' && (
+          <div style={{ fontSize: '12px', lineHeight: 1.6, color: '#e5e7eb', marginTop: '6px' }}>
+            <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px dashed #3b82f6', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px' }}>
+              <b style={{ color: '#60a5fa', fontSize: '13px' }}>🌐 Hosting Architecture: GitHub Pages vs Vercel</b>
+              <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#cbd5e1' }}>
+                • <b>GitHub Pages (pradeepparmar902.github.io):</b> Static client-side host. It serves HTML/JS and has no Node.js server to run incoming HTTP webhooks.<br />
+                • <b>Vercel (Recommended 100% Free):</b> Full Next.js server hosting. 1-click deploy from your GitHub repo. Supports <code>/api/payments/webhook</code> 24/7 with zero cost.<br />
+                • <b>Static Host Alternative (Option B):</b> If you host on GitHub Pages, use our <b>Option B (Android SMS-to-Sheet)</b> or <b>Customer Claimed UTR</b> which works 100% via Google Sheets without needing a server!
+              </p>
             </div>
 
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #374151', borderRadius: '8px', padding: '10px' }}>
-              <b style={{ color: '#4ade80', fontSize: '12px' }}>🔹 Google Pay for Business Setup:</b>
-              <ol style={{ margin: '6px 0 0', paddingLeft: '16px', fontSize: '11px', color: '#9ca3af' }}>
-                <li>Log in to <b>business.google.com/payments</b>.</li>
-                <li>Go to <b>Settings</b> &gt; <b>Integrations &amp; Callbacks</b>.</li>
-                <li>Paste your webhook URL into Notification Webhook.</li>
-                <li>Enable <b>Transaction Credit (SUCCESS)</b> and Save.</li>
-              </ol>
+            <b style={{ color: '#10b981', display: 'block', marginBottom: '4px' }}>
+              📡 Your Inbound Webhook Endpoint URL:
+            </b>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
+              <code style={{ background: '#111827', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', color: '#34d399', flex: 1, minWidth: '220px', overflowX: 'auto' }}>
+                {typeof window !== 'undefined' ? `${window.location.origin}/api/payments/webhook` : 'https://your-domain.com/api/payments/webhook'}
+              </code>
+              <button
+                type="button"
+                className="chip on"
+                style={{ fontSize: '11px', whiteSpace: 'nowrap' }}
+                onClick={() => {
+                  const url = `${window.location.origin}/api/payments/webhook`;
+                  navigator.clipboard?.writeText?.(url);
+                  say(`Copied Webhook URL: ${url} 📋`);
+                }}
+              >
+                📋 Copy URL
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #374151', borderRadius: '8px', padding: '10px' }}>
+                <b style={{ color: '#38bdf8', fontSize: '12px' }}>🔹 Paytm for Business Setup:</b>
+                <ol style={{ margin: '6px 0 0', paddingLeft: '16px', fontSize: '11px', color: '#9ca3af' }}>
+                  <li>Log in to <b>dashboard.paytm.com</b>.</li>
+                  <li>Go to <b>Developer Settings</b> &gt; <b>Webhooks</b>.</li>
+                  <li>Paste your webhook URL above.</li>
+                  <li>Subscribe to <b>Payment Success (TXN_SUCCESS)</b> and Save.</li>
+                </ol>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #374151', borderRadius: '8px', padding: '10px' }}>
+                <b style={{ color: '#4ade80', fontSize: '12px' }}>🔹 Google Pay for Business Setup:</b>
+                <ol style={{ margin: '6px 0 0', paddingLeft: '16px', fontSize: '11px', color: '#9ca3af' }}>
+                  <li>Log in to <b>business.google.com/payments</b>.</li>
+                  <li>Go to <b>Settings</b> &gt; <b>Integrations &amp; Callbacks</b>.</li>
+                  <li>Paste your webhook URL into Notification Webhook.</li>
+                  <li>Enable <b>Transaction Credit (SUCCESS)</b> and Save.</li>
+                </ol>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </CollapsibleSection>
 
       <CollapsibleSection
@@ -8768,9 +8872,9 @@ export function AdminPortalView() {
         )}
       </div>
 
-      <div className="card">
+      <div className="card" id="admin-tables-section">
         <div className="row sp">
-          <h3>📱 Tables & QR Code Generator</h3>
+          <h3>📱 Tables &amp; QR Code Generator</h3>
           <div className="row" style={{ gap: '6px' }}>
             <button
               className="chip"
@@ -9155,88 +9259,31 @@ export function AdminPortalView() {
               style={{ width: '100%' }}
             />
           </div>
-          <div>
-            <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
-              💳 Direct UPI ID for 0%-Fee Customer QR Payments
-            </div>
-            <input
-              value={upiIdInput}
-              onChange={(e) => setUpiIdInput(e.target.value)}
-              placeholder="e.g. tadkatruck@okicici"
-              className="inp"
-              style={{ width: '100%' }}
-            />
-          </div>
-          <div>
-            <div className="mu" style={{ fontSize: '11px', marginBottom: '3px' }}>
-              🏪 UPI Payee Display Name
-            </div>
-            <input
-              value={upiNameInput}
-              onChange={(e) => setUpiNameInput(e.target.value)}
-              placeholder="Tadka Truck"
-              className="inp"
-              style={{ width: '100%' }}
-            />
-          </div>
           <div
             style={{
-              marginTop: '12px',
-              padding: '12px',
-              background: 'rgba(255,255,255,0.04)',
-              borderRadius: '12px',
-              border: '1px solid #382562',
+              marginTop: '10px',
+              padding: '10px 12px',
+              background: 'rgba(59, 130, 246, 0.08)',
+              border: '1px dashed #3b82f6',
+              borderRadius: '8px',
+              fontSize: '12px',
             }}
           >
-            <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '4px' }}>
-              ⚡ Restaurant Billing Model (Prepaid vs Postpaid)
-            </div>
-            <p className="mu" style={{ fontSize: '11px', margin: '0 0 10px' }}>
-              Choose whether customer &amp; waiter orders must be paid upfront before the chef starts cooking, or paid after dining.
+            <b>💳 Looking for UPI ID, Payment QR &amp; Billing Settings?</b>
+            <p className="mu" style={{ margin: '3px 0 8px', fontSize: '11px' }}>
+              All UPI configuration, payment QR codes, live bank reconciliation, and billing modes are located in the dedicated master section above:
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <button
-                type="button"
-                className={`chip ${billingModelInput === 'postpaid' ? 'on' : ''}`}
-                style={{
-                  padding: '10px 8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  border: billingModelInput === 'postpaid' ? '2px solid #10b981' : '1px solid #444',
-                }}
-                onClick={() => setBillingModelInput('postpaid')}
-              >
-                <span style={{ fontSize: '13px', fontWeight: 'bold' }}>🍽️ Postpaid (Dine-in)</span>
-                <span style={{ fontSize: '10px', opacity: 0.8, textAlign: 'center' }}>
-                  Order &rarr; Cook &amp; Serve &rarr; Pay at exit
-                </span>
-              </button>
-
-              <button
-                type="button"
-                className={`chip ${billingModelInput === 'prepaid' ? 'on' : ''}`}
-                style={{
-                  padding: '10px 8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '4px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  border: billingModelInput === 'prepaid' ? '2px solid #f59e0b' : '1px solid #444',
-                }}
-                onClick={() => setBillingModelInput('prepaid')}
-              >
-                <span style={{ fontSize: '13px', fontWeight: 'bold' }}>⚡ Prepaid (QSR / Fast Food)</span>
-                <span style={{ fontSize: '10px', opacity: 0.8, textAlign: 'center' }}>
-                  Order &rarr; Pay &amp; Verify &rarr; Send to Chef
-                </span>
-              </button>
-            </div>
+            <button
+              type="button"
+              className="chip on"
+              style={{ fontSize: '11px' }}
+              onClick={() => {
+                setOpenAdminSections((p) => ({ ...p, billingWorkflow: true }));
+                say('Opened 💳 QR Codes, UPI & Payments Hub above! ⬆️');
+              }}
+            >
+              ⬆️ Open QR Codes, UPI &amp; Payments Hub
+            </button>
           </div>
 
           <button
@@ -9247,16 +9294,17 @@ export function AdminPortalView() {
                 instagramHandle: igHandleInput.trim(),
                 facebookUrl: fbUrlInput.trim(),
                 socialTag: socTagInput.trim(),
-                upiId: upiIdInput.trim(),
-                upiName: upiNameInput.trim() || 'Tadka Truck',
-                billingModel: billingModelInput,
               };
+              dirtyFieldsRef.current.delete('googleReviewUrl');
+              dirtyFieldsRef.current.delete('instagramHandle');
+              dirtyFieldsRef.current.delete('facebookUrl');
+              dirtyFieldsRef.current.delete('socialTag');
               saveGoogleConfig(nextSocial);
               await syncToGoogleSheets(nextSocial);
-              say('Social, Review, UPI & Billing model settings saved & synced ✅');
+              say('Social & Google Review links saved & synced ✅');
             }}
           >
-            Save &amp; Sync Social, UPI &amp; Billing Settings
+            Save &amp; Sync Social &amp; Review Links
           </button>
 
           <details
