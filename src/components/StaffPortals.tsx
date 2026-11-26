@@ -6559,6 +6559,56 @@ export function AdminPortalView() {
     setShowQrAdmin(val);
   };
 
+  const [adminSearchQuery, setAdminSearchQuery] = useState('');
+
+  const SECTION_KEYWORDS: Record<string, string> = {
+    adminGuide: 'admin setup guide configuration notes role access',
+    customerGuide: 'customer ordering app guide notes flow ordering steps',
+    team: 'team staff manager chef waiter reception roles members mobile phone',
+    giveAccess: 'give access permissions assign role staff invite mobile',
+    whatsappBill: 'whatsapp messaging linked device gateway baileys qr code status connection',
+    whatsappTemplates: 'whatsapp message templates stage builder prepaid postpaid order delivery invoice bill receipt feedback current offers greetings header banner',
+    brandProfile: 'restaurant brand profile name tagline app style theme languages dietary filters veg jain options',
+    billingWorkflow: 'qr codes upi payments hub gpay google pay phonepe paytm soundbox prepaid postpaid bank reconciliation webhook standee vpa payment link payment qr',
+    gstSettings: 'gst gstin master tax billing percentage single item exempt tax receipt',
+    rewards: 'reward approvals customer vouchers stars free dish review claims',
+    rewardMaster: 'rewards discounts coupons stars master referral code loyalty points reel discount',
+    menuAdmin: 'menu studio dishes add dish price photo category badge ribbon vegetarian jain food items stock',
+    tablesQr: 'tables dining qr code generator table token print qr scan table 1 table 2 table 3 patio table stickers active',
+    socialLinks: 'social media google review links instagram facebook reels snaps hashtag caption',
+    storage: 'google sheet drive storage cloud backup gviz setup apps script sync',
+  };
+
+  const isSectionVisible = (key: string): boolean => {
+    if (!adminSearchQuery.trim()) return true;
+    const q = adminSearchQuery.trim().toLowerCase();
+    const keywords = (SECTION_KEYWORDS[key] || '').toLowerCase();
+    return keywords.includes(q) || key.toLowerCase().includes(q);
+  };
+
+  const handleAdminSearch = (query: string) => {
+    setAdminSearchQuery(query);
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      setOpenAdminSections((prev) => {
+        const next = { ...prev };
+        Object.keys(SECTION_KEYWORDS).forEach((key) => {
+          const match = (SECTION_KEYWORDS[key] || '').toLowerCase().includes(q) || key.toLowerCase().includes(q);
+          if (match) {
+            next[key] = true;
+          }
+        });
+        return next;
+      });
+      if (q.includes('table') || q.includes('qr')) {
+        setShowQrAdmin(true);
+      }
+      if (q.includes('menu') || q.includes('dish')) {
+        setShowMenuAdmin(true);
+      }
+    }
+  };
+
   // Menu editor collapsible state
   const [showMenuAdmin, setShowMenuAdmin] = useState(false);
   const [newDishEn, setNewDishEn] = useState('');
@@ -6685,171 +6735,255 @@ export function AdminPortalView() {
         </div>
       </div>
 
-      <CollapsibleSection
-        title="📘 Admin Setup &amp; Configuration Guide Notes"
-        badge="Guide"
-        isOpen={!!openAdminSections.adminGuide}
-        onToggle={() => toggleAdminSection('adminGuide')}
+      {/* 🔍 Instant Admin Sections Search & Quick Filter Bar */}
+      <div
+        style={{
+          background: 'rgba(255, 255, 255, 0.04)',
+          borderRadius: '12px',
+          padding: '10px 12px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          marginBottom: '14px',
+        }}
       >
-        <ol style={{ margin: '0', paddingLeft: '18px', fontSize: '12px', lineHeight: 1.6 }}>
-          <li>
-            <b>👥 Team &amp; 🔑 Give Access:</b> Register mobile numbers for your{' '}
-            <b>Manager</b>, <b>Chef</b>, <b>Waiter</b>, and <b>Reception</b>{' '}
-            staff. When they log in with their mobile number, their assigned
-            portal opens automatically.
-          </li>
-          <li>
-            <b>🏪 Restaurant / Brand Profile:</b> Pick your app-wide visual theme
-            (<b>Style 1 to Style 6</b>), set your <b>Restaurant Name</b> and{' '}
-            <b>Hero Tagline</b>, and add/edit/delete <b>Menu Languages</b> and{' '}
-            <b>Customer Dietary Filters</b>.
-          </li>
-          <li>
-            <b>🧾 GST &amp; GSTIN Master:</b> Toggle GST on/off, choose between{' '}
-            <b>Bottom of Bill (Single %)</b> or <b>Each Menu Item (Item-wise %)</b>,
-            and save your 15-digit <b>GSTIN</b> for customer tax receipts.
-          </li>
-          <li>
-            <b>🎬 Reward Approvals &amp; 🎁 Rewards Master:</b> Approve customer
-            social/review proofs and configure star targets, coupon codes,
-            referral codes, and discount rules.
-          </li>
-          <li>
-            <b>🍽️ Menu Admin &amp; 📱 Tables &amp; QR Generator:</b> Add or edit
-            dishes (with language translations, dietary dropdown, and item GST %)
-            and print Table QR posters for dine-in tables.
-          </li>
-          <li>
-            <b>📣 Social Media, Google Review &amp; Direct UPI:</b> Save your
-            Google Review link, Instagram handle, Facebook Page, caption tag, and{' '}
-            <b>Direct UPI ID</b> for 0%-commission customer QR payments.
-          </li>
-        </ol>
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="📱 Customer Ordering &amp; App Guide Notes"
-        badge="Customer Flow"
-        isOpen={!!openAdminSections.customerGuide}
-        onToggle={() => toggleAdminSection('customerGuide')}
-      >
-        <CustomerGuideNotesContent />
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="👥 Team"
-        badge={`${S.staff.length}`}
-        isOpen={!!openAdminSections.team}
-        onToggle={() => toggleAdminSection('team')}
-      >
-        {S.staff.map((x, i) => (
-          <div
-            key={x.id || x.ph}
-            style={{ marginTop: i > 0 ? '12px' : 0, opacity: x.on ? 1 : 0.5 }}
-          >
-            <div className="row sp">
-              <b>{x.n}</b>
-              <span className={`tag ${x.r === 'Admin' ? 'hot' : ''}`}>
-                {x.r}
-              </span>
-            </div>
-            <div className="mu">{x.ph}</div>
-            <div className="mu">
-              {x.r === 'Manager' && x.mg
-                ? ROLE_DESCRIPTIONS.Admin
-                : ROLE_DESCRIPTIONS[x.r]}
-            </div>
-            {x.r !== 'Admin' && (
-              <div
-                className="row"
-                style={{ marginTop: '6px', flexWrap: 'wrap' }}
-              >
-                {x.r === 'Manager' && (
-                  <button
-                    className={`chip ${x.mg ? 'on' : ''}`}
-                    onClick={() => toggleManagerAccess(i)}
-                  >
-                    Can manage access: {x.mg ? 'On' : 'Off'}
-                  </button>
-                )}
-                <button
-                  className="chip"
-                  onClick={() => toggleStaffActive(i)}
-                >
-                  {x.on ? 'Remove access' : 'Restore access'}
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title="🔑 Give Access"
-        isOpen={!!openAdminSections.giveAccess}
-        onToggle={() => toggleAdminSection('giveAccess')}
-      >
-        <p className="mu" style={{ margin: '0 0 8px' }}>
-          Enter their mobile number. They log in with it and see their portal.
-        </p>
-        <div className="row" style={{ marginBottom: '8px' }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <span style={{ position: 'absolute', left: '10px', fontSize: '14px', color: '#94a3b8' }}>🔍</span>
           <input
-            id="asn"
-            value={staffName}
-            onChange={(e) => setStaffName(e.target.value)}
-            placeholder="Name"
+            type="text"
+            value={adminSearchQuery}
+            onChange={(e) => handleAdminSearch(e.target.value)}
+            placeholder="Search sections: table, qr, upi, gpay, gst, menu, whatsapp..."
             className="inp"
+            style={{
+              width: '100%',
+              paddingLeft: '32px',
+              paddingRight: adminSearchQuery ? '32px' : '10px',
+              fontSize: '12.5px',
+              borderRadius: '8px',
+            }}
           />
-        </div>
-        <CountryCodeMobileInput
-          id="asph"
-          value={staffMob}
-          onChange={setStaffMob}
-        />
-        <div className="row" style={{ flexWrap: 'wrap', margin: '8px 0' }}>
-          {assignableRoles.map((r) => (
+          {adminSearchQuery && (
             <button
-              key={r}
-              className={`chip ${S.sf === r ? 'on' : ''}`}
-              onClick={() => updateState((p) => ({ ...p, sf: r }))}
+              type="button"
+              onClick={() => handleAdminSearch('')}
+              title="Clear Search"
+              style={{
+                position: 'absolute',
+                right: '8px',
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                fontSize: '14px',
+                cursor: 'pointer',
+                padding: '4px',
+              }}
             >
-              {r}
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Quick Filter Tag Chips */}
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginTop: '8px', paddingBottom: '2px' }}>
+          {[
+            { label: '🪑 Table QRs', q: 'table' },
+            { label: '💳 Payment UPI & QR', q: 'upi' },
+            { label: '💬 WhatsApp', q: 'whatsapp' },
+            { label: '🍲 Menu Studio', q: 'menu' },
+            { label: '🧾 GST Master', q: 'gst' },
+            { label: '🎁 Rewards', q: 'reward' },
+            { label: '👥 Team', q: 'team' },
+          ].map((item) => (
+            <button
+              key={item.q}
+              type="button"
+              className={`chip ${adminSearchQuery.toLowerCase() === item.q ? 'on' : ''}`}
+              style={{ fontSize: '11px', padding: '2px 8px', whiteSpace: 'nowrap' }}
+              onClick={() => handleAdminSearch(adminSearchQuery.toLowerCase() === item.q ? '' : item.q)}
+            >
+              {item.label}
             </button>
           ))}
         </div>
-        <p className="mu">{ROLE_DESCRIPTIONS[S.sf]}</p>
-        <button
-          className="btn"
-          onClick={() => {
-            addStaff(staffName, staffMob);
-            setStaffName('');
-            setStaffMob('');
-          }}
+      </div>
+
+      {isSectionVisible('adminGuide') && (
+        <CollapsibleSection
+          title="📘 Admin Setup &amp; Configuration Guide Notes"
+          badge="Guide"
+          isOpen={!!openAdminSections.adminGuide}
+          onToggle={() => toggleAdminSection('adminGuide')}
         >
-          Give access
-        </button>
-      </CollapsibleSection>
+          <ol style={{ margin: '0', paddingLeft: '18px', fontSize: '12px', lineHeight: 1.6 }}>
+            <li>
+              <b>👥 Team &amp; 🔑 Give Access:</b> Register mobile numbers for your{' '}
+              <b>Manager</b>, <b>Chef</b>, <b>Waiter</b>, and <b>Reception</b>{' '}
+              staff. When they log in with their mobile number, their assigned
+              portal opens automatically.
+            </li>
+            <li>
+              <b>🏪 Restaurant / Brand Profile:</b> Pick your app-wide visual theme
+              (<b>Style 1 to Style 6</b>), set your <b>Restaurant Name</b> and{' '}
+              <b>Hero Tagline</b>, and add/edit/delete <b>Menu Languages</b> and{' '}
+              <b>Customer Dietary Filters</b>.
+            </li>
+            <li>
+              <b>🧾 GST &amp; GSTIN Master:</b> Toggle GST on/off, choose between{' '}
+              <b>Bottom of Bill (Single %)</b> or <b>Each Menu Item (Item-wise %)</b>,
+              and save your 15-digit <b>GSTIN</b> for customer tax receipts.
+            </li>
+            <li>
+              <b>🎬 Reward Approvals &amp; 🎁 Rewards Master:</b> Approve customer
+              social/review proofs and configure star targets, coupon codes,
+              referral codes, and discount rules.
+            </li>
+            <li>
+              <b>🍽️ Menu Admin &amp; 📱 Tables &amp; QR Generator:</b> Add or edit
+              dishes (with language translations, dietary dropdown, and item GST %)
+              and print Table QR posters for dine-in tables.
+            </li>
+            <li>
+              <b>📣 Social Media, Google Review &amp; Direct UPI:</b> Save your
+              Google Review link, Instagram handle, Facebook Page, caption tag, and{' '}
+              <b>Direct UPI ID</b> for 0%-commission customer QR payments.
+            </li>
+          </ol>
+        </CollapsibleSection>
+      )}
 
-      <CollapsibleSection
-        title="💬 WhatsApp Messaging &amp; Linked Device Gateway"
-        badge={S.googleConfig.whatsappDirectEnabled !== false ? 'Auto-Send' : (S.wab ? 'On' : 'Off')}
-        isOpen={!!openAdminSections.whatsappBill}
-        onToggle={() => toggleAdminSection('whatsappBill')}
-      >
-        <WhatsAppGatewaySettingsSection />
-      </CollapsibleSection>
+      {isSectionVisible('customerGuide') && (
+        <CollapsibleSection
+          title="📱 Customer Ordering &amp; App Guide Notes"
+          badge="Customer Flow"
+          isOpen={!!openAdminSections.customerGuide}
+          onToggle={() => toggleAdminSection('customerGuide')}
+        >
+          <CustomerGuideNotesContent />
+        </CollapsibleSection>
+      )}
 
-      <CollapsibleSection
-        title="📝 WhatsApp Message Templates &amp; Stage Builder"
-        badge={`${(S.googleConfig.whatsappTemplates || DEFAULT_WHATSAPP_TEMPLATES).filter((t) => t.enabled).length} Active`}
-        isOpen={!!openAdminSections.whatsappTemplates}
-        onToggle={() => toggleAdminSection('whatsappTemplates')}
-      >
-        <WhatsAppTemplatesManagerSection />
-      </CollapsibleSection>
+      {isSectionVisible('team') && (
+        <CollapsibleSection
+          title="👥 Team"
+          badge={`${S.staff.length}`}
+          isOpen={!!openAdminSections.team}
+          onToggle={() => toggleAdminSection('team')}
+        >
+          {S.staff.map((x, i) => (
+            <div
+              key={x.id || x.ph}
+              style={{ marginTop: i > 0 ? '12px' : 0, opacity: x.on ? 1 : 0.5 }}
+            >
+              <div className="row sp">
+                <b>{x.n}</b>
+                <span className={`tag ${x.r === 'Admin' ? 'hot' : ''}`}>
+                  {x.r}
+                </span>
+              </div>
+              <div className="mu">{x.ph}</div>
+              <div className="mu">
+                {x.r === 'Manager' && x.mg
+                  ? ROLE_DESCRIPTIONS.Admin
+                  : ROLE_DESCRIPTIONS[x.r]}
+              </div>
+              {x.r !== 'Admin' && (
+                <div
+                  className="row"
+                  style={{ marginTop: '6px', flexWrap: 'wrap' }}
+                >
+                  {x.r === 'Manager' && (
+                    <button
+                      className={`chip ${x.mg ? 'on' : ''}`}
+                      onClick={() => toggleManagerAccess(i)}
+                    >
+                      Can manage access: {x.mg ? 'On' : 'Off'}
+                    </button>
+                  )}
+                  <button
+                    className="chip"
+                    onClick={() => toggleStaffActive(i)}
+                  >
+                    {x.on ? 'Remove access' : 'Restore access'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </CollapsibleSection>
+      )}
 
-      <CollapsibleSection
-        title="🏪 Restaurant / Brand Profile"
+      {isSectionVisible('giveAccess') && (
+        <CollapsibleSection
+          title="🔑 Give Access"
+          isOpen={!!openAdminSections.giveAccess}
+          onToggle={() => toggleAdminSection('giveAccess')}
+        >
+          <p className="mu" style={{ margin: '0 0 8px' }}>
+            Enter their mobile number. They log in with it and see their portal.
+          </p>
+          <div className="row" style={{ marginBottom: '8px' }}>
+            <input
+              id="asn"
+              value={staffName}
+              onChange={(e) => setStaffName(e.target.value)}
+              placeholder="Name"
+              className="inp"
+            />
+          </div>
+          <CountryCodeMobileInput
+            id="asph"
+            value={staffMob}
+            onChange={setStaffMob}
+          />
+          <div className="row" style={{ flexWrap: 'wrap', margin: '8px 0' }}>
+            {assignableRoles.map((r) => (
+              <button
+                key={r}
+                className={`chip ${S.sf === r ? 'on' : ''}`}
+                onClick={() => updateState((p) => ({ ...p, sf: r }))}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <p className="mu">{ROLE_DESCRIPTIONS[S.sf]}</p>
+          <button
+            className="btn"
+            onClick={() => {
+              addStaff(staffName, staffMob);
+              setStaffName('');
+              setStaffMob('');
+            }}
+          >
+            Give access
+          </button>
+        </CollapsibleSection>
+      )}
+
+      {isSectionVisible('whatsappBill') && (
+        <CollapsibleSection
+          title="💬 WhatsApp Messaging &amp; Linked Device Gateway"
+          badge={S.googleConfig.whatsappDirectEnabled !== false ? 'Auto-Send' : (S.wab ? 'On' : 'Off')}
+          isOpen={!!openAdminSections.whatsappBill}
+          onToggle={() => toggleAdminSection('whatsappBill')}
+        >
+          <WhatsAppGatewaySettingsSection />
+        </CollapsibleSection>
+      )}
+
+      {isSectionVisible('whatsappTemplates') && (
+        <CollapsibleSection
+          title="📝 WhatsApp Message Templates &amp; Stage Builder"
+          badge={`${(S.googleConfig.whatsappTemplates || DEFAULT_WHATSAPP_TEMPLATES).filter((t) => t.enabled).length} Active`}
+          isOpen={!!openAdminSections.whatsappTemplates}
+          onToggle={() => toggleAdminSection('whatsappTemplates')}
+        >
+          <WhatsAppTemplatesManagerSection />
+        </CollapsibleSection>
+      )}
+
+      {isSectionVisible('brandProfile') && (
+        <CollapsibleSection
+          title="🏪 Restaurant / Brand Profile"
         badge={`${S.googleConfig.restaurantName || 'Tadka Truck'} · ${
           S.googleConfig.appStyle === 'style6'
             ? 'Style 6 (Royal Gold)'
@@ -7341,9 +7475,11 @@ export function AdminPortalView() {
           Save &amp; Sync Brand Profile
         </button>
       </CollapsibleSection>
+      )}
 
-      <CollapsibleSection
-        title="💳 QR Codes, UPI & Payments Hub (GPay / PhonePe / Paytm / Soundbox)"
+      {isSectionVisible('billingWorkflow') && (
+        <CollapsibleSection
+          title="💳 QR Codes, UPI & Payments Hub (GPay / PhonePe / Paytm / Soundbox)"
         badge={`${billingModelInput === 'prepaid' ? '⚡ Prepaid (Pay First)' : '🍽️ Postpaid (Dine-in)'} · ${
           upiIdInput ? 'UPI: ' + upiIdInput : '⚠️ Set UPI ID'
         }`}
@@ -7754,9 +7890,11 @@ export function AdminPortalView() {
           </div>
         )}
       </CollapsibleSection>
+      )}
 
-      <CollapsibleSection
-        title="🧾 GST &amp; GSTIN Master"
+      {isSectionVisible('gstSettings') && (
+        <CollapsibleSection
+          title="🧾 GST &amp; GSTIN Master"
         badge={
           S.googleConfig.gstEnabled !== false
             ? `${S.googleConfig.gstRate ?? 5}%${
@@ -7875,38 +8013,42 @@ export function AdminPortalView() {
           Save &amp; Sync GST Settings
         </button>
       </CollapsibleSection>
+      )}
 
-      <RewardApprovalsSection
-        isOpen={!!openAdminSections.rewards}
-        onToggle={() => toggleAdminSection('rewards')}
-      />
+      {isSectionVisible('rewards') && (
+        <RewardApprovalsSection
+          isOpen={!!openAdminSections.rewards}
+          onToggle={() => toggleAdminSection('rewards')}
+        />
+      )}
 
-      <CollapsibleSection
-        title="🎁 Rewards, Discounts, Coupons &amp; Stars Master"
-        badge={S.googleConfig.rewardRules?.couponCode || DEFAULT_REWARD_RULES.couponCode}
-        isOpen={!!openAdminSections.rewardMaster}
-        onToggle={() => toggleAdminSection('rewardMaster')}
-      >
-        <RewardRulesMasterContent />
-      </CollapsibleSection>
+      {isSectionVisible('rewardMaster') && (
+        <CollapsibleSection
+          title="🎁 Rewards, Discounts, Coupons &amp; Stars Master"
+          badge={S.googleConfig.rewardRules?.couponCode || DEFAULT_REWARD_RULES.couponCode}
+          isOpen={!!openAdminSections.rewardMaster}
+          onToggle={() => toggleAdminSection('rewardMaster')}
+        >
+          <RewardRulesMasterContent />
+        </CollapsibleSection>
+      )}
 
-      <div className="card">
-        <div className="row sp">
-          <div>
-            <h3>🍽️ Menu Studio &amp; Dishes ({S.menu.length})</h3>
-            <div className="mu" style={{ fontSize: '11px', marginTop: '2px' }}>
+      {isSectionVisible('menuAdmin') && (
+        <CollapsibleSection
+          title={`🍽️ Menu Studio & Dishes (${S.menu.length})`}
+          badge={`${S.menu.length} Dishes`}
+          isOpen={!!openAdminSections.menuAdmin || showMenuAdmin}
+          onToggle={() => {
+            toggleAdminSection('menuAdmin');
+            setShowMenuAdmin((prev) => !prev);
+          }}
+        >
+          <div className="row sp" style={{ marginBottom: '12px' }}>
+            <div className="mu" style={{ fontSize: '11px' }}>
               Add live photos, prices, categories, ribbons, ratings &amp; prep times
             </div>
           </div>
-          <button
-            className="chip"
-            onClick={() => setShowMenuAdmin((prev) => !prev)}
-          >
-            {showMenuAdmin ? 'Close' : 'Manage Dishes & Photos'}
-          </button>
-        </div>
-        {showMenuAdmin && (
-          <div style={{ marginTop: '12px' }}>
+          <div>
             {/* List of current dishes */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {S.menu.map((m) => {
@@ -8869,30 +9011,32 @@ export function AdminPortalView() {
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </CollapsibleSection>
+      )}
 
-      <div className="card" id="admin-tables-section">
-        <div className="row sp">
-          <h3>📱 Tables &amp; QR Code Generator</h3>
-          <div className="row" style={{ gap: '6px' }}>
-            <button
-              className="chip"
-              style={{ fontSize: '12px' }}
-              onClick={resetTables}
-            >
-              🔄 Reset Tables
-            </button>
-            <button
-              className="chip"
-              onClick={() => setShowQrAdmin((prev) => !prev)}
-            >
-              {showQrAdmin ? 'Close' : 'Manage tables'}
-            </button>
-          </div>
-        </div>
-        {showQrAdmin && (
-          <div style={{ marginTop: '10px' }}>
+      {isSectionVisible('tablesQr') && (
+        <CollapsibleSection
+          title="📱 Tables &amp; QR Code Generator"
+          badge={`${S.tables.length} Tables · ${S.tables.filter((t) => t.active !== false).length} Active`}
+          isOpen={!!openAdminSections.tablesQr || showQrAdmin}
+          onToggle={() => {
+            toggleAdminSection('tablesQr');
+            setShowQrAdmin((prev) => !prev);
+          }}
+        >
+          <div id="admin-tables-section">
+            <div className="row sp" style={{ marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+              <div className="mu" style={{ fontSize: '12px' }}>
+                Generate QR codes for table dining, download print sticker cards, manage active status &amp; tokens
+              </div>
+              <button
+                className="chip"
+                style={{ fontSize: '12px' }}
+                onClick={resetTables}
+              >
+                🔄 Reset Tables
+              </button>
+            </div>
             {/* Add / Set Manual Table Number */}
             <div className="row" style={{ marginBottom: '12px', gap: '6px' }}>
               <input
@@ -9196,15 +9340,16 @@ export function AdminPortalView() {
               );
             })}
           </div>
-        )}
-      </div>
+        </CollapsibleSection>
+      )}
 
-      <CollapsibleSection
-        title="📣 Social Media & Google Review Links"
-        badge={S.googleConfig.googleReviewUrl ? 'Configured' : undefined}
-        isOpen={!!openAdminSections.socialLinks}
-        onToggle={() => toggleAdminSection('socialLinks')}
-      >
+      {isSectionVisible('socialLinks') && (
+        <CollapsibleSection
+          title="📣 Social Media & Google Review Links"
+          badge={S.googleConfig.googleReviewUrl ? 'Configured' : undefined}
+          isOpen={!!openAdminSections.socialLinks}
+          onToggle={() => toggleAdminSection('socialLinks')}
+        >
         <p className="mu" style={{ margin: '0 0 8px', fontSize: '12px' }}>
           Customers open these real links when posting a Google Review or
           sharing reels/snaps. Saved to Google Sheets (`Restaurant_Config`) so
@@ -9349,8 +9494,9 @@ export function AdminPortalView() {
           </details>
         </div>
       </CollapsibleSection>
+      )}
 
-      {isStandaloneMode && (
+      {isStandaloneMode && isSectionVisible('storage') && (
         <CollapsibleSection
           title="☁️ Google Sheet &amp; Drive Storage Setup"
           isOpen={!!openAdminSections.storage}
@@ -9359,6 +9505,31 @@ export function AdminPortalView() {
         >
           <GoogleStorageAdminCard />
         </CollapsibleSection>
+      )}
+
+      {adminSearchQuery.trim() && Object.keys(SECTION_KEYWORDS).every((k) => !isSectionVisible(k)) && (
+        <div
+          style={{
+            padding: '24px 16px',
+            textAlign: 'center',
+            background: 'rgba(239, 68, 68, 0.08)',
+            border: '1px dashed #ef4444',
+            borderRadius: '12px',
+            margin: '16px 0',
+          }}
+        >
+          <div style={{ fontSize: '24px', marginBottom: '6px' }}>🔍 No matching sections found</div>
+          <div className="mu" style={{ fontSize: '13px', marginBottom: '12px' }}>
+            No admin settings or tools match &ldquo;<b>{adminSearchQuery}</b>&rdquo;.
+          </div>
+          <button
+            type="button"
+            className="chip on"
+            onClick={() => handleAdminSearch('')}
+          >
+            ✕ Clear Search
+          </button>
+        </div>
       )}
     </>
   );
