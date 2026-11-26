@@ -7299,14 +7299,38 @@ export function AdminPortalView() {
       </CollapsibleSection>
 
       <CollapsibleSection
-        title="⚡ Billing Workflow Mode (Prepaid vs Postpaid)"
-        badge={billingModelInput === 'prepaid' ? '⚡ Prepaid (Pay First)' : '🍽️ Postpaid (Dine-in)'}
+        title="💳 UPI Payment QR Code, Payment Links & ⚡ Billing Mode"
+        badge={`${billingModelInput === 'prepaid' ? '⚡ Prepaid (Pay First)' : '🍽️ Postpaid (Dine-in)'} · ${
+          upiIdInput ? 'UPI: ' + upiIdInput : '⚠️ Set UPI ID'
+        }`}
         isOpen={!!openAdminSections.billingWorkflow}
         onToggle={() => toggleAdminSection('billingWorkflow')}
       >
         <p className="mu" style={{ margin: '0 0 10px', fontSize: '12px' }}>
-          Choose whether customer &amp; waiter orders must be paid upfront before the chef starts cooking, or paid after dining.
+          Configure your restaurant&apos;s direct bank UPI ID for 0%-fee customer QR payments &amp; 1-tap payment links, and choose whether dining is Prepaid or Postpaid.
         </p>
+
+        <div
+          style={{
+            background: 'rgba(59, 130, 246, 0.12)',
+            borderRadius: '10px',
+            padding: '10px 12px',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+            marginBottom: '12px',
+            fontSize: '12px',
+            lineHeight: 1.5,
+          }}
+        >
+          <b>💡 Where Payment QR Code &amp; Payment Links appear for customers:</b>
+          <ul style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
+            <li>
+              <b>⚡ In Prepaid Mode:</b> As soon as customers place an order on their phone, the <b>Payment QR Code</b> and <b>1-Tap Google Pay / PhonePe / Paytm links</b> appear immediately on screen so they pay before food preparation.
+            </li>
+            <li>
+              <b>🍽️ In Postpaid Mode:</b> Customers place orders without paying upfront. The <b>Payment QR Code</b> and <b>Payment Link</b> appear under their <b>Bill Tab</b> when ready to pay at exit, or when the waiter pushes the digital bill.
+            </li>
+          </ul>
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
           <button
@@ -7492,6 +7516,21 @@ export function AdminPortalView() {
                 <span style={{ color: '#16a34a', fontSize: '11px', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
                   ✅ Valid NPCI Format · Payee: {upiNameInput || 'Restaurant'} ({upiIdInput})
                 </span>
+
+                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <a
+                    href={buildUpiUri({
+                      upiId: upiIdInput,
+                      payeeName: upiNameInput || 'Restaurant',
+                      amount: 1,
+                      note: 'Test Payment Link',
+                    })}
+                    className="chip on"
+                    style={{ textDecoration: 'none', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    🔗 Test 1-Tap UPI Payment Link
+                  </a>
+                </div>
 
                 <div
                   style={{
