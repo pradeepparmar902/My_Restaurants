@@ -6418,9 +6418,13 @@ export function AdminPortalView() {
 
   // Track fields being actively edited so background Google Sheets polling never overwrites user's typing
   const dirtyFieldsRef = useRef<Set<string>>(new Set());
+  const prevSlugRef = useRef(activeWorkspaceSlug);
 
   useEffect(() => {
-    dirtyFieldsRef.current.clear();
+    if (prevSlugRef.current !== activeWorkspaceSlug) {
+      prevSlugRef.current = activeWorkspaceSlug;
+      dirtyFieldsRef.current.clear();
+    }
   }, [activeWorkspaceSlug]);
 
   // Keep Admin form inputs synced when Google Sheets finishes pulling S.googleConfig (without overwriting dirty fields)
@@ -7640,6 +7644,7 @@ export function AdminPortalView() {
                   <input
                     type="text"
                     value={upiIdInput}
+                    onFocus={() => dirtyFieldsRef.current.add('upiId')}
                     onChange={(e) => {
                       dirtyFieldsRef.current.add('upiId');
                       setUpiIdInput(e.target.value.trim());
@@ -7694,6 +7699,7 @@ export function AdminPortalView() {
                   <input
                     type="text"
                     value={upiNameInput}
+                    onFocus={() => dirtyFieldsRef.current.add('upiName')}
                     onChange={(e) => {
                       dirtyFieldsRef.current.add('upiName');
                       setUpiNameInput(e.target.value);
@@ -7711,6 +7717,7 @@ export function AdminPortalView() {
                   <input
                     type="text"
                     value={upiQrImageUrlInput}
+                    onFocus={() => dirtyFieldsRef.current.add('upiQrImageUrl')}
                     onChange={(e) => {
                       dirtyFieldsRef.current.add('upiQrImageUrl');
                       setUpiQrImageUrlInput(e.target.value);
