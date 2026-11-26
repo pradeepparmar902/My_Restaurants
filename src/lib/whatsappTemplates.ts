@@ -1,3 +1,5 @@
+import { buildUpiUri } from './helpers';
+
 /**
  * Dynamic WhatsApp Message Template Engine
  * Powers drag-and-drop / variable-based templates across multiple restaurant stages:
@@ -596,11 +598,12 @@ export function buildOrderWhatsAppPayload(params: {
   // Format UPI Link for prepaid
   const upiId = (googleConfig?.upiId || '').trim() || '9819984437@upi';
   const upiName = (googleConfig?.upiName || '').trim() || restaurantName;
-  const paymentLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(
-    upiName
-  )}&am=${finalTotal}&cu=INR&tn=${encodeURIComponent(
-    `Counter ${counterNo} Table ${tableNo}`
-  )}`;
+  const paymentLink = buildUpiUri({
+    upiId,
+    payeeName: upiName,
+    amount: finalTotal,
+    note: `Counter ${counterNo} Table ${tableNo}`,
+  });
 
   // Social Links
   const socialParts: string[] = [];
