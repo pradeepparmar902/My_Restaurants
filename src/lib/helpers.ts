@@ -442,24 +442,26 @@ export function buildUpiUri(params: {
     return '';
   }
 
-  // Replace underscores, hyphens and illegal characters in Payee Name with clean spaces for NPCI bank switch compliance
-  const sanitizedName = (params.payeeName || 'Restaurant')
+  // Ensure Payee Name matches account holder name for NPCI bank switch compliance
+  let rawName = (params.payeeName || '').trim();
+  if (!rawName || rawName === 'Restaurant' || rawName === 'Bhart Dhab' || rawName === 'Tadka Truck') {
+    if (cleanId.toLowerCase().startsWith('pradeepparmar')) {
+      rawName = 'PRADEEP PARMAR';
+    }
+  }
+  const sanitizedName = (rawName || 'PRADEEP PARMAR')
     .replace(/[_\-]+/g, ' ')
     .replace(/[^\w\s]/g, '')
     .trim();
-  const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
+  const cleanName = encodeURIComponent(sanitizedName);
   const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
 
-  // Minimal standard NPCI format with literal '@' and no problematic tn spaces
-  return `upi://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
+  // Standard NPCI format with literal '@', mode=01 and cu=INR
+  return `upi://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&mode=01`;
 }
 
 /**
  * Checks whether a UPI VPA is a personal savings account handle.
- * Major banks (ICICI, HDFC, SBI, Axis) block website-initiated browser intents with pre-filled &am=
- * to personal P2P handles, throwing: "You've exceeded the bank limit for this payment. Retry with a smaller amount."
- * For these handles, omitting &am= in browser intent links allows GPay/PhonePe to open directly with
- * the payee pre-selected so the customer enters the amount without bank security rejection.
  */
 export function isPersonalUpiHandle(upiId?: string | null): boolean {
   if (!upiId) return false;
@@ -480,22 +482,26 @@ export function buildGPayIntentUri(params: {
   const cleanId = rawId.replace(/\s+/g, '');
   if (!cleanId || !cleanId.includes('@')) return '';
 
-  const sanitizedName = (params.payeeName || 'Restaurant')
+  let rawName = (params.payeeName || '').trim();
+  if (!rawName || rawName === 'Restaurant' || rawName === 'Bhart Dhab' || rawName === 'Tadka Truck') {
+    if (cleanId.toLowerCase().startsWith('pradeepparmar')) {
+      rawName = 'PRADEEP PARMAR';
+    }
+  }
+  const sanitizedName = (rawName || 'PRADEEP PARMAR')
     .replace(/[_\-]+/g, ' ')
     .replace(/[^\w\s]/g, '')
     .trim();
-  const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
-  const isPersonal = isPersonalUpiHandle(cleanId);
-  const shouldIncludeAmount = !params.skipAmount && !isPersonal && params.amount > 0;
-  const amountPart = shouldIncludeAmount ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const cleanName = encodeURIComponent(sanitizedName);
+  const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
 
   // On iOS devices, intent:// isn't supported; tez:// or upi:// works
   if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
-    return `tez://upi/pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
+    return `tez://upi/pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&mode=01`;
   }
 
   // Official Android Intent targeting Google Pay package directly
-  return `intent://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+  return `intent://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&mode=01#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
 }
 
 /**
@@ -511,16 +517,20 @@ export function buildPhonePeIntentUri(params: {
   const cleanId = rawId.replace(/\s+/g, '');
   if (!cleanId || !cleanId.includes('@')) return '';
 
-  const sanitizedName = (params.payeeName || 'Restaurant')
+  let rawName = (params.payeeName || '').trim();
+  if (!rawName || rawName === 'Restaurant' || rawName === 'Bhart Dhab' || rawName === 'Tadka Truck') {
+    if (cleanId.toLowerCase().startsWith('pradeepparmar')) {
+      rawName = 'PRADEEP PARMAR';
+    }
+  }
+  const sanitizedName = (rawName || 'PRADEEP PARMAR')
     .replace(/[_\-]+/g, ' ')
     .replace(/[^\w\s]/g, '')
     .trim();
-  const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
-  const isPersonal = isPersonalUpiHandle(cleanId);
-  const shouldIncludeAmount = !params.skipAmount && !isPersonal && params.amount > 0;
-  const amountPart = shouldIncludeAmount ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const cleanName = encodeURIComponent(sanitizedName);
+  const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
 
-  return `phonepe://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
+  return `phonepe://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&mode=01`;
 }
 
 /**
@@ -536,16 +546,20 @@ export function buildPaytmIntentUri(params: {
   const cleanId = rawId.replace(/\s+/g, '');
   if (!cleanId || !cleanId.includes('@')) return '';
 
-  const sanitizedName = (params.payeeName || 'Restaurant')
+  let rawName = (params.payeeName || '').trim();
+  if (!rawName || rawName === 'Restaurant' || rawName === 'Bhart Dhab' || rawName === 'Tadka Truck') {
+    if (cleanId.toLowerCase().startsWith('pradeepparmar')) {
+      rawName = 'PRADEEP PARMAR';
+    }
+  }
+  const sanitizedName = (rawName || 'PRADEEP PARMAR')
     .replace(/[_\-]+/g, ' ')
     .replace(/[^\w\s]/g, '')
     .trim();
-  const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
-  const isPersonal = isPersonalUpiHandle(cleanId);
-  const shouldIncludeAmount = !params.skipAmount && !isPersonal && params.amount > 0;
-  const amountPart = shouldIncludeAmount ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const cleanName = encodeURIComponent(sanitizedName);
+  const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
 
-  return `paytmmp://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
+  return `paytmmp://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&mode=01`;
 }
 
 export function isValidUpiId(id?: string | null): boolean {

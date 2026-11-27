@@ -1904,20 +1904,12 @@ export function OrderTabView() {
   const hasValidUpi = isValidUpiId(effectiveUpiId);
   const upiId = hasValidUpi ? effectiveUpiId : '';
   const isPersonal = isPersonalUpiHandle(upiId);
-  const upiName = (S.googleConfig?.upiName || S.googleConfig?.restaurantName || (activeWorkspaceSlug === 'bhart-dhab' ? 'Bhart Dhab' : 'Restaurant')).trim();
+  const upiName = (S.googleConfig?.upiName || (activeWorkspaceSlug === 'bhart-dhab' ? 'PRADEEP PARMAR' : S.googleConfig?.restaurantName || 'Restaurant')).trim();
   const upiUri = hasValidUpi
     ? buildUpiUri({
         upiId,
         payeeName: upiName,
         amount: effectivePayable,
-      })
-    : '';
-  const intentUpiUri = hasValidUpi
-    ? buildUpiUri({
-        upiId,
-        payeeName: upiName,
-        amount: effectivePayable,
-        skipAmount: isPersonal,
       })
     : '';
   const gpayUri = hasValidUpi
@@ -2101,13 +2093,8 @@ export function OrderTabView() {
                       boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                     }}
                   >
-                    🟢 Open Google Pay (Pay ₹{totalPayablePrepaid})
+                    🟢 Open Google Pay · ₹{totalPayablePrepaid}
                   </a>
-                  {isPersonal && (
-                    <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', marginTop: '-4px' }}>
-                      👉 Opens GPay directly to <b>{upiName}</b> · Enter <b>₹{totalPayablePrepaid}</b> &amp; confirm
-                    </div>
-                  )}
 
                   {/* PhonePe & Paytm Quick Launch Buttons */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -2153,7 +2140,7 @@ export function OrderTabView() {
 
                   {/* Other UPI Apps (Generic Chooser / BHIM) */}
                   <a
-                    href={intentUpiUri}
+                    href={upiUri}
                     className="btn ghost"
                     style={{
                       fontSize: '12px',
@@ -2166,7 +2153,7 @@ export function OrderTabView() {
                       border: '1px solid rgba(255, 255, 255, 0.25)',
                     }}
                   >
-                    📱 Other UPI App (BHIM / CRED / Any)
+                    📱 Other UPI App (BHIM / Any) · ₹{totalPayablePrepaid}
                   </a>
 
                   {isPersonal && (
@@ -2464,13 +2451,8 @@ export function OrderTabView() {
                       boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                     }}
                   >
-                    🟢 Open Google Pay (Pay ₹{totalAmount})
+                    🟢 Open Google Pay · ₹{totalAmount}
                   </a>
-                  {isPersonal && (
-                    <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', marginTop: '-4px' }}>
-                      👉 Opens GPay directly to <b>{upiName}</b> · Enter <b>₹{totalAmount}</b> &amp; confirm
-                    </div>
-                  )}
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <a
@@ -2514,7 +2496,7 @@ export function OrderTabView() {
                   </div>
 
                   <a
-                    href={intentUpiUri}
+                    href={upiUri}
                     className="btn ghost"
                     style={{
                       fontSize: '12px',
@@ -2527,7 +2509,7 @@ export function OrderTabView() {
                       border: '1px solid rgba(255, 255, 255, 0.25)',
                     }}
                   >
-                    📱 Other UPI App (BHIM / CRED / Any)
+                    📱 Other UPI App (BHIM / Any) · ₹{totalAmount}
                   </a>
 
                   {isPersonal && (
@@ -4073,20 +4055,14 @@ export function BillTabView() {
           const upiId =
             (S.googleConfig.upiId || '').trim() ||
             (activeWorkspaceSlug === 'bhart-dhab' ? 'pradeepparmar9022@okaxis' : '');
+          const isPersonal = isPersonalUpiHandle(upiId);
           const upiName =
             (S.googleConfig.upiName || '').trim() ||
-            (activeWorkspaceSlug === 'bhart-dhab' ? 'Bhart Dhab' : 'Restaurant');
-          const isPersonal = isPersonalUpiHandle(upiId);
+            (activeWorkspaceSlug === 'bhart-dhab' ? 'PRADEEP PARMAR' : 'Restaurant');
           const upiUri = buildUpiUri({
             upiId,
             payeeName: upiName,
             amount: per,
-          });
-          const intentUpiUri = buildUpiUri({
-            upiId,
-            payeeName: upiName,
-            amount: per,
-            skipAmount: isPersonal,
           });
           const gpayUri = buildGPayIntentUri({
             upiId,
@@ -4177,13 +4153,8 @@ export function BillTabView() {
                     boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                   }}
                 >
-                  🟢 Open Google Pay (Pay ₹{per})
+                  🟢 Open Google Pay · ₹{per}
                 </a>
-                {isPersonal && (
-                  <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', marginTop: '-4px' }}>
-                    👉 Opens GPay directly to <b>{upiName}</b> · Enter <b>₹{per}</b> &amp; confirm
-                  </div>
-                )}
 
                 {/* PhonePe & Paytm Quick Launch Buttons */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -4229,7 +4200,7 @@ export function BillTabView() {
 
                 {/* Other UPI Apps (Generic Chooser / BHIM) */}
                 <a
-                  href={intentUpiUri}
+                  href={upiUri}
                   className="btn ghost"
                   style={{
                     fontSize: '12px',
@@ -4242,7 +4213,7 @@ export function BillTabView() {
                     border: '1px solid rgba(255, 255, 255, 0.25)',
                   }}
                 >
-                  📱 Other UPI App (BHIM / CRED / Any)
+                  📱 Other UPI App (BHIM / Any) · ₹{per}
                 </a>
 
                 {isPersonal && (
