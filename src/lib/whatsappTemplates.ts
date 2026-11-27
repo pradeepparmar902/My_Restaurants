@@ -596,7 +596,9 @@ export function buildOrderWhatsAppPayload(params: {
     (activeWorkspaceSlug === 'bhart-dhab' ? 'Bhart Dhab' : 'Tadka Restaurant');
 
   // Format UPI Link for prepaid
-  const upiId = (googleConfig?.upiId || '').trim() || '9819984437@upi';
+  const upiId =
+    (googleConfig?.upiId || '').trim() ||
+    (activeWorkspaceSlug === 'bhart-dhab' ? 'pradeepparmar9022@okaxis' : 'pradeepparmar9022@okaxis');
   const upiName = (googleConfig?.upiName || '').trim() || restaurantName;
   const paymentLink = buildUpiUri({
     upiId,

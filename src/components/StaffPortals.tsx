@@ -5666,7 +5666,7 @@ export function WhatsAppTemplatesManagerSection() {
   // Sample data dictionary for live preview
   const sampleData = useMemo(() => {
     const restName = S.googleConfig.restaurantName || 'Bhart Dhab';
-    const upiId = S.googleConfig.upiId || '9819984437@upi';
+    const upiId = S.googleConfig.upiId || 'pradeepparmar9022@okaxis';
     const gstRate = S.googleConfig.gstRate ?? 5;
     const subtotal = 240;
     const discount = 50;

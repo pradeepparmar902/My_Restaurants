@@ -1803,6 +1803,7 @@ export function OrderTabView() {
     removeInvitedMember,
     pullFromGoogleSheets,
     reportCustomerPrepaidPayment,
+    activeWorkspaceSlug,
   } = useTadka();
   const [inviteMob, setInviteMob] = useState('');
   const [utrInput, setUtrInput] = useState('');
@@ -1898,9 +1899,10 @@ export function OrderTabView() {
     : isUrlInactive;
 
   const rawUpiId = (S.googleConfig?.upiId || '').trim();
-  const hasValidUpi = isValidUpiId(rawUpiId);
-  const upiId = hasValidUpi ? rawUpiId : '';
-  const upiName = (S.googleConfig?.upiName || S.googleConfig?.restaurantName || 'Restaurant').trim();
+  const effectiveUpiId = rawUpiId || (activeWorkspaceSlug === 'bhart-dhab' ? 'pradeepparmar9022@okaxis' : '');
+  const hasValidUpi = isValidUpiId(effectiveUpiId);
+  const upiId = hasValidUpi ? effectiveUpiId : '';
+  const upiName = (S.googleConfig?.upiName || S.googleConfig?.restaurantName || (activeWorkspaceSlug === 'bhart-dhab' ? 'Bhart Dhab' : 'Restaurant')).trim();
   const upiUri = hasValidUpi
     ? buildUpiUri({
         upiId,
@@ -3962,11 +3964,14 @@ export function BillTabView() {
             Payment QR code is locked. Please ask your waiter or captain to activate Table {S.activeTable}.
           </p>
         </div>
-      ) : S.pm === 'UPI' && (S.googleConfig.upiId || '').trim() ? (
+      ) : S.pm === 'UPI' && ((S.googleConfig.upiId || '').trim() || activeWorkspaceSlug === 'bhart-dhab') ? (
         (() => {
-          const upiId = (S.googleConfig.upiId || '').trim();
+          const upiId =
+            (S.googleConfig.upiId || '').trim() ||
+            (activeWorkspaceSlug === 'bhart-dhab' ? 'pradeepparmar9022@okaxis' : '');
           const upiName =
-            (S.googleConfig.upiName || '').trim() || 'Restaurant';
+            (S.googleConfig.upiName || '').trim() ||
+            (activeWorkspaceSlug === 'bhart-dhab' ? 'Bhart Dhab' : 'Restaurant');
           const upiUri = buildUpiUri({
             upiId,
             payeeName: upiName,

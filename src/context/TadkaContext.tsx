@@ -4190,6 +4190,8 @@ export function TadkaProvider({
                 appsScriptWebAppUrl: entry.appsScriptWebAppUrl || tenantCfg.appsScriptWebAppUrl || '',
                 spreadsheetId: entry.spreadsheetId || tenantCfg.spreadsheetId || '',
                 driveFolderId: entry.driveFolderId || tenantCfg.driveFolderId || '',
+                ...(entry.upiId ? { upiId: entry.upiId } : {}),
+                ...(entry.upiName ? { upiName: entry.upiName } : {}),
                 ...(urlGateway ? { whatsappGatewayUrl: urlGateway } : {}),
               };
               break;
@@ -4268,6 +4270,8 @@ export function TadkaProvider({
           ...(tenantCfg.ownerMobile
             ? { ownerMobile: tenantCfg.ownerMobile }
             : {}),
+          ...(tenantCfg.upiId ? { upiId: tenantCfg.upiId } : {}),
+          ...(tenantCfg.upiName ? { upiName: tenantCfg.upiName } : {}),
           appsScriptWebAppUrl:
             tenantCfg.appsScriptWebAppUrl ||
             (!isDifferentWorkspace ? prev.googleConfig.appsScriptWebAppUrl : '') ||
