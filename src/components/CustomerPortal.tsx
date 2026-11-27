@@ -1905,11 +1905,14 @@ export function OrderTabView() {
   const upiId = hasValidUpi ? effectiveUpiId : '';
   const isPersonal = isPersonalUpiHandle(upiId);
   const upiName = (S.googleConfig?.upiName || (activeWorkspaceSlug === 'bhart-dhab' ? 'PRADEEP PARMAR' : S.googleConfig?.restaurantName || 'Restaurant')).trim();
+  const orderRef = S.sess?.no ? `T${S.activeTable || 1}C${S.sess.no}` : `T${S.activeTable || 1}`;
   const upiUri = hasValidUpi
     ? buildUpiUri({
         upiId,
         payeeName: upiName,
         amount: effectivePayable,
+        tr: `TADKA${orderRef}${Date.now().toString(36).toUpperCase()}`,
+        note: `Order ${orderRef}`,
       })
     : '';
   const gpayUri = hasValidUpi
@@ -1917,6 +1920,8 @@ export function OrderTabView() {
         upiId,
         payeeName: upiName,
         amount: effectivePayable,
+        tr: `TADKA${orderRef}${Date.now().toString(36).toUpperCase()}`,
+        note: `Order ${orderRef}`,
       })
     : '';
   const phonePeUri = hasValidUpi
@@ -1924,6 +1929,8 @@ export function OrderTabView() {
         upiId,
         payeeName: upiName,
         amount: effectivePayable,
+        tr: `TADKA${orderRef}${Date.now().toString(36).toUpperCase()}`,
+        note: `Order ${orderRef}`,
       })
     : '';
   const paytmUri = hasValidUpi
@@ -1931,6 +1938,8 @@ export function OrderTabView() {
         upiId,
         payeeName: upiName,
         amount: effectivePayable,
+        tr: `TADKA${orderRef}${Date.now().toString(36).toUpperCase()}`,
+        note: `Order ${orderRef}`,
       })
     : '';
   const customStandeeImg = (S.googleConfig?.upiQrImageUrl || '').trim();
@@ -2169,8 +2178,7 @@ export function OrderTabView() {
                         lineHeight: '1.4',
                       }}
                     >
-                      <b>💡 Bank Limit Tip:</b> If your bank reports <i>&quot;exceeded bank limit&quot;</i>, banks block browser auto-debits to personal accounts.
-                      Tap <b>Open Google Pay</b> and enter ₹{totalPayablePrepaid} manually, tap <b>📋 Copy UPI ID</b> to paste in your app, or scan the QR above from another phone or your phone&apos;s Gallery.
+                      <b>💡 If bank shows &quot;exceeded bank limit&quot;:</b> Tap <b>📋 Copy UPI ID</b> above → Open Google Pay / PhonePe → Tap <b>Pay UPI ID</b> → Paste &amp; Pay ₹{totalPayablePrepaid}. Or scan the QR code above directly with any camera!
                     </div>
                   )}
 
@@ -4059,25 +4067,34 @@ export function BillTabView() {
           const upiName =
             (S.googleConfig.upiName || '').trim() ||
             (activeWorkspaceSlug === 'bhart-dhab' ? 'PRADEEP PARMAR' : 'Restaurant');
+          const billRef = S.sess?.no ? `T${S.activeTable || 1}C${S.sess.no}` : `T${S.activeTable || 1}`;
           const upiUri = buildUpiUri({
             upiId,
             payeeName: upiName,
             amount: per,
+            tr: `TADKA${billRef}${Date.now().toString(36).toUpperCase()}`,
+            note: `Bill ${billRef}`,
           });
           const gpayUri = buildGPayIntentUri({
             upiId,
             payeeName: upiName,
             amount: per,
+            tr: `TADKA${billRef}${Date.now().toString(36).toUpperCase()}`,
+            note: `Bill ${billRef}`,
           });
           const phonePeUri = buildPhonePeIntentUri({
             upiId,
             payeeName: upiName,
             amount: per,
+            tr: `TADKA${billRef}${Date.now().toString(36).toUpperCase()}`,
+            note: `Bill ${billRef}`,
           });
           const paytmUri = buildPaytmIntentUri({
             upiId,
             payeeName: upiName,
             amount: per,
+            tr: `TADKA${billRef}${Date.now().toString(36).toUpperCase()}`,
+            note: `Bill ${billRef}`,
           });
           const customStandeeImg = (S.googleConfig?.upiQrImageUrl || '').trim();
           const isValidStandeeUrl = Boolean(customStandeeImg && /^https?:\/\/.+/i.test(customStandeeImg));
@@ -4229,8 +4246,7 @@ export function BillTabView() {
                       lineHeight: '1.4',
                     }}
                   >
-                    <b>💡 Bank Limit Tip:</b> If bank reports <i>&quot;exceeded bank limit&quot;</i>, banks block browser auto-debits to personal accounts.
-                    Tap <b>Open Google Pay</b> and enter ₹{per} manually, tap <b>📋 Copy UPI ID</b> to paste in your app, or scan the QR above from another phone or your phone&apos;s Gallery.
+                    <b>💡 If bank shows &quot;exceeded bank limit&quot;:</b> Tap <b>📋 Copy UPI ID</b> above → Open Google Pay / PhonePe → Tap <b>Pay UPI ID</b> → Paste &amp; Pay ₹{per}. Or scan the QR code above directly with any camera!
                   </div>
                 )}
               </div>

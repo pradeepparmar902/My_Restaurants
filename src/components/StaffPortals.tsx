@@ -6340,6 +6340,7 @@ export function AdminPortalView() {
     saveGoogleConfig,
     syncToGoogleSheets,
     say,
+    uploadMediaToDrive,
   } = useTadka();
 
   const [staffName, setStaffName] = useState('');
@@ -7731,6 +7732,64 @@ export function AdminPortalView() {
                       ⚠️ This field is for an image web URL (e.g. https://.../standee.jpg), NOT a UPI ID. Leave this field empty if you want the app to auto-generate the QR code from your UPI ID above.
                     </span>
                   )}
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                    <label
+                      className="btn ghost"
+                      style={{
+                        fontSize: '11px',
+                        padding: '4px 10px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        margin: 0,
+                      }}
+                    >
+                      📁 Upload Standee QR Photo from Gallery
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = async () => {
+                            const base64Data = (reader.result as string).split(',')[1];
+                            say('Uploading QR photo to Google Drive... ⏳');
+                            const uploaded = await uploadMediaToDrive({
+                              fileName: `gpay_standee_qr_${Date.now()}.png`,
+                              kind: 'dish_photo',
+                              mimeType: file.type || 'image/png',
+                              base64Data,
+                            });
+                            if (uploaded) {
+                              dirtyFieldsRef.current.add('upiQrImageUrl');
+                              setUpiQrImageUrlInput(uploaded);
+                              say('Official Standee QR uploaded & saved! ✅');
+                            } else {
+                              say('Upload failed. Please try again.');
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                    {upiQrImageUrlInput && (
+                      <button
+                        type="button"
+                        className="chip"
+                        style={{ fontSize: '11px', padding: '2px 8px' }}
+                        onClick={() => {
+                          dirtyFieldsRef.current.add('upiQrImageUrl');
+                          setUpiQrImageUrlInput('');
+                          say('Cleared standee photo. Auto-generated QR restored.');
+                        }}
+                      >
+                        ✕ Clear Photo
+                      </button>
+                    )}
+                  </div>
                   <span className="mu" style={{ fontSize: '10px' }}>
                     If provided, customers will see your exact physical standee photo instead of the generated QR. Leave empty to use auto-generated QR.
                   </span>

@@ -434,6 +434,7 @@ export function buildUpiUri(params: {
   payeeName?: string;
   amount: number;
   note?: string;
+  tr?: string;
   skipAmount?: boolean;
 }): string {
   const rawId = (params.upiId || '').trim();
@@ -455,9 +456,11 @@ export function buildUpiUri(params: {
     .trim();
   const cleanName = encodeURIComponent(sanitizedName);
   const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const trPart = params.tr ? `&tr=${encodeURIComponent(params.tr)}` : `&tr=TADKA${Date.now().toString(36).toUpperCase()}`;
+  const notePart = params.note ? `&tn=${encodeURIComponent(params.note.replace(/[^\w\s]/g, '').trim())}` : '&tn=OrderPayment';
 
-  // Standard NPCI format with literal '@', mode=01 and cu=INR
-  return `upi://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&mode=01`;
+  // Standard NPCI format with literal '@', amount, and cu=INR (no mode=02 which demands a digital signature)
+  return `upi://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR${notePart}`;
 }
 
 /**
@@ -476,6 +479,8 @@ export function buildGPayIntentUri(params: {
   upiId: string;
   payeeName?: string;
   amount: number;
+  note?: string;
+  tr?: string;
   skipAmount?: boolean;
 }): string {
   const rawId = (params.upiId || '').trim();
@@ -494,14 +499,16 @@ export function buildGPayIntentUri(params: {
     .trim();
   const cleanName = encodeURIComponent(sanitizedName);
   const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const trPart = params.tr ? `&tr=${encodeURIComponent(params.tr)}` : `&tr=TADKA${Date.now().toString(36).toUpperCase()}`;
+  const notePart = params.note ? `&tn=${encodeURIComponent(params.note.replace(/[^\w\s]/g, '').trim())}` : '&tn=OrderPayment';
 
   // On iOS devices, intent:// isn't supported; tez:// or upi:// works
   if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
-    return `tez://upi/pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&mode=01`;
+    return `tez://upi/pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR${notePart}`;
   }
 
   // Official Android Intent targeting Google Pay package directly
-  return `intent://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&mode=01#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+  return `intent://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR${notePart}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
 }
 
 /**
@@ -511,6 +518,8 @@ export function buildPhonePeIntentUri(params: {
   upiId: string;
   payeeName?: string;
   amount: number;
+  note?: string;
+  tr?: string;
   skipAmount?: boolean;
 }): string {
   const rawId = (params.upiId || '').trim();
@@ -529,8 +538,9 @@ export function buildPhonePeIntentUri(params: {
     .trim();
   const cleanName = encodeURIComponent(sanitizedName);
   const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const notePart = params.note ? `&tn=${encodeURIComponent(params.note.replace(/[^\w\s]/g, '').trim())}` : '&tn=OrderPayment';
 
-  return `phonepe://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&mode=01`;
+  return `phonepe://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR${notePart}`;
 }
 
 /**
@@ -540,6 +550,8 @@ export function buildPaytmIntentUri(params: {
   upiId: string;
   payeeName?: string;
   amount: number;
+  note?: string;
+  tr?: string;
   skipAmount?: boolean;
 }): string {
   const rawId = (params.upiId || '').trim();
@@ -558,8 +570,9 @@ export function buildPaytmIntentUri(params: {
     .trim();
   const cleanName = encodeURIComponent(sanitizedName);
   const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const notePart = params.note ? `&tn=${encodeURIComponent(params.note.replace(/[^\w\s]/g, '').trim())}` : '&tn=OrderPayment';
 
-  return `paytmmp://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR&mode=01`;
+  return `paytmmp://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR${notePart}`;
 }
 
 export function isValidUpiId(id?: string | null): boolean {
