@@ -434,6 +434,7 @@ export function buildUpiUri(params: {
   payeeName?: string;
   amount: number;
   note?: string;
+  skipAmount?: boolean;
 }): string {
   const rawId = (params.upiId || '').trim();
   const cleanId = rawId.replace(/\s+/g, '');
@@ -447,20 +448,33 @@ export function buildUpiUri(params: {
     .replace(/[^\w\s]/g, '')
     .trim();
   const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
-  const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
 
   // Minimal standard NPCI format with literal '@' and no problematic tn spaces
   return `upi://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
 }
 
 /**
- * Direct Android Intent to launch Google Pay (GPay) specifically,
- * bypassing Android's default UPI handler (which may hijack upi:// with BHIM).
+ * Checks whether a UPI VPA is a personal savings account handle.
+ * Major banks (ICICI, HDFC, SBI, Axis) block website-initiated browser intents with pre-filled &am=
+ * to personal P2P handles, throwing: "You've exceeded the bank limit for this payment. Retry with a smaller amount."
+ * For these handles, omitting &am= in browser intent links allows GPay/PhonePe to open directly with
+ * the payee pre-selected so the customer enters the amount without bank security rejection.
+ */
+export function isPersonalUpiHandle(upiId?: string | null): boolean {
+  if (!upiId) return false;
+  const clean = upiId.trim().toLowerCase();
+  return /@(okaxis|okhdfcbank|oksbi|okicici|upi|ybl|axl|ibl)$/i.test(clean);
+}
+
+/**
+ * Direct Android Intent or iOS URL scheme to launch Google Pay (GPay) specifically.
  */
 export function buildGPayIntentUri(params: {
   upiId: string;
   payeeName?: string;
   amount: number;
+  skipAmount?: boolean;
 }): string {
   const rawId = (params.upiId || '').trim();
   const cleanId = rawId.replace(/\s+/g, '');
@@ -471,7 +485,9 @@ export function buildGPayIntentUri(params: {
     .replace(/[^\w\s]/g, '')
     .trim();
   const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
-  const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const isPersonal = isPersonalUpiHandle(cleanId);
+  const shouldIncludeAmount = !params.skipAmount && !isPersonal && params.amount > 0;
+  const amountPart = shouldIncludeAmount ? `&am=${Number(params.amount).toFixed(2)}` : '';
 
   // On iOS devices, intent:// isn't supported; tez:// or upi:// works
   if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
@@ -489,6 +505,7 @@ export function buildPhonePeIntentUri(params: {
   upiId: string;
   payeeName?: string;
   amount: number;
+  skipAmount?: boolean;
 }): string {
   const rawId = (params.upiId || '').trim();
   const cleanId = rawId.replace(/\s+/g, '');
@@ -499,7 +516,9 @@ export function buildPhonePeIntentUri(params: {
     .replace(/[^\w\s]/g, '')
     .trim();
   const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
-  const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const isPersonal = isPersonalUpiHandle(cleanId);
+  const shouldIncludeAmount = !params.skipAmount && !isPersonal && params.amount > 0;
+  const amountPart = shouldIncludeAmount ? `&am=${Number(params.amount).toFixed(2)}` : '';
 
   return `phonepe://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
 }
@@ -511,6 +530,7 @@ export function buildPaytmIntentUri(params: {
   upiId: string;
   payeeName?: string;
   amount: number;
+  skipAmount?: boolean;
 }): string {
   const rawId = (params.upiId || '').trim();
   const cleanId = rawId.replace(/\s+/g, '');
@@ -521,7 +541,9 @@ export function buildPaytmIntentUri(params: {
     .replace(/[^\w\s]/g, '')
     .trim();
   const cleanName = encodeURIComponent(sanitizedName || 'Restaurant');
-  const amountPart = params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const isPersonal = isPersonalUpiHandle(cleanId);
+  const shouldIncludeAmount = !params.skipAmount && !isPersonal && params.amount > 0;
+  const amountPart = shouldIncludeAmount ? `&am=${Number(params.amount).toFixed(2)}` : '';
 
   return `paytmmp://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
 }

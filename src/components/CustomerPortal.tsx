@@ -15,6 +15,7 @@ import {
   buildPhonePeIntentUri,
   buildPaytmIntentUri,
   isValidUpiId,
+  isPersonalUpiHandle,
 } from '@/lib/helpers';
 import {
   ConnectedAccountsCard,
@@ -1902,12 +1903,21 @@ export function OrderTabView() {
   const effectiveUpiId = rawUpiId || (activeWorkspaceSlug === 'bhart-dhab' ? 'pradeepparmar9022@okaxis' : '');
   const hasValidUpi = isValidUpiId(effectiveUpiId);
   const upiId = hasValidUpi ? effectiveUpiId : '';
+  const isPersonal = isPersonalUpiHandle(upiId);
   const upiName = (S.googleConfig?.upiName || S.googleConfig?.restaurantName || (activeWorkspaceSlug === 'bhart-dhab' ? 'Bhart Dhab' : 'Restaurant')).trim();
   const upiUri = hasValidUpi
     ? buildUpiUri({
         upiId,
         payeeName: upiName,
         amount: effectivePayable,
+      })
+    : '';
+  const intentUpiUri = hasValidUpi
+    ? buildUpiUri({
+        upiId,
+        payeeName: upiName,
+        amount: effectivePayable,
+        skipAmount: isPersonal,
       })
     : '';
   const gpayUri = hasValidUpi
@@ -2045,6 +2055,30 @@ export function OrderTabView() {
                   <span style={{ color: '#4b5563', fontSize: '10px', display: 'block' }}>
                     Scan with GPay / PhonePe / Paytm / BHIM
                   </span>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '8px' }}>
+                    <button
+                      type="button"
+                      className="chip"
+                      style={{ fontSize: '11px', padding: '3px 8px', background: '#f8fafc', color: '#0f172a', border: '1px solid #cbd5e1', cursor: 'pointer' }}
+                      onClick={() => {
+                        if (upiId) {
+                          navigator.clipboard?.writeText(upiId);
+                          say(`Copied UPI ID: ${upiId} 📋`);
+                        }
+                      }}
+                    >
+                      📋 Copy UPI ID
+                    </button>
+                    <a
+                      href={qrDisplayUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="chip"
+                      style={{ fontSize: '11px', padding: '3px 8px', background: '#f8fafc', color: '#0f172a', border: '1px solid #cbd5e1', textDecoration: 'none' }}
+                    >
+                      🔍 View QR
+                    </a>
+                  </div>
                 </div>
 
                 <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -2067,8 +2101,13 @@ export function OrderTabView() {
                       boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                     }}
                   >
-                    🟢 Open Google Pay (GPay) · ₹{totalPayablePrepaid}
+                    🟢 Open Google Pay (Pay ₹{totalPayablePrepaid})
                   </a>
+                  {isPersonal && (
+                    <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', marginTop: '-4px' }}>
+                      👉 Opens GPay directly to <b>{upiName}</b> · Enter <b>₹{totalPayablePrepaid}</b> &amp; confirm
+                    </div>
+                  )}
 
                   {/* PhonePe & Paytm Quick Launch Buttons */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -2114,7 +2153,7 @@ export function OrderTabView() {
 
                   {/* Other UPI Apps (Generic Chooser / BHIM) */}
                   <a
-                    href={upiUri}
+                    href={intentUpiUri}
                     className="btn ghost"
                     style={{
                       fontSize: '12px',
@@ -2129,6 +2168,24 @@ export function OrderTabView() {
                   >
                     📱 Other UPI App (BHIM / CRED / Any)
                   </a>
+
+                  {isPersonal && (
+                    <div
+                      style={{
+                        padding: '8px 10px',
+                        background: '#fffbeb',
+                        border: '1px solid #fde68a',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        color: '#92400e',
+                        textAlign: 'left',
+                        lineHeight: '1.4',
+                      }}
+                    >
+                      <b>💡 Bank Limit Tip:</b> If your bank reports <i>&quot;exceeded bank limit&quot;</i>, banks block browser auto-debits to personal accounts.
+                      Tap <b>Open Google Pay</b> and enter ₹{totalPayablePrepaid} manually, tap <b>📋 Copy UPI ID</b> to paste in your app, or scan the QR above from another phone or your phone&apos;s Gallery.
+                    </div>
+                  )}
 
                   <button
                     type="button"
@@ -2362,6 +2419,30 @@ export function OrderTabView() {
                   <span style={{ color: '#4b5563', fontSize: '10px', display: 'block' }}>
                     Scan with GPay / PhonePe / Paytm / BHIM
                   </span>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '8px' }}>
+                    <button
+                      type="button"
+                      className="chip"
+                      style={{ fontSize: '11px', padding: '3px 8px', background: '#f8fafc', color: '#0f172a', border: '1px solid #cbd5e1', cursor: 'pointer' }}
+                      onClick={() => {
+                        if (upiId) {
+                          navigator.clipboard?.writeText(upiId);
+                          say(`Copied UPI ID: ${upiId} 📋`);
+                        }
+                      }}
+                    >
+                      📋 Copy UPI ID
+                    </button>
+                    <a
+                      href={qrDisplayUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="chip"
+                      style={{ fontSize: '11px', padding: '3px 8px', background: '#f8fafc', color: '#0f172a', border: '1px solid #cbd5e1', textDecoration: 'none' }}
+                    >
+                      🔍 View QR
+                    </a>
+                  </div>
                 </div>
 
                 <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -2383,8 +2464,13 @@ export function OrderTabView() {
                       boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                     }}
                   >
-                    🟢 Open Google Pay (GPay) · ₹{totalAmount}
+                    🟢 Open Google Pay (Pay ₹{totalAmount})
                   </a>
+                  {isPersonal && (
+                    <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', marginTop: '-4px' }}>
+                      👉 Opens GPay directly to <b>{upiName}</b> · Enter <b>₹{totalAmount}</b> &amp; confirm
+                    </div>
+                  )}
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     <a
@@ -2428,7 +2514,7 @@ export function OrderTabView() {
                   </div>
 
                   <a
-                    href={upiUri}
+                    href={intentUpiUri}
                     className="btn ghost"
                     style={{
                       fontSize: '12px',
@@ -2443,6 +2529,24 @@ export function OrderTabView() {
                   >
                     📱 Other UPI App (BHIM / CRED / Any)
                   </a>
+
+                  {isPersonal && (
+                    <div
+                      style={{
+                        padding: '8px 10px',
+                        background: '#fffbeb',
+                        border: '1px solid #fde68a',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        color: '#92400e',
+                        textAlign: 'left',
+                        lineHeight: '1.4',
+                      }}
+                    >
+                      <b>💡 Bank Limit Tip:</b> If bank reports <i>&quot;exceeded bank limit&quot;</i>, banks block browser auto-debits to personal accounts.
+                      Tap <b>Open Google Pay</b> and enter ₹{totalAmount} manually, tap <b>📋 Copy UPI ID</b> to paste in your app, or scan the QR above from another phone or your phone&apos;s Gallery.
+                    </div>
+                  )}
 
                   <div className="row" style={{ gap: '8px', marginTop: '4px' }}>
                     <button
@@ -3972,10 +4076,17 @@ export function BillTabView() {
           const upiName =
             (S.googleConfig.upiName || '').trim() ||
             (activeWorkspaceSlug === 'bhart-dhab' ? 'Bhart Dhab' : 'Restaurant');
+          const isPersonal = isPersonalUpiHandle(upiId);
           const upiUri = buildUpiUri({
             upiId,
             payeeName: upiName,
             amount: per,
+          });
+          const intentUpiUri = buildUpiUri({
+            upiId,
+            payeeName: upiName,
+            amount: per,
+            skipAmount: isPersonal,
           });
           const gpayUri = buildGPayIntentUri({
             upiId,
@@ -4020,6 +4131,30 @@ export function BillTabView() {
                   height={180}
                   style={{ display: 'block' }}
                 />
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    className="chip"
+                    style={{ fontSize: '11px', padding: '3px 8px', background: '#f8fafc', color: '#0f172a', border: '1px solid #cbd5e1', cursor: 'pointer' }}
+                    onClick={() => {
+                      if (upiId) {
+                        navigator.clipboard?.writeText(upiId);
+                        say(`Copied UPI ID: ${upiId} 📋`);
+                      }
+                    }}
+                  >
+                    📋 Copy UPI ID
+                  </button>
+                  <a
+                    href={upiQrUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="chip"
+                    style={{ fontSize: '11px', padding: '3px 8px', background: '#f8fafc', color: '#0f172a', border: '1px solid #cbd5e1', textDecoration: 'none' }}
+                  >
+                    🔍 View QR
+                  </a>
+                </div>
               </div>
 
               <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -4042,8 +4177,13 @@ export function BillTabView() {
                     boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                   }}
                 >
-                  🟢 Open Google Pay (GPay) · ₹{per}
+                  🟢 Open Google Pay (Pay ₹{per})
                 </a>
+                {isPersonal && (
+                  <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', marginTop: '-4px' }}>
+                    👉 Opens GPay directly to <b>{upiName}</b> · Enter <b>₹{per}</b> &amp; confirm
+                  </div>
+                )}
 
                 {/* PhonePe & Paytm Quick Launch Buttons */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -4089,7 +4229,7 @@ export function BillTabView() {
 
                 {/* Other UPI Apps (Generic Chooser / BHIM) */}
                 <a
-                  href={upiUri}
+                  href={intentUpiUri}
                   className="btn ghost"
                   style={{
                     fontSize: '12px',
@@ -4104,6 +4244,24 @@ export function BillTabView() {
                 >
                   📱 Other UPI App (BHIM / CRED / Any)
                 </a>
+
+                {isPersonal && (
+                  <div
+                    style={{
+                      padding: '8px 10px',
+                      background: '#fffbeb',
+                      border: '1px solid #fde68a',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      color: '#92400e',
+                      textAlign: 'left',
+                      lineHeight: '1.4',
+                    }}
+                  >
+                    <b>💡 Bank Limit Tip:</b> If bank reports <i>&quot;exceeded bank limit&quot;</i>, banks block browser auto-debits to personal accounts.
+                    Tap <b>Open Google Pay</b> and enter ₹{per} manually, tap <b>📋 Copy UPI ID</b> to paste in your app, or scan the QR above from another phone or your phone&apos;s Gallery.
+                  </div>
+                )}
               </div>
               <button
                 className="btn"

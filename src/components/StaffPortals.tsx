@@ -7801,6 +7801,9 @@ export function AdminPortalView() {
                         <li>
                           <b>Self-Pay Restriction:</b> Google Pay blocks scanning your own QR code from the same account. Scan from <b>another phone</b> or test with <b>PhonePe / Paytm / BHIM</b>.
                         </li>
+                        <li>
+                          <b>Bank Intent Security vs Camera QR:</b> Scanning this QR code with a phone camera allows in-person payments up to ₹1,00,000. For mobile browser 1-tap buttons, banks (ICICI/HDFC/Axis) block automated web debits to personal savings handles (<code>@okaxis</code>), so the app opens Google Pay directly to your name so customers confirm the amount without the bank error. To support prefilled amounts on web buttons, register a free <b>Google Pay for Business</b> merchant VPA.
+                        </li>
                       </ul>
                     </div>
                   </div>
