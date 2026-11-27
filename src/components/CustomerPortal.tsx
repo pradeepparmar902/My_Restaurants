@@ -2083,9 +2083,9 @@ export function OrderTabView() {
                 </div>
 
                 <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {/* Primary 1-Tap Google Pay Button */}
+                  {/* Primary 1-Tap Universal UPI Payment Button (Original Working Spec) */}
                   <a
-                    href={gpayUri}
+                    href={upiUri}
                     className="btn"
                     style={{
                       background: '#0f9d58',
@@ -2102,7 +2102,7 @@ export function OrderTabView() {
                       boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                     }}
                   >
-                    🟢 Open Google Pay · ₹{totalPayablePrepaid}
+                    📱 Open GPay / PhonePe / Paytm · ₹{totalPayablePrepaid}
                   </a>
 
                   {/* PhonePe & Paytm Quick Launch Buttons */}
@@ -4151,9 +4151,9 @@ export function BillTabView() {
               </div>
 
               <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* Primary 1-Tap Google Pay Button */}
+                {/* Primary 1-Tap Universal UPI Payment Button (Original Working Spec) */}
                 <a
-                  href={gpayUri}
+                  href={upiUri}
                   className="btn"
                   style={{
                     background: '#0f9d58',
@@ -4170,7 +4170,7 @@ export function BillTabView() {
                     boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                   }}
                 >
-                  🟢 Open Google Pay · ₹{per}
+                  📱 Open GPay / PhonePe / Paytm · ₹{per}
                 </a>
 
                 {/* PhonePe & Paytm Quick Launch Buttons */}

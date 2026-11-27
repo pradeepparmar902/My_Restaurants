@@ -459,8 +459,8 @@ export function buildUpiUri(params: {
   const trPart = params.tr ? `&tr=${encodeURIComponent(params.tr)}` : `&tr=TADKA${Date.now().toString(36).toUpperCase()}`;
   const notePart = params.note ? `&tn=${encodeURIComponent(params.note.replace(/[^\w\s]/g, '').trim())}` : '&tn=OrderPayment';
 
-  // Standard NPCI format with literal '@', amount, and cu=INR (no mode=02 which demands a digital signature)
-  return `upi://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR${notePart}`;
+  // Minimal standard NPCI format with literal '@', exact amount, and cu=INR (no tn or mode flags that trigger bank intent limits)
+  return `upi://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
 }
 
 /**
@@ -473,7 +473,11 @@ export function isPersonalUpiHandle(upiId?: string | null): boolean {
 }
 
 /**
- * Direct Android Intent or iOS URL scheme to launch Google Pay (GPay) specifically.
+ * Direct launcher for Google Pay (GPay).
+ * NOTE: For personal savings VPAs, never use 'tez://' or Android package locks,
+ * as banks (ICICI/SBI) classify 'tez://' as a Tez Merchant Gateway call and block
+ * transfers with "You've exceeded the bank limit for this payment".
+ * Using standard 'upi://pay' opens the app in native UPI mode without triggering the merchant block.
  */
 export function buildGPayIntentUri(params: {
   upiId: string;
@@ -483,32 +487,7 @@ export function buildGPayIntentUri(params: {
   tr?: string;
   skipAmount?: boolean;
 }): string {
-  const rawId = (params.upiId || '').trim();
-  const cleanId = rawId.replace(/\s+/g, '');
-  if (!cleanId || !cleanId.includes('@')) return '';
-
-  let rawName = (params.payeeName || '').trim();
-  if (!rawName || rawName === 'Restaurant' || rawName === 'Bhart Dhab' || rawName === 'Tadka Truck') {
-    if (cleanId.toLowerCase().startsWith('pradeepparmar')) {
-      rawName = 'PRADEEP PARMAR';
-    }
-  }
-  const sanitizedName = (rawName || 'PRADEEP PARMAR')
-    .replace(/[_\-]+/g, ' ')
-    .replace(/[^\w\s]/g, '')
-    .trim();
-  const cleanName = encodeURIComponent(sanitizedName);
-  const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
-  const trPart = params.tr ? `&tr=${encodeURIComponent(params.tr)}` : `&tr=TADKA${Date.now().toString(36).toUpperCase()}`;
-  const notePart = params.note ? `&tn=${encodeURIComponent(params.note.replace(/[^\w\s]/g, '').trim())}` : '&tn=OrderPayment';
-
-  // On iOS devices, intent:// isn't supported; tez:// or upi:// works
-  if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
-    return `tez://upi/pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR${notePart}`;
-  }
-
-  // Official Android Intent targeting Google Pay package directly
-  return `intent://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR${notePart}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+  return buildUpiUri(params);
 }
 
 /**
@@ -540,7 +519,7 @@ export function buildPhonePeIntentUri(params: {
   const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
   const notePart = params.note ? `&tn=${encodeURIComponent(params.note.replace(/[^\w\s]/g, '').trim())}` : '&tn=OrderPayment';
 
-  return `phonepe://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR${notePart}`;
+  return `phonepe://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
 }
 
 /**
@@ -570,9 +549,8 @@ export function buildPaytmIntentUri(params: {
     .trim();
   const cleanName = encodeURIComponent(sanitizedName);
   const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
-  const notePart = params.note ? `&tn=${encodeURIComponent(params.note.replace(/[^\w\s]/g, '').trim())}` : '&tn=OrderPayment';
 
-  return `paytmmp://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR${notePart}`;
+  return `paytmmp://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
 }
 
 export function isValidUpiId(id?: string | null): boolean {
