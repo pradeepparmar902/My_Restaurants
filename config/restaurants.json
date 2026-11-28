@@ -1,0 +1,47 @@
+{
+  "defaultRestaurant": "tadka-truck",
+  "restaurants": {
+    "tadka-truck": {
+      "name": "Tadka Truck",
+      "slug": "tadka-truck",
+      "appStyle": "style1",
+      "appsScriptWebAppUrl": "https://script.google.com/macros/s/AKfycbyQkzH6LMy16fOcvQLdSsKNsbKmJRx3fC37d7DUTxbCKkB1nPp1ESHH0EcVS5dI6Zym/exec",
+      "spreadsheetId": "17E4TMRaEc_VoAE0qajaIsgPiJpuJWDGPECR-RJRwTCs",
+      "driveFolderId": "1MRw5ircB_XUf8jSv5vPBDTM08pwhzAMX",
+      "updatedAt": "2026-11-16T16:39:42.307Z"
+    },
+    "bhart-dhab": {
+      "name": "Bhart Dhab",
+      "slug": "bhart-dhab",
+      "appStyle": "style2",
+      "upiId": "pradeepparmar9022@okaxis",
+      "upiName": "PRADEEP PARMAR",
+      "appsScriptWebAppUrl": "https://script.google.com/macros/s/AKfycbyQkzH6LMy16fOcvQLdSsKNsbKmJRx3fC37d7DUTxbCKkB1nPp1ESHH0EcVS5dI6Zym/exec",
+      "spreadsheetId": "1IzALyDWczW6DL2_ZDEUwMl-dNxOMPHxVzpR97WGKY40",
+      "driveFolderId": "https://docs.google.com/spreadsheets/d/1IzALyDWczW6DL2_ZDEUwMl-dNxOMPHxVzpR97WGKY40/edit?usp=drive_link",
+      "updatedAt": "2026-11-27T07:45:00.000Z"
+    },
+    "bharat-dhaba": {
+      "name": "Bhart Dhab",
+      "slug": "bhart-dhab",
+      "appStyle": "style2",
+      "upiId": "pradeepparmar9022@okaxis",
+      "upiName": "PRADEEP PARMAR",
+      "appsScriptWebAppUrl": "https://script.google.com/macros/s/AKfycbyQkzH6LMy16fOcvQLdSsKNsbKmJRx3fC37d7DUTxbCKkB1nPp1ESHH0EcVS5dI6Zym/exec",
+      "spreadsheetId": "1IzALyDWczW6DL2_ZDEUwMl-dNxOMPHxVzpR97WGKY40",
+      "driveFolderId": "https://docs.google.com/spreadsheets/d/1IzALyDWczW6DL2_ZDEUwMl-dNxOMPHxVzpR97WGKY40/edit?usp=drive_link",
+      "updatedAt": "2026-11-27T07:45:00.000Z"
+    },
+    "bharat-dhab": {
+      "name": "Bhart Dhab",
+      "slug": "bhart-dhab",
+      "appStyle": "style2",
+      "upiId": "pradeepparmar9022@okaxis",
+      "upiName": "PRADEEP PARMAR",
+      "appsScriptWebAppUrl": "https://script.google.com/macros/s/AKfycbyQkzH6LMy16fOcvQLdSsKNsbKmJRx3fC37d7DUTxbCKkB1nPp1ESHH0EcVS5dI6Zym/exec",
+      "spreadsheetId": "1IzALyDWczW6DL2_ZDEUwMl-dNxOMPHxVzpR97WGKY40",
+      "driveFolderId": "https://docs.google.com/spreadsheets/d/1IzALyDWczW6DL2_ZDEUwMl-dNxOMPHxVzpR97WGKY40/edit?usp=drive_link",
+      "updatedAt": "2026-11-27T07:45:00.000Z"
+    }
+  }
+}
