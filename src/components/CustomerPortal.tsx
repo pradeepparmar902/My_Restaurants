@@ -1904,7 +1904,16 @@ export function OrderTabView() {
   const hasValidUpi = isValidUpiId(effectiveUpiId);
   const upiId = hasValidUpi ? effectiveUpiId : '';
   const isPersonal = isPersonalUpiHandle(upiId);
-  const upiName = (S.googleConfig?.upiName || (activeWorkspaceSlug === 'bhart-dhab' ? 'PRADEEP PARMAR' : S.googleConfig?.restaurantName || 'Restaurant')).trim();
+  const isBhartDhab =
+    activeWorkspaceSlug === 'bhart-dhab' ||
+    activeWorkspaceSlug === 'bharat-dhaba' ||
+    activeWorkspaceSlug === 'bharat-dhab';
+  const rawUpiName = (S.googleConfig?.upiName || '').trim();
+  const upiName = (
+    rawUpiName && (!isBhartDhab || (rawUpiName !== 'Tadka Truck' && rawUpiName !== 'Restaurant'))
+      ? rawUpiName
+      : (isBhartDhab ? 'Bharat Dhaba' : (S.googleConfig?.restaurantName || 'Restaurant'))
+  ).trim();
   const orderRef = S.sess?.no ? `T${S.activeTable || 1}C${S.sess.no}` : `T${S.activeTable || 1}`;
   const upiUri = hasValidUpi
     ? buildUpiUri({
@@ -4069,9 +4078,16 @@ export function BillTabView() {
             (S.googleConfig.upiId || '').trim() ||
             (activeWorkspaceSlug === 'bhart-dhab' ? 'pradeepparmar9022@okaxis' : '');
           const isPersonal = isPersonalUpiHandle(upiId);
-          const upiName =
-            (S.googleConfig.upiName || '').trim() ||
-            (activeWorkspaceSlug === 'bhart-dhab' ? 'PRADEEP PARMAR' : 'Restaurant');
+          const isBhart =
+            activeWorkspaceSlug === 'bhart-dhab' ||
+            activeWorkspaceSlug === 'bharat-dhaba' ||
+            activeWorkspaceSlug === 'bharat-dhab';
+          const rawUpiName = (S.googleConfig?.upiName || '').trim();
+          const upiName = (
+            rawUpiName && (!isBhart || (rawUpiName !== 'Tadka Truck' && rawUpiName !== 'Restaurant'))
+              ? rawUpiName
+              : (isBhart ? 'Bharat Dhaba' : (S.googleConfig?.restaurantName || 'Restaurant'))
+          ).trim();
           const billRef = S.sess?.no ? `T${S.activeTable || 1}C${S.sess.no}` : `T${S.activeTable || 1}`;
           const upiUri = buildUpiUri({
             upiId,

@@ -443,11 +443,13 @@ export function buildUpiUri(params: {
     return '';
   }
 
-  // Ensure Payee Name matches account holder name for NPCI bank switch compliance
+  // Clean and sanitize Payee Name for NPCI bank switch compliance
   let rawName = (params.payeeName || '').trim();
-  if (!rawName || rawName === 'Restaurant' || rawName === 'Bhart Dhab' || rawName === 'Tadka Truck') {
+  if (!rawName || rawName === 'Restaurant') {
     if (cleanId.toLowerCase().startsWith('pradeepparmar')) {
       rawName = 'PRADEEP PARMAR';
+    } else {
+      rawName = 'Bharat Dhaba';
     }
   }
   const sanitizedName = (rawName || 'PRADEEP PARMAR')
@@ -490,9 +492,11 @@ export function buildGPayIntentUri(params: {
   if (!cleanId || !cleanId.includes('@')) return '';
 
   let rawName = (params.payeeName || '').trim();
-  if (!rawName || rawName === 'Restaurant' || rawName === 'Bhart Dhab' || rawName === 'Tadka Truck') {
+  if (!rawName || rawName === 'Restaurant') {
     if (cleanId.toLowerCase().startsWith('pradeepparmar')) {
       rawName = 'PRADEEP PARMAR';
+    } else {
+      rawName = 'Bharat Dhaba';
     }
   }
   const sanitizedName = (rawName || 'PRADEEP PARMAR')
@@ -527,9 +531,11 @@ export function buildPhonePeIntentUri(params: {
   if (!cleanId || !cleanId.includes('@')) return '';
 
   let rawName = (params.payeeName || '').trim();
-  if (!rawName || rawName === 'Restaurant' || rawName === 'Bhart Dhab' || rawName === 'Tadka Truck') {
+  if (!rawName || rawName === 'Restaurant') {
     if (cleanId.toLowerCase().startsWith('pradeepparmar')) {
       rawName = 'PRADEEP PARMAR';
+    } else {
+      rawName = 'Bharat Dhaba';
     }
   }
   const sanitizedName = (rawName || 'PRADEEP PARMAR')
@@ -559,9 +565,11 @@ export function buildPaytmIntentUri(params: {
   if (!cleanId || !cleanId.includes('@')) return '';
 
   let rawName = (params.payeeName || '').trim();
-  if (!rawName || rawName === 'Restaurant' || rawName === 'Bhart Dhab' || rawName === 'Tadka Truck') {
+  if (!rawName || rawName === 'Restaurant') {
     if (cleanId.toLowerCase().startsWith('pradeepparmar')) {
       rawName = 'PRADEEP PARMAR';
+    } else {
+      rawName = 'Bharat Dhaba';
     }
   }
   const sanitizedName = (rawName || 'PRADEEP PARMAR')

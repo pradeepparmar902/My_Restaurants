@@ -6343,6 +6343,16 @@ export function AdminPortalView() {
     uploadMediaToDrive,
   } = useTadka();
 
+  const isBhartDhab =
+    activeWorkspaceSlug === 'bhart-dhab' ||
+    activeWorkspaceSlug === 'bharat-dhaba' ||
+    activeWorkspaceSlug === 'bharat-dhab';
+  const defaultRestaurantName = isBhartDhab ? 'Bharat Dhaba' : 'Tadka Truck';
+  const defaultUpiName = isBhartDhab ? 'Bharat Dhaba' : 'Tadka Truck';
+  const defaultUpiId = isBhartDhab ? 'pradeepparmar9022@okaxis' : '';
+  const defaultIgHandle = isBhartDhab ? '@bharatdhaba' : '@tadkatruck';
+  const defaultSocTag = isBhartDhab ? '#BharatDhaba @bharatdhaba' : '#TadkaTruck @tadkatruck';
+
   const [staffName, setStaffName] = useState('');
   const [staffMob, setStaffMob] = useState('');
   const [checkMob, setCheckMob] = useState('');
@@ -6361,9 +6371,11 @@ export function AdminPortalView() {
               ? 'style2'
               : 'style1'
   );
-  const [restaurantNameInput, setRestaurantNameInput] = useState(
-    S.googleConfig.restaurantName || 'Tadka Truck'
-  );
+  const [restaurantNameInput, setRestaurantNameInput] = useState(() => {
+    const rName = S.googleConfig.restaurantName;
+    if (isBhartDhab && (!rName || rName === 'Tadka Truck')) return 'Bharat Dhaba';
+    return rName || defaultRestaurantName;
+  });
   const [restaurantTaglineInput, setRestaurantTaglineInput] = useState(
     S.googleConfig.restaurantTagline || ''
   );
@@ -6388,17 +6400,25 @@ export function AdminPortalView() {
   const [revUrlInput, setRevUrlInput] = useState(
     S.googleConfig.googleReviewUrl || ''
   );
-  const [igHandleInput, setIgHandleInput] = useState(
-    S.googleConfig.instagramHandle || '@tadkatruck'
-  );
+  const [igHandleInput, setIgHandleInput] = useState(() => {
+    const ig = S.googleConfig.instagramHandle;
+    if (isBhartDhab && (!ig || ig === '@tadkatruck')) return '@bharatdhaba';
+    return ig || defaultIgHandle;
+  });
   const [fbUrlInput, setFbUrlInput] = useState(S.googleConfig.facebookUrl || '');
-  const [socTagInput, setSocTagInput] = useState(
-    S.googleConfig.socialTag || '#TadkaTruck @tadkatruck'
-  );
-  const [upiIdInput, setUpiIdInput] = useState(S.googleConfig.upiId || '');
-  const [upiNameInput, setUpiNameInput] = useState(
-    S.googleConfig.upiName || 'Tadka Truck'
-  );
+  const [socTagInput, setSocTagInput] = useState(() => {
+    const st = S.googleConfig.socialTag;
+    if (isBhartDhab && (!st || st.includes('TadkaTruck'))) return '#BharatDhaba @bharatdhaba';
+    return st || defaultSocTag;
+  });
+  const [upiIdInput, setUpiIdInput] = useState(() => {
+    return S.googleConfig.upiId || defaultUpiId;
+  });
+  const [upiNameInput, setUpiNameInput] = useState(() => {
+    const uName = S.googleConfig.upiName;
+    if (isBhartDhab && (!uName || uName === 'Tadka Truck')) return 'Bharat Dhaba';
+    return uName || defaultUpiName;
+  });
   const [upiQrImageUrlInput, setUpiQrImageUrlInput] = useState(
     S.googleConfig.upiQrImageUrl || ''
   );
@@ -6446,7 +6466,12 @@ export function AdminPortalView() {
       );
     }
     if (!dirtyFieldsRef.current.has('restaurantName')) {
-      setRestaurantNameInput(S.googleConfig.restaurantName || 'Tadka Truck');
+      const rName = S.googleConfig.restaurantName;
+      setRestaurantNameInput(
+        isBhartDhab && (!rName || rName === 'Tadka Truck')
+          ? 'Bharat Dhaba'
+          : rName || defaultRestaurantName
+      );
     }
     if (!dirtyFieldsRef.current.has('restaurantTagline')) {
       setRestaurantTaglineInput(S.googleConfig.restaurantTagline || '');
@@ -6484,19 +6509,34 @@ export function AdminPortalView() {
       setRevUrlInput(S.googleConfig.googleReviewUrl || '');
     }
     if (!dirtyFieldsRef.current.has('instagramHandle')) {
-      setIgHandleInput(S.googleConfig.instagramHandle || '@tadkatruck');
+      const ig = S.googleConfig.instagramHandle;
+      setIgHandleInput(
+        isBhartDhab && (!ig || ig === '@tadkatruck')
+          ? '@bharatdhaba'
+          : ig || defaultIgHandle
+      );
     }
     if (!dirtyFieldsRef.current.has('facebookUrl')) {
       setFbUrlInput(S.googleConfig.facebookUrl || '');
     }
     if (!dirtyFieldsRef.current.has('socialTag')) {
-      setSocTagInput(S.googleConfig.socialTag || '#TadkaTruck @tadkatruck');
+      const st = S.googleConfig.socialTag;
+      setSocTagInput(
+        isBhartDhab && (!st || st.includes('TadkaTruck'))
+          ? '#BharatDhaba @bharatdhaba'
+          : st || defaultSocTag
+      );
     }
     if (!dirtyFieldsRef.current.has('upiId')) {
-      setUpiIdInput(S.googleConfig.upiId || '');
+      setUpiIdInput(S.googleConfig.upiId || defaultUpiId);
     }
     if (!dirtyFieldsRef.current.has('upiName')) {
-      setUpiNameInput(S.googleConfig.upiName || 'Tadka Truck');
+      const uName = S.googleConfig.upiName;
+      setUpiNameInput(
+        isBhartDhab && (!uName || uName === 'Tadka Truck')
+          ? 'Bharat Dhaba'
+          : uName || defaultUpiName
+      );
     }
     if (!dirtyFieldsRef.current.has('upiQrImageUrl')) {
       setUpiQrImageUrlInput(S.googleConfig.upiQrImageUrl || '');
@@ -6989,7 +7029,7 @@ export function AdminPortalView() {
       {isSectionVisible('brandProfile') && (
         <CollapsibleSection
           title="🏪 Restaurant / Brand Profile"
-        badge={`${S.googleConfig.restaurantName || 'Tadka Truck'} · ${
+        badge={`${S.googleConfig.restaurantName || defaultRestaurantName} · ${
           S.googleConfig.appStyle === 'style6'
             ? 'Style 6 (Royal Gold)'
             : S.googleConfig.appStyle === 'style5'
@@ -7092,7 +7132,7 @@ export function AdminPortalView() {
         <input
           value={restaurantNameInput}
           onChange={(e) => setRestaurantNameInput(e.target.value)}
-          placeholder="Tadka Truck"
+          placeholder={defaultRestaurantName}
           className="inp"
           style={{ width: '100%', marginBottom: '8px' }}
         />
@@ -7462,7 +7502,7 @@ export function AdminPortalView() {
             const jainItem = dietaryFiltersInput.find((f) => f.id === 'jain');
             const nextBrand = {
               appStyle: appStyleInput,
-              restaurantName: restaurantNameInput.trim() || 'Tadka Truck',
+              restaurantName: restaurantNameInput.trim() || defaultRestaurantName,
               restaurantTagline: restaurantTaglineInput.trim(),
               menuLanguages: menuLanguagesInput,
               enabledLanguages: enabledLangs.length
@@ -7812,7 +7852,7 @@ export function AdminPortalView() {
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
                         buildUpiUri({
                           upiId: upiIdInput,
-                          payeeName: upiNameInput || 'Restaurant',
+                          payeeName: upiNameInput || defaultUpiName,
                           amount: 1,
                           note: 'Test Payment',
                         })
@@ -7821,14 +7861,14 @@ export function AdminPortalView() {
                       style={{ width: '140px', height: '140px', display: 'block', margin: '0 auto' }}
                     />
                     <span style={{ color: '#16a34a', fontSize: '11px', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
-                      ✅ Valid NPCI Format · Payee: {upiNameInput || 'Restaurant'} ({upiIdInput})
+                      ✅ Valid NPCI Format · Payee: {upiNameInput || defaultUpiName} ({upiIdInput})
                     </span>
 
                     <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <a
                         href={buildUpiUri({
                           upiId: upiIdInput,
-                          payeeName: upiNameInput || 'Restaurant',
+                          payeeName: upiNameInput || defaultUpiName,
                           amount: 1,
                           note: 'Test Payment Link',
                         })}
@@ -7878,7 +7918,7 @@ export function AdminPortalView() {
                 const nextCfg = {
                   billingModel: billingModelInput,
                   upiId: upiIdInput.trim(),
-                  upiName: upiNameInput.trim() || 'Restaurant',
+                  upiName: upiNameInput.trim() || defaultUpiName,
                   upiQrImageUrl: upiQrImageUrlInput.trim(),
                 };
                 dirtyFieldsRef.current.delete('upiId');
