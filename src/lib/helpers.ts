@@ -588,3 +588,29 @@ export function isValidUpiId(id?: string | null): boolean {
   return Boolean(v && v.includes('@') && v !== 'tadkatruck@okicici' && v.length >= 5);
 }
 
+/**
+ * Downloads a QR code image to user's device gallery / downloads folder,
+ * with fallback to opening in a new tab if blob fetch is blocked by CORS.
+ */
+export async function downloadQrImage(url: string, filename = 'payment_qr.png'): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Fetch failed');
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(blobUrl);
+    document.body.removeChild(a);
+    return true;
+  } catch {
+    window.open(url, '_blank');
+    return false;
+  }
+}
+
+

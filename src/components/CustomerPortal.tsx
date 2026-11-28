@@ -16,6 +16,7 @@ import {
   buildPaytmIntentUri,
   isValidUpiId,
   isPersonalUpiHandle,
+  downloadQrImage,
 } from '@/lib/helpers';
 import {
   ConnectedAccountsCard,
@@ -2065,7 +2066,7 @@ export function OrderTabView() {
                   <span style={{ color: '#4b5563', fontSize: '10px', display: 'block' }}>
                     Scan with GPay / PhonePe / Paytm / BHIM
                   </span>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       className="chip"
@@ -2078,6 +2079,23 @@ export function OrderTabView() {
                       }}
                     >
                       📋 Copy UPI ID
+                    </button>
+                    <button
+                      type="button"
+                      className="chip"
+                      style={{ fontSize: '11px', padding: '3px 8px', background: '#ecfdf5', color: '#065f46', border: '1px solid #6ee7b7', cursor: 'pointer', fontWeight: 600 }}
+                      onClick={async () => {
+                        say('Saving QR code to your phone... ⏳');
+                        const ok = await downloadQrImage(
+                          qrDisplayUrl,
+                          `UPI_QR_${upiName.replace(/\s+/g, '_')}_Rs${totalPayablePrepaid}.png`
+                        );
+                        if (ok) {
+                          say(`✅ QR Saved! Open GPay/PhonePe → Tap Scanner 🔲 → Tap Photos 🖼️ to pay ₹${totalPayablePrepaid} without bank limit error!`);
+                        }
+                      }}
+                    >
+                      📥 Save QR
                     </button>
                     <a
                       href={qrDisplayUrl}
@@ -2113,6 +2131,7 @@ export function OrderTabView() {
                     onClick={() => {
                       if (upiId) {
                         navigator.clipboard?.writeText(upiId);
+                        say(`Copied UPI ID: ${upiId} · Launching Google Pay... 🚀 (If bank limit error appears, tap 'Pay UPI ID' & paste!)`);
                       }
                     }}
                   >
@@ -2137,6 +2156,12 @@ export function OrderTabView() {
                         padding: '10px 6px',
                         borderRadius: '8px',
                       }}
+                      onClick={() => {
+                        if (upiId) {
+                          navigator.clipboard?.writeText(upiId);
+                          say(`Copied UPI ID: ${upiId} · Launching PhonePe... 🚀`);
+                        }
+                      }}
                     >
                       🟣 PhonePe
                     </a>
@@ -2155,6 +2180,12 @@ export function OrderTabView() {
                         fontWeight: 'bold',
                         padding: '10px 6px',
                         borderRadius: '8px',
+                      }}
+                      onClick={() => {
+                        if (upiId) {
+                          navigator.clipboard?.writeText(upiId);
+                          say(`Copied UPI ID: ${upiId} · Launching Paytm... 🚀`);
+                        }
                       }}
                     >
                       🔵 Paytm
@@ -2175,6 +2206,12 @@ export function OrderTabView() {
                       gap: '6px',
                       border: '1px solid rgba(255, 255, 255, 0.25)',
                     }}
+                    onClick={() => {
+                      if (upiId) {
+                        navigator.clipboard?.writeText(upiId);
+                        say(`Copied UPI ID: ${upiId} · Opening UPI Chooser... 🚀`);
+                      }
+                    }}
                   >
                     📱 Universal UPI Chooser (Any App) · ₹{totalPayablePrepaid}
                   </a>
@@ -2182,17 +2219,30 @@ export function OrderTabView() {
                   {isPersonal && (
                     <div
                       style={{
-                        padding: '8px 10px',
+                        padding: '10px 12px',
                         background: '#fffbeb',
-                        border: '1px solid #fde68a',
-                        borderRadius: '8px',
-                        fontSize: '11px',
-                        color: '#92400e',
+                        border: '1.5px solid #f59e0b',
+                        borderRadius: '10px',
+                        fontSize: '11.5px',
+                        color: '#78350f',
                         textAlign: 'left',
-                        lineHeight: '1.4',
+                        lineHeight: '1.45',
                       }}
                     >
-                      <b>💡 If bank shows &quot;exceeded bank limit&quot;:</b> Tap <b>📋 Copy UPI ID</b> above → Open Google Pay / PhonePe → Tap <b>Pay UPI ID</b> → Paste &amp; Pay ₹{totalPayablePrepaid}. Or scan the QR code above directly with any camera!
+                      <div style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '5px', color: '#92400e', marginBottom: '4px' }}>
+                        <span>💡</span> Paying on this phone &amp; seeing &ldquo;Exceeded Bank Limit&rdquo;?
+                      </div>
+                      <div style={{ color: '#451a03' }}>
+                        Banks block browser links to personal accounts. <b>Two 100% working ways to pay on this device:</b>
+                      </div>
+                      <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                        <div style={{ background: '#ffffff', padding: '6px 8px', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                          <b>Method 1 (0% Bank Errors):</b> Tap <b>📥 Save QR</b> above &rarr; In GPay/PhonePe tap <b>Scan 🔲</b> &rarr; tap <b>Photos 🖼️</b> &rarr; select QR to pay ₹{totalPayablePrepaid}.
+                        </div>
+                        <div style={{ background: '#ffffff', padding: '6px 8px', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                          <b>Method 2 (Pay via UPI ID):</b> We copied <code>{upiId}</code>. In GPay/PhonePe tap <b>&ldquo;Pay UPI ID&rdquo;</b> &rarr; paste &amp; pay ₹{totalPayablePrepaid}.
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -4145,7 +4195,7 @@ export function BillTabView() {
                   height={180}
                   style={{ display: 'block' }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     className="chip"
@@ -4158,6 +4208,23 @@ export function BillTabView() {
                     }}
                   >
                     📋 Copy UPI ID
+                  </button>
+                  <button
+                    type="button"
+                    className="chip"
+                    style={{ fontSize: '11px', padding: '3px 8px', background: '#ecfdf5', color: '#065f46', border: '1px solid #6ee7b7', cursor: 'pointer', fontWeight: 600 }}
+                    onClick={async () => {
+                      say('Saving QR code to your phone... ⏳');
+                      const ok = await downloadQrImage(
+                        upiQrUrl,
+                        `UPI_QR_${upiName.replace(/\s+/g, '_')}_Rs${per}.png`
+                      );
+                      if (ok) {
+                        say(`✅ QR Saved! Open GPay/PhonePe → Tap Scanner 🔲 → Tap Photos 🖼️ to pay ₹${per} without bank limit error!`);
+                      }
+                    }}
+                  >
+                    📥 Save QR
                   </button>
                   <a
                     href={upiQrUrl}
@@ -4193,6 +4260,7 @@ export function BillTabView() {
                   onClick={() => {
                     if (upiId) {
                       navigator.clipboard?.writeText(upiId);
+                      say(`Copied UPI ID: ${upiId} · Launching Google Pay... 🚀 (If bank limit error appears, tap 'Pay UPI ID' & paste!)`);
                     }
                   }}
                 >
@@ -4217,6 +4285,12 @@ export function BillTabView() {
                       padding: '10px 6px',
                       borderRadius: '8px',
                     }}
+                    onClick={() => {
+                      if (upiId) {
+                        navigator.clipboard?.writeText(upiId);
+                        say(`Copied UPI ID: ${upiId} · Launching PhonePe... 🚀`);
+                      }
+                    }}
                   >
                     🟣 PhonePe
                   </a>
@@ -4235,6 +4309,12 @@ export function BillTabView() {
                       fontWeight: 'bold',
                       padding: '10px 6px',
                       borderRadius: '8px',
+                    }}
+                    onClick={() => {
+                      if (upiId) {
+                        navigator.clipboard?.writeText(upiId);
+                        say(`Copied UPI ID: ${upiId} · Launching Paytm... 🚀`);
+                      }
                     }}
                   >
                     🔵 Paytm
@@ -4255,6 +4335,12 @@ export function BillTabView() {
                     gap: '6px',
                     border: '1px solid rgba(255, 255, 255, 0.25)',
                   }}
+                  onClick={() => {
+                    if (upiId) {
+                      navigator.clipboard?.writeText(upiId);
+                      say(`Copied UPI ID: ${upiId} · Opening UPI Chooser... 🚀`);
+                    }
+                  }}
                 >
                   📱 Universal UPI Chooser (Any App) · ₹{per}
                 </a>
@@ -4262,17 +4348,30 @@ export function BillTabView() {
                 {isPersonal && (
                   <div
                     style={{
-                      padding: '8px 10px',
+                      padding: '10px 12px',
                       background: '#fffbeb',
-                      border: '1px solid #fde68a',
-                      borderRadius: '8px',
-                      fontSize: '11px',
-                      color: '#92400e',
+                      border: '1.5px solid #f59e0b',
+                      borderRadius: '10px',
+                      fontSize: '11.5px',
+                      color: '#78350f',
                       textAlign: 'left',
-                      lineHeight: '1.4',
+                      lineHeight: '1.45',
                     }}
                   >
-                    <b>💡 If bank shows &quot;exceeded bank limit&quot;:</b> Tap <b>📋 Copy UPI ID</b> above → Open Google Pay / PhonePe → Tap <b>Pay UPI ID</b> → Paste &amp; Pay ₹{per}. Or scan the QR code above directly with any camera!
+                    <div style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '5px', color: '#92400e', marginBottom: '4px' }}>
+                      <span>💡</span> Paying on this phone &amp; seeing &ldquo;Exceeded Bank Limit&rdquo;?
+                    </div>
+                    <div style={{ color: '#451a03' }}>
+                      Banks block browser links to personal accounts. <b>Two 100% working ways to pay on this device:</b>
+                    </div>
+                    <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <div style={{ background: '#ffffff', padding: '6px 8px', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                        <b>Method 1 (0% Bank Errors):</b> Tap <b>📥 Save QR</b> above &rarr; In GPay/PhonePe tap <b>Scan 🔲</b> &rarr; tap <b>Photos 🖼️</b> &rarr; select QR to pay ₹{per}.
+                      </div>
+                      <div style={{ background: '#ffffff', padding: '6px 8px', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                        <b>Method 2 (Pay via UPI ID):</b> We copied <code>{upiId}</code>. In GPay/PhonePe tap <b>&ldquo;Pay UPI ID&rdquo;</b> &rarr; paste &amp; pay ₹{per}.
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
