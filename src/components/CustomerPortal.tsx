@@ -2083,9 +2083,9 @@ export function OrderTabView() {
                 </div>
 
                 <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {/* Primary 1-Tap Universal UPI Payment Button (Original Working Spec) */}
+                  {/* Primary 1-Tap Google Pay Button (Directly targets Google Pay, never BHIM) */}
                   <a
-                    href={upiUri}
+                    href={gpayUri}
                     className="btn"
                     style={{
                       background: '#0f9d58',
@@ -2101,8 +2101,13 @@ export function OrderTabView() {
                       fontSize: '14px',
                       boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                     }}
+                    onClick={() => {
+                      if (upiId) {
+                        navigator.clipboard?.writeText(upiId);
+                      }
+                    }}
                   >
-                    📱 Open GPay / PhonePe / Paytm · ₹{totalPayablePrepaid}
+                    🟢 Open Google Pay · ₹{totalPayablePrepaid}
                   </a>
 
                   {/* PhonePe & Paytm Quick Launch Buttons */}
@@ -2147,7 +2152,7 @@ export function OrderTabView() {
                     </a>
                   </div>
 
-                  {/* Other UPI Apps (Generic Chooser / BHIM) */}
+                  {/* Universal System UPI Chooser */}
                   <a
                     href={upiUri}
                     className="btn ghost"
@@ -2162,7 +2167,7 @@ export function OrderTabView() {
                       border: '1px solid rgba(255, 255, 255, 0.25)',
                     }}
                   >
-                    📱 Other UPI App (BHIM / Any) · ₹{totalPayablePrepaid}
+                    📱 Universal UPI Chooser (Any App) · ₹{totalPayablePrepaid}
                   </a>
 
                   {isPersonal && (
@@ -4151,9 +4156,9 @@ export function BillTabView() {
               </div>
 
               <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* Primary 1-Tap Universal UPI Payment Button (Original Working Spec) */}
+                {/* Primary 1-Tap Google Pay Button (Directly targets Google Pay, never BHIM) */}
                 <a
-                  href={upiUri}
+                  href={gpayUri}
                   className="btn"
                   style={{
                     background: '#0f9d58',
@@ -4169,8 +4174,13 @@ export function BillTabView() {
                     fontSize: '14px',
                     boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                   }}
+                  onClick={() => {
+                    if (upiId) {
+                      navigator.clipboard?.writeText(upiId);
+                    }
+                  }}
                 >
-                  📱 Open GPay / PhonePe / Paytm · ₹{per}
+                  🟢 Open Google Pay · ₹{per}
                 </a>
 
                 {/* PhonePe & Paytm Quick Launch Buttons */}
@@ -4215,7 +4225,7 @@ export function BillTabView() {
                   </a>
                 </div>
 
-                {/* Other UPI Apps (Generic Chooser / BHIM) */}
+                {/* Universal System UPI Chooser */}
                 <a
                   href={upiUri}
                   className="btn ghost"
@@ -4230,7 +4240,7 @@ export function BillTabView() {
                     border: '1px solid rgba(255, 255, 255, 0.25)',
                   }}
                 >
-                  📱 Other UPI App (BHIM / Any) · ₹{per}
+                  📱 Universal UPI Chooser (Any App) · ₹{per}
                 </a>
 
                 {isPersonal && (

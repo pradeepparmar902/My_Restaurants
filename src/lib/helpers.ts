@@ -474,10 +474,8 @@ export function isPersonalUpiHandle(upiId?: string | null): boolean {
 
 /**
  * Direct launcher for Google Pay (GPay).
- * NOTE: For personal savings VPAs, never use 'tez://' or Android package locks,
- * as banks (ICICI/SBI) classify 'tez://' as a Tez Merchant Gateway call and block
- * transfers with "You've exceeded the bank limit for this payment".
- * Using standard 'upi://pay' opens the app in native UPI mode without triggering the merchant block.
+ * Explicitly targets Google Pay package on Android so BHIM does not hijack upi:// links.
+ * On iOS, uses 'gpay://upi/pay' or 'tez://upi/pay' to launch Google Pay directly.
  */
 export function buildGPayIntentUri(params: {
   upiId: string;
@@ -487,7 +485,30 @@ export function buildGPayIntentUri(params: {
   tr?: string;
   skipAmount?: boolean;
 }): string {
-  return buildUpiUri(params);
+  const rawId = (params.upiId || '').trim();
+  const cleanId = rawId.replace(/\s+/g, '');
+  if (!cleanId || !cleanId.includes('@')) return '';
+
+  let rawName = (params.payeeName || '').trim();
+  if (!rawName || rawName === 'Restaurant' || rawName === 'Bhart Dhab' || rawName === 'Tadka Truck') {
+    if (cleanId.toLowerCase().startsWith('pradeepparmar')) {
+      rawName = 'PRADEEP PARMAR';
+    }
+  }
+  const sanitizedName = (rawName || 'PRADEEP PARMAR')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/[^\w\s]/g, '')
+    .trim();
+  const cleanName = encodeURIComponent(sanitizedName);
+  const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+
+  // On iOS devices, gpay:// launches Google Pay app directly
+  if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    return `gpay://upi/pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
+  }
+
+  // On Android, target Google Pay package directly so BHIM does not hijack it
+  return `intent://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
 }
 
 /**
