@@ -12,6 +12,7 @@ import {
   normalizeMobile,
   buildUpiUri,
   buildGPayIntentUri,
+  buildGPayFallbackUri,
   buildPhonePeIntentUri,
   buildPaytmIntentUri,
   isValidUpiId,
@@ -1934,6 +1935,15 @@ export function OrderTabView() {
         note: `Order ${orderRef}`,
       })
     : '';
+  const gpayFallbackUri = hasValidUpi
+    ? buildGPayFallbackUri({
+        upiId,
+        payeeName: upiName,
+        amount: effectivePayable,
+        tr: `TADKA${orderRef}${Date.now().toString(36).toUpperCase()}`,
+        note: `Order ${orderRef}`,
+      })
+    : '';
   const phonePeUri = hasValidUpi
     ? buildPhonePeIntentUri({
         upiId,
@@ -2128,10 +2138,19 @@ export function OrderTabView() {
                       fontSize: '14px',
                       boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                     }}
-                    onClick={() => {
+                    onClick={(e) => {
                       if (upiId) {
                         navigator.clipboard?.writeText(upiId);
                         say(`Copied UPI ID: ${upiId} · Launching Google Pay... 🚀 (If bank limit error appears, tap 'Pay UPI ID' & paste!)`);
+                      }
+                      if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                        e.preventDefault();
+                        window.location.href = gpayUri;
+                        if (gpayFallbackUri) {
+                          setTimeout(() => {
+                            window.location.href = gpayFallbackUri;
+                          }, 1200);
+                        }
                       }
                     }}
                   >
@@ -4153,6 +4172,13 @@ export function BillTabView() {
             tr: `TADKA${billRef}${Date.now().toString(36).toUpperCase()}`,
             note: `Bill ${billRef}`,
           });
+          const gpayFallbackUri = buildGPayFallbackUri({
+            upiId,
+            payeeName: upiName,
+            amount: per,
+            tr: `TADKA${billRef}${Date.now().toString(36).toUpperCase()}`,
+            note: `Bill ${billRef}`,
+          });
           const phonePeUri = buildPhonePeIntentUri({
             upiId,
             payeeName: upiName,
@@ -4257,10 +4283,19 @@ export function BillTabView() {
                     fontSize: '14px',
                     boxShadow: '0 2px 10px rgba(15, 157, 88, 0.4)',
                   }}
-                  onClick={() => {
+                  onClick={(e) => {
                     if (upiId) {
                       navigator.clipboard?.writeText(upiId);
                       say(`Copied UPI ID: ${upiId} · Launching Google Pay... 🚀 (If bank limit error appears, tap 'Pay UPI ID' & paste!)`);
+                    }
+                    if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                      e.preventDefault();
+                      window.location.href = gpayUri;
+                      if (gpayFallbackUri) {
+                        setTimeout(() => {
+                          window.location.href = gpayFallbackUri;
+                        }, 1200);
+                      }
                     }
                   }}
                 >

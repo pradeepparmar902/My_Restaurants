@@ -505,14 +505,72 @@ export function buildGPayIntentUri(params: {
     .trim();
   const cleanName = encodeURIComponent(sanitizedName);
   const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const cleanTr = encodeURIComponent(
+    (params.tr || `TADKA${Date.now().toString(36).toUpperCase()}`)
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(0, 30)
+  );
+  const cleanNote = encodeURIComponent(
+    (params.note || 'Order Payment')
+      .replace(/[^\w\s]/g, '')
+      .trim()
+      .slice(0, 30) || 'Order Payment'
+  );
 
-  // On iOS devices, gpay:// launches Google Pay app directly
+  const queryParams = `pa=${cleanId}&pn=${cleanName}&mc=&tr=${cleanTr}&tn=${cleanNote}${amountPart}&cu=INR`;
+
+  // On iOS devices, tez:// was the original and most reliable GPay scheme in backup
   if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
-    return `gpay://upi/pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR`;
+    return `tez://upi/pay?${queryParams}`;
   }
 
   // On Android, target Google Pay package directly so BHIM does not hijack it
-  return `intent://pay?pa=${cleanId}&pn=${cleanName}${amountPart}&cu=INR#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+  return `intent://pay?${queryParams}#Intent;scheme=upi;package=com.google.android.apps.nbu.paisa.user;end`;
+}
+
+/**
+ * Modern iOS Google Pay URI (gpay://) as secondary fallback if tez:// is not registered.
+ */
+export function buildGPayFallbackUri(params: {
+  upiId: string;
+  payeeName?: string;
+  amount: number;
+  note?: string;
+  tr?: string;
+  skipAmount?: boolean;
+}): string {
+  const rawId = (params.upiId || '').trim();
+  const cleanId = rawId.replace(/\s+/g, '');
+  if (!cleanId || !cleanId.includes('@')) return '';
+
+  let rawName = (params.payeeName || '').trim();
+  if (!rawName || rawName === 'Restaurant') {
+    if (cleanId.toLowerCase().startsWith('pradeepparmar')) {
+      rawName = 'PRADEEP PARMAR';
+    } else {
+      rawName = 'Bharat Dhaba';
+    }
+  }
+  const sanitizedName = (rawName || 'PRADEEP PARMAR')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/[^\w\s]/g, '')
+    .trim();
+  const cleanName = encodeURIComponent(sanitizedName);
+  const amountPart = !params.skipAmount && params.amount > 0 ? `&am=${Number(params.amount).toFixed(2)}` : '';
+  const cleanTr = encodeURIComponent(
+    (params.tr || `TADKA${Date.now().toString(36).toUpperCase()}`)
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(0, 30)
+  );
+  const cleanNote = encodeURIComponent(
+    (params.note || 'Order Payment')
+      .replace(/[^\w\s]/g, '')
+      .trim()
+      .slice(0, 30) || 'Order Payment'
+  );
+
+  const queryParams = `pa=${cleanId}&pn=${cleanName}&mc=&tr=${cleanTr}&tn=${cleanNote}${amountPart}&cu=INR`;
+  return `gpay://upi/pay?${queryParams}`;
 }
 
 /**
